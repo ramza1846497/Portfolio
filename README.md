@@ -7,6 +7,7 @@
 - Configured firewall(ufw)
 - Built web server using nginx
 - Built portfolio web server using Docker
+- Built monitoring stack with Prometheus and Grafana using Docker Compose
 ## Environment
 - OS: Ubuntu 24.04
 - Platform: WSL2 on Windows
