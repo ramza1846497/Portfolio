@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ポケットオセロ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap">
+<style>
+/* Layout: one-screen game table — walnut tabletop, felt board centered, score pills above, controls below. Deliberately single-theme. */
+:root {
+  --table: #3a2a21;
+  --table-deep: #2a1e17;
+  --felt: #1d7349;
+  --felt-dark: #155a38;
+  --line: #0e3d26;
+  --brass: #e0ad4f;
+  --ink: #f3ece2;
+  --ink-soft: #c9b9a6;
+  --disc-black: #16130f;
+  --disc-white: #f7f4ee;
+  --font-display: "Dela Gothic One", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+  --font-body: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: radial-gradient(120% 80% at 50% 0%, var(--table) 0%, var(--table-deep) 100%);
+  background-color: var(--table-deep);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  -webkit-tap-highlight-color: transparent;
+}
+.wrap {
+  max-width: 520px;
+  margin: 0 auto;
+  padding-inline: 16px;
+  padding-block: 14px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+h1 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 1.6rem;
+  margin: 0;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+}
+h1 span { color: var(--brass); }
+.sub { color: var(--ink-soft); font-size: 0.8rem; letter-spacing: 0.08em; }
+
+.settings { display: flex; flex-wrap: wrap; gap: 8px; }
+.seg {
+  display: inline-flex;
+  background: rgba(0,0,0,0.28);
+  border-radius: 999px;
+  padding: 3px;
+  gap: 2px;
+}
+.seg button {
+  font: inherit;
+  font-size: 0.82rem;
+  border: 0;
+  background: transparent;
+  color: var(--ink-soft);
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.seg button[aria-pressed="true"] { background: var(--brass); color: var(--table-deep); font-weight: 700; }
+.seg[hidden] { display: none !important; }
+
+.scores { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.score {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  background: rgba(0,0,0,0.22);
+  border: 2px solid transparent;
+  transition: border-color .2s, background .2s;
+}
+.score.active { border-color: var(--brass); background: rgba(224,173,79,0.12); }
+.score .chip { width: 26px; height: 26px; border-radius: 50%; flex: none; }
+.score .who { font-size: 0.78rem; color: var(--ink-soft); line-height: 1.2; }
+.score .num {
+  margin-left: auto;
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  font-variant-numeric: tabular-nums;
+}
+.chip.b { background: radial-gradient(circle at 35% 30%, #4a443c, var(--disc-black) 60%); }
+.chip.w { background: radial-gradient(circle at 35% 30%, #ffffff, #d8d2c8 75%); }
+
+.board-frame {
+  background: linear-gradient(160deg, #5a3f2e, #2c1f17);
+  padding: 10px;
+  border-radius: 16px;
+  box-shadow: 0 14px 30px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.08);
+  position: relative;
+}
+.board {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  aspect-ratio: 1;
+  max-width: 100%;
+  background: var(--line);
+  gap: 2px;
+  padding: 2px;
+  border-radius: 6px;
+  position: relative;
+}
+.cell {
+  background: var(--felt);
+  border: 0;
+  padding: 0;
+  margin: 0;
+  position: relative;
+  cursor: default;
+  touch-action: manipulation;
+  display: grid;
+  place-items: center;
+}
+.cell.legal { cursor: pointer; }
+.cell.legal::after {
+  content: "";
+  width: 24%; height: 24%;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.22);
+}
+.cell.legal:hover::after, .cell.legal:focus-visible::after { background: rgba(224,173,79,0.75); }
+.cell:focus-visible { outline: 3px solid var(--brass); outline-offset: -3px; z-index: 1; }
+.star {
+  position: absolute; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--line); transform: translate(-50%, -50%); pointer-events: none; z-index: 1;
+}
+.disc {
+  width: 84%; height: 84%;
+  border-radius: 50%;
+  box-shadow: 0 2px 3px rgba(0,0,0,0.5);
+  pointer-events: none;
+}
+.disc.b { background: radial-gradient(circle at 35% 30%, #4a443c, var(--disc-black) 60%); }
+.disc.w { background: radial-gradient(circle at 35% 30%, #ffffff, #d8d2c8 75%); }
+.disc.placed { animation: drop .22s ease-out; }
+.disc.flip { animation: flip .38s ease-in-out; }
+.cell.last::before {
+  content: ""; position: absolute; width: 14%; height: 14%; border-radius: 50%;
+  background: #e5484d; z-index: 2;
+}
+@keyframes drop { from { transform: scale(1.35); opacity: .3; } to { transform: scale(1); opacity: 1; } }
+@keyframes flip { 0% { transform: scaleX(1); } 50% { transform: scaleX(0.05); } 100% { transform: scaleX(1); } }
+
+.status {
+  min-height: 1.5em;
+  text-align: center;
+  font-weight: 700;
+  color: var(--ink);
+}
+.status.thinking { color: var(--ink-soft); }
+
+.actions { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.btn {
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+  padding: 11px 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(243,236,226,0.18);
+  background: rgba(0,0,0,0.25);
+  color: var(--ink);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.btn.primary { background: var(--brass); color: var(--table-deep); border-color: transparent; }
+.btn:disabled { opacity: .4; cursor: default; }
+.btn:focus-visible, .seg button:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+
+.overlay {
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+  background: rgba(20,14,10,0.55);
+  border-radius: 16px;
+  z-index: 5;
+}
+.result {
+  background: var(--table-deep);
+  border: 2px solid var(--brass);
+  border-radius: 16px;
+  padding: 20px 26px;
+  text-align: center;
+  display: grid;
+  gap: 10px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+.result h2 { font-family: var(--font-display); font-weight: 400; font-size: 1.6rem; margin: 0; color: var(--brass); }
+.result p { margin: 0; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+
+.toast {
+  position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(20,14,10,0.88);
+  color: var(--ink);
+  padding: 10px 18px;
+  border-radius: 999px;
+  font-weight: 700;
+  z-index: 4;
+  pointer-events: none;
+}
+.howto { color: var(--ink-soft); font-size: 0.8rem; line-height: 1.7; margin: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .disc.placed, .disc.flip { animation: none; }
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>ポケット<span>オセロ</span></h1>
+    <div class="sub">8×8 · 黒が先手</div>
+  </header>
+
+  <div class="settings">
+    <div class="seg" role="group" aria-label="対戦モード" id="modeSeg">
+      <button type="button" id="modeCpu" data-mode="cpu">CPUと対戦</button>
+      <button type="button" id="modePvp" data-mode="pvp">2人で対戦</button>
+    </div>
+    <div class="seg" role="group" aria-label="CPUの強さ" id="levelSeg">
+      <button type="button" id="lv1" data-level="1">よわい</button>
+      <button type="button" id="lv2" data-level="2">ふつう</button>
+      <button type="button" id="lv3" data-level="3">つよい</button>
+    </div>
+    <div class="seg" role="group" aria-label="あなたの石" id="sideSeg">
+      <button type="button" id="sideB" data-side="1">黒(先手)</button>
+      <button type="button" id="sideW" data-side="2">白(後手)</button>
+    </div>
+  </div>
+
+  <div class="scores">
+    <div class="score" id="scoreB">
+      <div class="chip b"></div>
+      <div class="who" id="whoB">黒</div>
+      <div class="num" id="numB">2</div>
+    </div>
+    <div class="score" id="scoreW">
+      <div class="chip w"></div>
+      <div class="who" id="whoW">白</div>
+      <div class="num" id="numW">2</div>
+    </div>
+  </div>
+
+  <div class="board-frame" id="frame">
+    <div class="board" id="board" role="grid" aria-label="オセロ盤"></div>
+    <div class="toast" id="toast" hidden></div>
+    <div class="overlay" id="overlay" hidden>
+      <div class="result">
+        <h2 id="resultTitle">黒の勝ち</h2>
+        <p id="resultScore">黒 40 − 24 白</p>
+        <button type="button" class="btn primary" id="againBtn">もう一局</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="status" id="status" aria-live="polite">あなたの番です</div>
+
+  <div class="actions">
+    <button type="button" class="btn" id="undoBtn">一手戻す</button>
+    <button type="button" class="btn" id="hintBtn" aria-pressed="true">ヒント表示</button>
+    <button type="button" class="btn primary" id="newBtn">新しい対局</button>
+  </div>
+
+  <p class="howto">点が出ているマスに置けます。相手の石を自分の石ではさむと裏返ります。置ける場所がないときは自動でパスになり、どちらも置けなくなったら終了。石が多いほうの勝ちです。</p>
+</div>
+
+<script>
+(function () {
+  const EMPTY = 0, BLACK = 1, WHITE = 2;
+  const DIRS = [[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]];
+  const WEIGHTS = [
+    120,-20, 20,  5,  5, 20,-20,120,
+    -20,-40, -5, -5, -5, -5,-40,-20,
+     20, -5, 15,  3,  3, 15, -5, 20,
+      5, -5,  3,  3,  3,  3, -5,  5,
+      5, -5,  3,  3,  3,  3, -5,  5,
+     20, -5, 15,  3,  3, 15, -5, 20,
+    -20,-40, -5, -5, -5, -5,-40,-20,
+    120,-20, 20,  5,  5, 20,-20,120
+  ];
+  const NAME = { 1: "黒", 2: "白" };
+
+  // ---------- rules ----------
+  function initialBoard() {
+    const b = new Array(64).fill(EMPTY);
+    b[27] = WHITE; b[28] = BLACK; b[35] = BLACK; b[36] = WHITE;
+    return b;
+  }
+  function flipsFor(b, p, i) {
+    if (b[i] !== EMPTY) return [];
+    const o = 3 - p, x = i % 8, y = i >> 3, out = [];
+    for (const [dx, dy] of DIRS) {
+      let cx = x + dx, cy = y + dy;
+      const line = [];
+      while (cx >= 0 && cx < 8 && cy >= 0 && cy < 8 && b[cy * 8 + cx] === o) {
+        line.push(cy * 8 + cx); cx += dx; cy += dy;
+      }
+      if (line.length && cx >= 0 && cx < 8 && cy >= 0 && cy < 8 && b[cy * 8 + cx] === p) out.push(...line);
+    }
+    return out;
+  }
+  function legalMoves(b, p) {
+    const ms = [];
+    for (let i = 0; i < 64; i++) if (b[i] === EMPTY && flipsFor(b, p, i).length) ms.push(i);
+    return ms;
+  }
+  function applyMove(b, p, i) {
+    const nb = b.slice(), f = flipsFor(b, p, i);
+    nb[i] = p;
+    for (const j of f) nb[j] = p;
+    return { board: nb, flipped: f };
+  }
+  function count(b) {
+    let bl = 0, wh = 0;
+    for (const v of b) { if (v === BLACK) bl++; else if (v === WHITE) wh++; }
+    return { b: bl, w: wh };
+  }
+
+  // ---------- CPU ----------
+  function evaluate(b, p) {
+    const o = 3 - p;
+    let s = 0;
+    for (let i = 0; i < 64; i++) {
+      if (b[i] === p) s += WEIGHTS[i]; else if (b[i] === o) s -= WEIGHTS[i];
+    }
+    s += 6 * (legalMoves(b, p).length - legalMoves(b, o).length);
+    return s;
+  }
+  function finalScore(b, p) {
+    const c = count(b), mine = p === BLACK ? c.b : c.w, theirs = p === BLACK ? c.w : c.b;
+    return (mine - theirs) * 10000;
+  }
+  function negamax(b, p, depth, alpha, beta, exact) {
+    const ms = legalMoves(b, p);
+    if (!ms.length) {
+      if (!legalMoves(b, 3 - p).length) return finalScore(b, p);
+      return -negamax(b, 3 - p, depth, -beta, -alpha, exact);
+    }
+    if (depth === 0) return exact ? finalScore(b, p) : evaluate(b, p);
+    ms.sort((a, c) => WEIGHTS[c] - WEIGHTS[a]);
+    let best = -Infinity;
+    for (const m of ms) {
+      const v = -negamax(applyMove(b, p, m).board, 3 - p, depth - 1, -beta, -alpha, exact);
+      if (v > best) best = v;
+      if (v > alpha) alpha = v;
+      if (alpha >= beta) break;
+    }
+    return best;
+  }
+  function chooseMove(b, p, level) {
+    const ms = legalMoves(b, p);
+    if (ms.length === 1) return ms[0];
+    if (level === 1) {
+      if (Math.random() < 0.5) return ms[Math.floor(Math.random() * ms.length)];
+      return ms.reduce((a, c) => (flipsFor(b, p, c).length > flipsFor(b, p, a).length ? c : a));
+    }
+    const empties = b.filter(v => v === EMPTY).length;
+    let depth = level === 2 ? 2 : 4, exact = false;
+    if (level === 3 && empties <= 10) { depth = empties; exact = true; }
+    let best = ms[0], bestV = -Infinity;
+    const ordered = ms.slice().sort((a, c) => WEIGHTS[c] - WEIGHTS[a]);
+    for (const m of ordered) {
+      const v = -negamax(applyMove(b, p, m).board, 3 - p, depth - 1, -Infinity, -bestV, exact) + Math.random() * 0.5;
+      if (v > bestV) { bestV = v; best = m; }
+    }
+    return best;
+  }
+
+  // ---------- state ----------
+  let state = {
+    board: initialBoard(), turn: BLACK, history: [], last: -1,
+    mode: "cpu", level: 2, human: BLACK, hints: true, over: false
+  };
+  let lastFlipped = [], lastPlaced = -1, cpuTimer = null, toastTimer = null;
+
+  const $ = id => document.getElementById(id);
+  const boardEl = $("board");
+  const cells = [];
+  for (let i = 0; i < 64; i++) {
+    const c = document.createElement("button");
+    c.type = "button";
+    c.className = "cell";
+    c.dataset.i = i;
+    c.setAttribute("aria-label", "ABCDEFGH"[i % 8] + ((i >> 3) + 1));
+    c.addEventListener("click", () => onCell(i));
+    boardEl.appendChild(c);
+    cells.push(c);
+  }
+  // star points at the 4 intersections
+  for (const [x, y] of [[2,2],[6,2],[2,6],[6,6]]) {
+    const s = document.createElement("div");
+    s.className = "star";
+    s.style.left = (x / 8 * 100) + "%";
+    s.style.top = (y / 8 * 100) + "%";
+    boardEl.appendChild(s);
+  }
+
+  function isCpuTurn() { return state.mode === "cpu" && !state.over && state.turn !== state.human; }
+
+  function render() {
+    const legal = state.over || isCpuTurn() ? [] : legalMoves(state.board, state.turn);
+    for (let i = 0; i < 64; i++) {
+      const c = cells[i], v = state.board[i];
+      c.classList.toggle("legal", state.hints && legal.includes(i));
+      c.classList.toggle("last", i === state.last);
+      const cur = c.firstChild;
+      if (v === EMPTY) { if (cur) cur.remove(); continue; }
+      const cls = v === BLACK ? "b" : "w";
+      let d = cur;
+      if (!d) { d = document.createElement("div"); c.appendChild(d); }
+      d.className = "disc " + cls + (i === lastPlaced ? " placed" : lastFlipped.includes(i) ? " flip" : "");
+    }
+    lastFlipped = []; lastPlaced = -1;
+
+    const sc = count(state.board);
+    $("numB").textContent = sc.b;
+    $("numW").textContent = sc.w;
+    $("scoreB").classList.toggle("active", !state.over && state.turn === BLACK);
+    $("scoreW").classList.toggle("active", !state.over && state.turn === WHITE);
+    if (state.mode === "cpu") {
+      $("whoB").textContent = state.human === BLACK ? "黒 · あなた" : "黒 · CPU";
+      $("whoW").textContent = state.human === WHITE ? "白 · あなた" : "白 · CPU";
+    } else {
+      $("whoB").textContent = "黒";
+      $("whoW").textContent = "白";
+    }
+
+    const st = $("status");
+    st.classList.remove("thinking");
+    if (state.over) st.textContent = "対局終了";
+    else if (isCpuTurn()) { st.textContent = "CPUが考えています…"; st.classList.add("thinking"); }
+    else if (state.mode === "cpu") st.textContent = "あなたの番です(" + NAME[state.turn] + ")";
+    else st.textContent = NAME[state.turn] + "の番です";
+
+    $("undoBtn").disabled = !state.history.length;
+    $("hintBtn").setAttribute("aria-pressed", String(state.hints));
+    $("hintBtn").textContent = state.hints ? "ヒント表示" : "ヒントなし";
+
+    for (const b of document.querySelectorAll("#modeSeg button")) b.setAttribute("aria-pressed", String(b.dataset.mode === state.mode));
+    for (const b of document.querySelectorAll("#levelSeg button")) b.setAttribute("aria-pressed", String(+b.dataset.level === state.level));
+    for (const b of document.querySelectorAll("#sideSeg button")) b.setAttribute("aria-pressed", String(+b.dataset.side === state.human));
+    $("levelSeg").hidden = state.mode !== "cpu";
+    $("sideSeg").hidden = state.mode !== "cpu";
+
+    if (state.over) showResult(sc); else $("overlay").hidden = true;
+  }
+
+  function showResult(sc) {
+    let title;
+    if (sc.b === sc.w) title = "引き分け";
+    else {
+      const winner = sc.b > sc.w ? BLACK : WHITE;
+      if (state.mode === "cpu") title = winner === state.human ? "あなたの勝ち!" : "CPUの勝ち";
+      else title = NAME[winner] + "の勝ち";
+    }
+    $("resultTitle").textContent = title;
+    $("resultScore").textContent = "黒 " + sc.b + " − " + sc.w + " 白";
+    $("overlay").hidden = false;
+  }
+
+  function toast(msg) {
+    const t = $("toast");
+    t.textContent = msg;
+    t.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { t.hidden = true; }, 1400);
+  }
+
+  function play(i) {
+    state.history.push({ board: state.board.slice(), turn: state.turn, last: state.last });
+    const r = applyMove(state.board, state.turn, i);
+    state.board = r.board;
+    state.last = i;
+    lastPlaced = i;
+    lastFlipped = r.flipped;
+    const next = 3 - state.turn;
+    if (legalMoves(state.board, next).length) state.turn = next;
+    else if (legalMoves(state.board, state.turn).length) {
+      toast(NAME[next] + "は置ける場所がないのでパス");
+    } else state.over = true;
+    render();
+    scheduleCpu();
+  }
+
+  function onCell(i) {
+    if (state.over || isCpuTurn()) return;
+    if (!flipsFor(state.board, state.turn, i).length) return;
+    play(i);
+  }
+
+  function scheduleCpu() {
+    clearTimeout(cpuTimer);
+    if (!isCpuTurn()) return;
+    cpuTimer = setTimeout(() => {
+      if (!isCpuTurn()) return;
+      play(chooseMove(state.board, state.turn, state.level));
+    }, 550);
+  }
+
+  function newGame() {
+    clearTimeout(cpuTimer);
+    state.board = initialBoard();
+    state.turn = BLACK;
+    state.history = [];
+    state.last = -1;
+    state.over = false;
+    $("toast").hidden = true;
+    render();
+    scheduleCpu();
+  }
+
+  function undo() {
+    if (!state.history.length) return;
+    clearTimeout(cpuTimer);
+    let h = state.history.pop();
+    // in CPU mode, rewind to the most recent position where it was the human's turn
+    while (state.mode === "cpu" && h.turn !== state.human && state.history.length) h = state.history.pop();
+    state.board = h.board;
+    state.turn = h.turn;
+    state.last = h.last;
+    state.over = false;
+    render();
+    scheduleCpu();
+  }
+
+  $("modeSeg").addEventListener("click", e => {
+    const m = e.target.closest("button")?.dataset.mode;
+    if (m && m !== state.mode) { state.mode = m; newGame(); }
+  });
+  $("levelSeg").addEventListener("click", e => {
+    const l = +e.target.closest("button")?.dataset.level;
+    if (l && l !== state.level) { state.level = l; render(); }
+  });
+  $("sideSeg").addEventListener("click", e => {
+    const s = +e.target.closest("button")?.dataset.side;
+    if (s && s !== state.human) { state.human = s; newGame(); }
+  });
+  $("undoBtn").addEventListener("click", undo);
+  $("newBtn").addEventListener("click", newGame);
+  $("againBtn").addEventListener("click", newGame);
+  $("hintBtn").addEventListener("click", () => { state.hints = !state.hints; render(); });
+
+  function start(saved) {
+    if (saved && Array.isArray(saved.board) && saved.board.length === 64) state = Object.assign(state, saved);
+    render();
+    scheduleCpu();
+  }
+  window.claude?.hot?.snapshot?.(() => state);
+  window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? null);
+})();
+</script>
+</body>
+</html>
