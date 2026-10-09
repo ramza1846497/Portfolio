@@ -77,9 +77,22 @@ body {
 #b-light { right: 116px; bottom: calc(22px + env(safe-area-inset-bottom, 0px)); }
 #b-run { right: 30px; bottom: calc(126px + env(safe-area-inset-bottom, 0px)); }
 #b-pause { right: 16px; top: calc(132px + env(safe-area-inset-top, 0px)); width: 44px; height: 44px; font-size: 13px; }
-#joy { position: fixed; width: 120px; height: 120px; margin: -60px 0 0 -60px; border-radius: 50%; border: 2px solid rgba(236,230,214,.35); pointer-events: none; display: none; }
-#joy i { position: absolute; left: 50%; top: 50%; width: 48px; height: 48px; margin: -24px 0 0 -24px; border-radius: 50%; background: rgba(236,230,214,.35); }
-#joy-hint { position: fixed; left: 16px; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); font-size: 13px; color: var(--dim); pointer-events: none; }
+#joy {
+  position: fixed; left: 20px; bottom: calc(22px + env(safe-area-inset-bottom, 0px)); width: 136px; height: 136px;
+  border-radius: 50%; border: 2px solid rgba(236,230,214,.5); background: rgba(10,12,12,.45);
+  pointer-events: auto; touch-action: none;
+}
+#joy::before, #joy::after { content: ""; position: absolute; left: 50%; top: 50%; background: rgba(236,230,214,.18); }
+#joy::before { width: 2px; height: 100px; margin: -50px 0 0 -1px; }
+#joy::after { width: 100px; height: 2px; margin: -1px 0 0 -50px; }
+#joy b { position: absolute; font-size: 11px; color: rgba(236,230,214,.5); font-weight: 500; line-height: 1; }
+#joy b.u { top: 6px; left: 50%; transform: translateX(-50%); } #joy b.d { bottom: 6px; left: 50%; transform: translateX(-50%); }
+#joy b.l { left: 7px; top: 50%; transform: translateY(-50%); } #joy b.r { right: 7px; top: 50%; transform: translateY(-50%); }
+#joy i { position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%;
+  background: rgba(236,230,214,.4); border: 2px solid rgba(236,230,214,.7); z-index: 1; }
+#joy.on { border-color: var(--lamp); }
+#joy.on i { background: rgba(233,179,80,.55); border-color: var(--lamp); }
+#joy-hint { position: fixed; left: 20px; width: 136px; text-align: center; bottom: calc(164px + env(safe-area-inset-bottom, 0px)); font-size: 12px; color: var(--dim); pointer-events: none; }
 
 /* panels */
 .panel-wrap { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(4,5,5,.72); overflow-y: auto; }
@@ -151,8 +164,8 @@ body.touch #mute { display: none; }
 <div id="sub"></div>
 
 <div id="touch" hidden>
-  <div id="joy"><i></i></div>
-  <div id="joy-hint">画面左側をドラッグで移動</div>
+  <div id="joy" role="application" aria-label="移動パッド"><b class="u">▲</b><b class="d">▼</b><b class="l">◀</b><b class="r">▶</b><i></i></div>
+  <div id="joy-hint">移動</div>
   <button class="tbtn" id="b-photo">撮影</button>
   <button class="tbtn" id="b-light">ライト</button>
   <button class="tbtn" id="b-run">走る</button>
@@ -169,7 +182,7 @@ body.touch #mute { display: none; }
     <p class="mission">証拠を3つ回収し、ヒトマネを撮影して、軽トラまで生きて戻れ。</p>
     <dl class="ctl">
       <dt>PC</dt><dd>WASD／矢印で移動・マウスでライトの向き・Shiftで走る・クリック／Spaceで撮影・Fでライト切替・Escで一時停止</dd>
-      <dt>スマホ</dt><dd>画面左側をドラッグで移動（ライトは進行方向）・右下のボタンで撮影／ライト／走る</dd>
+      <dt>スマホ</dt><dd>左下のパッドで移動（ライトは進行方向）・右下のボタンで撮影／ライト／走る</dd>
     </dl>
     <ul class="tips">
       <li>走ると足音で気づかれる。ライトは遠くからでも見える。</li>
@@ -396,28 +409,34 @@ cv.addEventListener("pointerdown", (e) => {
     return;
   }
   showTouch();
-  if (e.clientX < VW * 0.6 && joy.id === null) {
-    joy.id = e.pointerId; joy.ox = e.clientX; joy.oy = e.clientY; joy.x = joy.y = 0;
-    const j = $("#joy"); j.style.display = "block"; j.style.left = e.clientX + "px"; j.style.top = e.clientY + "px";
-    $("#joy-hint").hidden = true;
-    cv.setPointerCapture(e.pointerId);
-  }
 });
 cv.addEventListener("pointermove", (e) => {
-  if (e.pointerType === "mouse") { mouse.x = e.clientX; mouse.y = e.clientY; mouse.active = true; return; }
-  if (e.pointerId !== joy.id) return;
-  let dx = e.clientX - joy.ox, dy = e.clientY - joy.oy;
-  const m = Math.hypot(dx, dy), R = 50;
+  if (e.pointerType === "mouse") { mouse.x = e.clientX; mouse.y = e.clientY; mouse.active = true; }
+});
+// 左下の移動パッド（固定位置のアナログスティック）
+const pad = $("#joy"), knob = $("#joy i");
+function padMove(e) {
+  const r = pad.getBoundingClientRect();
+  let dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
+  const R = r.width / 2 - 20, m = Math.hypot(dx, dy);
   if (m > R) { dx *= R / m; dy *= R / m; }
   joy.x = dx / R; joy.y = dy / R;
-  $("#joy i").style.transform = `translate(${dx}px,${dy}px)`;
+  knob.style.transform = `translate(${dx}px,${dy}px)`;
+}
+pad.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  if (joy.id !== null) return;
+  joy.id = e.pointerId; pad.classList.add("on");
+  pad.setPointerCapture(e.pointerId);
+  padMove(e);
 });
+pad.addEventListener("pointermove", (e) => { if (e.pointerId === joy.id) padMove(e); });
 const joyEnd = (e) => {
   if (e.pointerId !== joy.id) return;
-  joy.id = null; joy.x = joy.y = 0; $("#joy").style.display = "none"; $("#joy i").style.transform = "";
+  joy.id = null; joy.x = joy.y = 0; knob.style.transform = ""; pad.classList.remove("on");
 };
-cv.addEventListener("pointerup", joyEnd);
-cv.addEventListener("pointercancel", joyEnd);
+pad.addEventListener("pointerup", joyEnd);
+pad.addEventListener("pointercancel", joyEnd);
 function showTouch() { $("#touch").hidden = false; mouse.active = false; document.body.classList.add("touch"); }
 if (matchMedia("(pointer: coarse)").matches) showTouch();
 const tb = (id, down, up) => {
