@@ -79,3 +79,10 @@ docker compose exec grafana grafana-cli admin reset-admin-password <new-password
 Open it directly (no server needed). You play an investigator tracking an
 unidentified creature in the mountains; skill checks are 1d100 roll-under,
 with HP / SAN tracking and 5 endings.
+
+## Action game: ヒトマネ夜間調査
+
+`hitomane-night.html` is a single-file top-down stealth/horror action game set
+in the same world. Explore a randomly generated night forest with a
+flashlight, collect 3 pieces of evidence, photograph the creature, and return
+to the truck. Works with keyboard + mouse or touch controls.
