@@ -451,7 +451,7 @@ tb("#b-run", () => (runHeld = true), () => (runHeld = false));
 tb("#b-pause", () => togglePause());
 
 /* ============ 音 ============ */
-let AC = null, master = null, muted = store.get("hitomane_muted", false);
+let AC = null, master = null, amb = null, muted = store.get("hitomane_muted", false);
 function initAudio() {
   if (AC) return;
   try {
@@ -465,9 +465,17 @@ function initAudio() {
     const g = AC.createGain(); g.gain.value = 0.05;
     const lfo = AC.createOscillator(), lg = AC.createGain(); lfo.frequency.value = 0.09; lg.gain.value = 0.035;
     lfo.connect(lg); lg.connect(g.gain); lfo.start();
-    src.connect(bp); bp.connect(g); g.connect(master); src.start();
+    amb = AC.createGain(); amb.gain.value = 0;
+    src.connect(bp); bp.connect(g); g.connect(amb); amb.connect(master); src.start();
     AC._noise = buf;
   } catch (e) { AC = null; }
+}
+// 環境ノイズ（風）はプレイ中だけ鳴らす。タイトル・一時停止・結果画面では消す
+function setAmbient(on) {
+  if (!amb) return;
+  const t = AC.currentTime;
+  amb.gain.cancelScheduledValues(t);
+  amb.gain.setTargetAtTime(on ? 1 : 0, t, on ? 0.4 : 0.08);
 }
 function tone(freq, dur, vol, type = "sine", slide) {
   if (!AC) return;
@@ -978,6 +986,7 @@ requestAnimationFrame(loop);
 function showHud(on) { $("#hud-l").hidden = $("#hud-r").hidden = !on; $("#mute").hidden = !on; }
 function start() {
   initAudio(); if (AC && AC.state === "suspended") AC.resume();
+  setAmbient(true);
   newGame();
   $("#title").hidden = true; $("#result").hidden = true; $("#pause").hidden = true;
   showHud(true); render(); hud();
@@ -990,11 +999,12 @@ function togglePause() {
   $("#pause").hidden = game.running;
   $("#pause-tc").textContent = "REC " + fmt(game.t);
   keys.clear(); runHeld = false;
-  if (AC) game.running ? AC.resume() : AC.suspend();
+  setAmbient(game.running);
   if (!game.running && "speechSynthesis" in window) speechSynthesis.cancel();
 }
 document.addEventListener("visibilitychange", () => { if (document.hidden && game && game.running && !game.over) togglePause(); });
 function end(win) {
+  setAmbient(false);
   game.over = true; game.running = false;
   keys.clear(); runHeld = false;
   if ("speechSynthesis" in window) speechSynthesis.cancel();
@@ -1031,7 +1041,7 @@ function end(win) {
 $("#start").onclick = start;
 $("#retry").onclick = start;
 $("#resume").onclick = togglePause;
-$("#quit").onclick = () => { game.over = true; game.running = false; $("#pause").hidden = true; showHud(false); $("#title").hidden = false; };
+$("#quit").onclick = () => { setAmbient(false); game.over = true; game.running = false; $("#pause").hidden = true; showHud(false); $("#title").hidden = false; };
 const bt = store.get("hitomane_best", null);
 if (bt) $("#best-title").textContent = `ベストタイム ${fmt(bt)}`;
 
