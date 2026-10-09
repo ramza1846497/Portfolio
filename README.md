@@ -72,3 +72,10 @@ fresh install and won't override it. Reset it directly instead:
 ```
 docker compose exec grafana grafana-cli admin reset-admin-password <new-password>
 ```
+
+## Solo TRPG: 未確認生物調査記録 第0347号
+
+`cryptid-trpg.html` is a single-file solo TRPG that runs in the browser.
+Open it directly (no server needed). You play an investigator tracking an
+unidentified creature in the mountains; skill checks are 1d100 roll-under,
+with HP / SAN tracking and 5 endings.

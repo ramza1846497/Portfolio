@@ -1,0 +1,1261 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>未確認生物調査記録 第0347号</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;700&family=Zen+Kurenaido&family=Special+Elite&family=VT323&display=swap" rel="stylesheet">
+<style>
+:root {
+  --desk: #15120e;
+  --paper: #efe6cf;
+  --paper-dark: #e2d5b4;
+  --folder: #c9b07a;
+  --ink: #2a241c;
+  --ink-soft: #5b5040;
+  --blue-ink: #1f3a7a;
+  --red: #a3221b;
+  --note: #d9cfa8;
+  --mincho: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  --hand: "Zen Kurenaido", "Klee", "Hiragino Maru Gothic ProN", cursive;
+  --type: "Special Elite", "Courier New", monospace;
+  --vt: "VT323", "Courier New", monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+body {
+  background:
+    radial-gradient(ellipse at 50% 30%, #2a231a 0%, var(--desk) 60%, #070605 100%);
+  color: var(--ink);
+  font-family: var(--mincho);
+  overflow-x: hidden;
+}
+
+/* ===== 記録映像オーバーレイ ===== */
+#noise {
+  position: fixed; inset: 0; width: 100%; height: 100%;
+  pointer-events: none; z-index: 50; opacity: .07;
+  image-rendering: pixelated; mix-blend-mode: screen;
+  transition: opacity .2s;
+}
+body.unstable #noise { opacity: .13; }
+body.glitch #noise { opacity: .4; }
+.scanlines {
+  position: fixed; inset: 0; pointer-events: none; z-index: 51;
+  background: repeating-linear-gradient(to bottom, rgba(0,0,0,.18) 0 1px, transparent 1px 3px);
+  mix-blend-mode: multiply;
+}
+.vignette {
+  position: fixed; inset: 0; pointer-events: none; z-index: 52;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.65) 100%);
+}
+.tracking {
+  position: fixed; left: 0; right: 0; height: 18px; top: -30px;
+  pointer-events: none; z-index: 53;
+  background: linear-gradient(to bottom, transparent, rgba(255,255,255,.08) 40%, rgba(255,255,255,.18) 50%, rgba(255,255,255,.08) 60%, transparent);
+  animation: track 9s linear infinite;
+}
+@keyframes track { 0% { top: -30px; } 70% { top: 105%; } 100% { top: 105%; } }
+#flash {
+  position: fixed; inset: 0; pointer-events: none; z-index: 54; opacity: 0;
+  background: radial-gradient(ellipse at center, transparent 30%, rgba(160,0,0,.6) 100%);
+}
+#flash.on { animation: flash .7s ease-out; }
+@keyframes flash { 0% { opacity: 1; } 100% { opacity: 0; } }
+
+.osd {
+  position: fixed; z-index: 55; pointer-events: none;
+  font-family: var(--vt); color: #f3f3f3; font-size: 22px; letter-spacing: 1px;
+  text-shadow: 0 0 4px rgba(255,255,255,.6), 2px 0 rgba(255,0,0,.35), -2px 0 rgba(0,200,255,.35);
+}
+#rec { top: 10px; right: 16px; }
+#rec .dot { color: #ff3030; animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+#osd-play { bottom: 10px; left: 16px; }
+#osd-mode { bottom: 10px; right: 16px; }
+
+body.glitch .stage { animation: shake .3s steps(3) 2; }
+body.glitch .paper p, body.glitch .paper li, body.glitch .notebook {
+  text-shadow: 2px 0 rgba(200,0,0,.45), -2px 0 rgba(0,160,200,.45);
+}
+@keyframes shake {
+  0% { transform: translate(0,0) skewX(0); }
+  33% { transform: translate(-4px,2px) skewX(1.5deg); }
+  66% { transform: translate(5px,-1px) skewX(-1deg); }
+  100% { transform: translate(0,0) skewX(0); }
+}
+body.unstable .paper .body p { animation: jitter 6s infinite; }
+@keyframes jitter {
+  0%, 96%, 100% { transform: none; }
+  97% { transform: translateX(1px); }
+  98% { transform: translateX(-2px); }
+}
+
+/* ===== レイアウト ===== */
+.stage {
+  max-width: 1120px; margin: 0 auto; padding: 56px 16px 64px;
+  display: grid; grid-template-columns: 290px 1fr; gap: 28px; align-items: start;
+}
+@media (max-width: 860px) {
+  .stage { grid-template-columns: 1fr; padding-top: 48px; gap: 18px; }
+}
+
+/* ===== 探索者手帳 ===== */
+.notebook {
+  position: sticky; top: 52px;
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 27px, rgba(70,90,140,.22) 27px 28px),
+    linear-gradient(135deg, #e6dcbf, #d6c79f);
+  border-radius: 4px 10px 10px 4px;
+  padding: 18px 18px 18px 34px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.6), inset 6px 0 0 #6a2b20, inset 9px 0 0 rgba(0,0,0,.25);
+  font-family: var(--hand); color: #26324f;
+  transform: rotate(-1.2deg);
+}
+@media (max-width: 860px) { .notebook { position: relative; top: 0; transform: none; } }
+.notebook::before {
+  content: ""; position: absolute; left: 14px; top: 16px; bottom: 16px; width: 8px;
+  background: radial-gradient(circle, #15120e 3px, transparent 3.5px) 0 0 / 8px 26px repeat-y;
+}
+.notebook h2 {
+  margin: 0 0 6px; font-size: 20px; font-weight: normal; letter-spacing: .1em;
+  border-bottom: 1px solid rgba(38,50,79,.4); padding-bottom: 4px;
+}
+.nb-name { font-size: 22px; line-height: 1.3; }
+.nb-job { font-size: 15px; color: #4a5576; margin-bottom: 10px; }
+.meter { margin: 8px 0 4px; }
+.meter-h { display: flex; justify-content: space-between; font-size: 17px; }
+.bar { height: 8px; border: 1px solid #26324f; border-radius: 2px; margin-top: 2px; background: rgba(255,255,255,.3); overflow: hidden; }
+.bar > i { display: block; height: 100%; background: #26324f; transition: width .5s; }
+.bar.san > i { background: #5a2e7a; }
+.bar.low > i { background: var(--red); }
+.changed { animation: changed 1s; }
+@keyframes changed { 0%, 50% { color: var(--red); transform: scale(1.15); } 100% { transform: none; } }
+.skills { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; margin-top: 10px; font-size: 16px; line-height: 28px; }
+.skills div { display: flex; justify-content: space-between; }
+.skills b { font-family: var(--type); font-weight: normal; }
+.clues { margin: 6px 0 0; padding: 0 0 0 1em; font-size: 15px; line-height: 28px; }
+.clues li.none { list-style: none; margin-left: -1em; color: #6b7390; }
+.nb-log { font-family: var(--type); font-size: 12px; line-height: 28px; color: #3a4466; max-height: 168px; overflow: hidden; }
+.nb-log .ok { color: #1f3a7a; } .nb-log .ng { color: var(--red); }
+.nb-sec { margin-top: 14px; }
+.nb-sec > span { font-size: 14px; color: #6b7390; letter-spacing: .1em; }
+
+/* ===== 調査ファイル ===== */
+.folder { position: relative; background: var(--folder); padding: 22px 16px 16px; border-radius: 0 6px 6px 6px;
+  box-shadow: 0 14px 40px rgba(0,0,0,.7); }
+.folder .tab {
+  position: absolute; top: -26px; left: 0; background: var(--folder); padding: 4px 18px 2px;
+  border-radius: 6px 6px 0 0; font-family: var(--type); font-size: 14px; color: #4b3a1c; letter-spacing: .08em;
+}
+.paper {
+  position: relative; background-color: var(--paper);
+  background-image:
+    radial-gradient(circle at 88% 82%, transparent 46px, rgba(120,72,20,.16) 48px, rgba(120,72,20,.05) 53px, transparent 55px),
+    radial-gradient(ellipse at 10% 0%, rgba(150,110,50,.18), transparent 40%),
+    radial-gradient(ellipse at 100% 100%, rgba(150,110,50,.22), transparent 45%),
+    repeating-linear-gradient(to bottom, transparent 0 31px, rgba(140,120,80,.12) 31px 32px);
+  padding: 72px 44px 36px; min-height: 560px;
+  box-shadow: 2px 3px 0 var(--paper-dark), 4px 6px 0 #d4c49c, 0 2px 10px rgba(0,0,0,.3);
+  line-height: 1.95; font-size: 16.5px;
+}
+@media (max-width: 600px) { .paper { padding: 64px 18px 28px; font-size: 15.5px; } }
+.clip {
+  position: absolute; top: -18px; right: 40px; width: 22px; height: 64px;
+  border: 3px solid #8b8f96; border-radius: 12px; border-bottom-color: #6f737a; z-index: 2;
+}
+.clip::after { content: ""; position: absolute; inset: 6px 3px 14px; border: 3px solid #9ea2a8; border-radius: 9px; border-top: none; }
+.file-head {
+  display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 6px 16px;
+  border-bottom: 2px solid var(--ink); padding-bottom: 6px; margin-bottom: 4px;
+  font-family: var(--type); font-size: 13px; color: var(--ink-soft); letter-spacing: .05em;
+}
+.file-head .place { font-family: var(--mincho); font-weight: 700; font-size: 19px; color: var(--ink); letter-spacing: .08em; }
+.file-sub { display: flex; justify-content: space-between; font-family: var(--type); font-size: 12px; color: var(--ink-soft); margin-bottom: 18px; border-bottom: 1px solid rgba(42,36,28,.4); padding-bottom: 3px; }
+.stamp {
+  display: inline-block; font-family: var(--mincho); font-weight: 700; color: var(--red);
+  border: 3px double var(--red); padding: 2px 12px; letter-spacing: .25em;
+  transform: rotate(-8deg); opacity: .82; mix-blend-mode: multiply;
+}
+.stamp.big { font-size: 34px; padding: 4px 22px; border-width: 5px; }
+.stamp.blue { color: var(--blue-ink); border-color: var(--blue-ink); }
+.secret { position: absolute; top: 16px; right: 110px; font-size: 20px; }
+.body p { margin: 0 0 1em; animation: inkin .7s both; }
+.body p.c { text-align: center; }
+.body p.dim { color: var(--ink-soft); font-size: .92em; }
+.body .field { font-family: var(--type); font-size: .82em; color: var(--ink-soft); letter-spacing: .06em; margin-right: .4em; }
+.body em { font-style: normal; background: linear-gradient(transparent 60%, rgba(163,34,27,.18) 60%); }
+.body .voice { font-weight: 700; letter-spacing: .05em; }
+.redact { background: #1b1814; color: transparent; border-radius: 1px; user-select: none; }
+@keyframes inkin { from { opacity: 0; filter: blur(2px); } to { opacity: 1; filter: none; } }
+
+.carry {
+  font-family: var(--hand); color: var(--blue-ink); font-size: 1.04em; line-height: 1.8;
+  background: rgba(255,255,255,.35); border-left: 3px solid rgba(31,58,122,.5);
+  padding: 10px 14px; margin: 0 0 22px; transform: rotate(-.3deg);
+}
+.carry p { margin: 0 0 .5em; animation: inkin .6s both; }
+.carry p:last-child { margin-bottom: 0; }
+.carry .roll { font-family: var(--type); font-size: 13px; color: var(--ink-soft); }
+.carry .roll .ok { color: var(--blue-ink); } .carry .roll .ng { color: var(--red); }
+.carry .dmg { color: var(--red); font-family: var(--type); font-size: 14px; }
+
+.choices { list-style: none; padding: 0; margin: 26px 0 0; border-top: 1px dashed rgba(42,36,28,.5); padding-top: 16px; }
+.choices li { margin: 0 0 10px; animation: inkin .6s both; }
+.choices button {
+  width: 100%; text-align: left; font: inherit; color: var(--ink); cursor: pointer;
+  background: rgba(255,255,255,.28); border: 1px solid rgba(42,36,28,.35); border-radius: 2px;
+  padding: 10px 14px 10px 40px; position: relative; line-height: 1.6; transition: background .15s, transform .15s;
+}
+.choices button::before { content: "□"; position: absolute; left: 14px; top: 10px; font-family: var(--mincho); }
+.choices button:hover:not(:disabled), .choices button:focus-visible { background: rgba(255,255,255,.6); transform: translateX(3px); outline: none; }
+.choices button:hover:not(:disabled)::before { content: "☑"; color: var(--blue-ink); }
+.choices button:disabled { opacity: .5; cursor: default; }
+.choices .tag { font-family: var(--type); font-size: 13px; color: var(--blue-ink); margin-left: 6px; white-space: nowrap; }
+.choices .tag.auto { color: #5a6b2e; }
+
+/* ===== 記録映像 ===== */
+.footage {
+  position: relative; background: #0b0d0b; color: #d8e6d0; font-family: var(--vt); font-size: 21px; line-height: 1.45;
+  padding: 44px 26px 30px; margin: 0 -10px 10px; border-radius: 6px; overflow: hidden;
+  box-shadow: inset 0 0 60px rgba(0,0,0,.9), 0 0 0 6px #222, 0 0 0 8px #0a0a0a;
+  text-shadow: 0 0 3px rgba(200,255,200,.5), 1px 0 rgba(255,0,0,.3), -1px 0 rgba(0,180,255,.3);
+}
+.footage::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(to bottom, rgba(255,255,255,.04) 0 1px, transparent 1px 3px);
+}
+.footage::after {
+  content: ""; position: absolute; left: 0; right: 0; height: 40px; top: -40px; pointer-events: none;
+  background: linear-gradient(transparent, rgba(255,255,255,.1), transparent);
+  animation: roll 3.5s linear infinite;
+}
+@keyframes roll { to { top: 110%; } }
+.footage .f-osd { position: absolute; top: 10px; left: 14px; right: 14px; display: flex; justify-content: space-between; font-size: 20px; color: #fff; }
+.footage .f-osd .dot { color: #ff3333; animation: blink 1s steps(1) infinite; }
+.footage p { margin: 0 0 .7em; }
+.footage .face { color: #fff; letter-spacing: 2px; animation: flick .18s steps(2) infinite; }
+@keyframes flick { 50% { opacity: .55; } }
+.footage + .body { margin-top: 0; }
+
+/* ===== 登録票 ===== */
+.form-row { display: flex; gap: 12px; align-items: baseline; margin: 0 0 14px; flex-wrap: wrap; }
+.form-row label { font-family: var(--type); font-size: 13px; color: var(--ink-soft); min-width: 96px; letter-spacing: .05em; }
+.form-row input[type=text] {
+  font-family: var(--hand); font-size: 22px; color: var(--blue-ink); background: transparent;
+  border: none; border-bottom: 1px solid var(--ink); padding: 2px 4px; flex: 1; min-width: 180px; outline: none;
+}
+.jobs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; flex: 1; min-width: 240px; }
+@media (max-width: 600px) { .jobs { grid-template-columns: 1fr; } }
+.jobs label { min-width: 0; display: block; font-family: var(--mincho); font-size: 15px; color: var(--ink);
+  border: 1px solid rgba(42,36,28,.35); padding: 8px 10px; cursor: pointer; background: rgba(255,255,255,.25); line-height: 1.5; }
+.jobs input { margin-right: 6px; accent-color: var(--blue-ink); }
+.jobs small { display: block; font-family: var(--type); font-size: 12px; color: var(--ink-soft); }
+.jobs label:has(input:checked) { background: rgba(255,255,255,.65); border-color: var(--blue-ink); }
+.stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px 14px; font-size: 15px; margin: 6px 0 4px; }
+@media (max-width: 600px) { .stat-grid { grid-template-columns: repeat(2, 1fr); } }
+.stat-grid div { display: flex; justify-content: space-between; border-bottom: 1px dotted rgba(42,36,28,.4); }
+.stat-grid b { font-family: var(--hand); font-weight: normal; color: var(--blue-ink); font-size: 19px; }
+.btn {
+  font-family: var(--mincho); font-size: 16px; font-weight: 700; letter-spacing: .1em; cursor: pointer;
+  background: var(--ink); color: var(--paper); border: none; padding: 10px 22px; border-radius: 2px;
+}
+.btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--ink); font-weight: 400; }
+.btn:hover { filter: brightness(1.25); }
+.btn-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 22px; }
+.rules { font-size: 14px; color: var(--ink-soft); border: 1px solid rgba(42,36,28,.3); padding: 10px 14px; margin-top: 18px; line-height: 1.8; }
+
+/* ===== ダイス判定 ===== */
+.overlay {
+  position: fixed; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center;
+  background: rgba(5,4,3,.72); padding: 16px;
+}
+.overlay.hidden { display: none; }
+.slip {
+  width: min(360px, 100%); background: #f2ead4; padding: 22px 24px 20px; text-align: center; position: relative;
+  box-shadow: 0 20px 50px rgba(0,0,0,.8); transform: rotate(1deg);
+  background-image: repeating-linear-gradient(to bottom, transparent 0 27px, rgba(140,120,80,.15) 27px 28px);
+  animation: slipin .35s ease-out;
+}
+@keyframes slipin { from { transform: translateY(30px) rotate(4deg); opacity: 0; } }
+.slip-h { font-family: var(--type); font-size: 13px; color: var(--ink-soft); letter-spacing: .2em; border-bottom: 1px solid var(--ink); padding-bottom: 4px; }
+.slip-label { font-size: 22px; font-weight: 700; margin: 10px 0 0; }
+.slip-target { font-family: var(--type); font-size: 14px; color: var(--ink-soft); }
+.d-num { font-family: var(--type); font-size: 76px; line-height: 1; margin: 14px 0 6px; color: var(--ink); letter-spacing: .05em; }
+.d-num.rolling { color: var(--ink-soft); filter: blur(.6px); }
+.d-sub { font-family: var(--type); font-size: 12px; color: var(--ink-soft); }
+.d-res { min-height: 58px; margin: 10px 0 4px; }
+.d-res .stamp { font-size: 26px; animation: stampin .25s ease-out; }
+@keyframes stampin { from { transform: scale(2.4) rotate(-8deg); opacity: 0; } to { transform: scale(1) rotate(-8deg); opacity: .85; } }
+.d-extra { font-family: var(--hand); font-size: 19px; color: var(--red); min-height: 26px; }
+.slip .btn { margin-top: 10px; width: 100%; }
+
+/* ===== エンディング ===== */
+.end-stamp { text-align: center; margin: 10px 0 26px; }
+.summary { border: 1px solid var(--ink); padding: 12px 16px; font-size: 14.5px; margin-top: 24px; background: rgba(255,255,255,.25); }
+.summary h3 { font-size: 14px; font-family: var(--type); margin: 0 0 6px; letter-spacing: .1em; font-weight: normal; color: var(--ink-soft); }
+.summary table { width: 100%; border-collapse: collapse; }
+.summary td { padding: 2px 4px; border-bottom: 1px dotted rgba(42,36,28,.35); vertical-align: top; }
+.summary td:first-child { width: 8em; color: var(--ink-soft); }
+.archive { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.archive span { font-family: var(--type); font-size: 12px; border: 1px solid var(--ink-soft); padding: 2px 8px; color: var(--ink-soft); }
+.archive span.got { color: var(--paper); background: var(--ink); border-color: var(--ink); }
+
+@media (prefers-reduced-motion: reduce) {
+  .tracking, .footage::after { animation: none; display: none; }
+  body.glitch .stage, body.unstable .paper .body p { animation: none; }
+}
+</style>
+</head>
+<body>
+<canvas id="noise" width="200" height="120" aria-hidden="true"></canvas>
+<div class="scanlines" aria-hidden="true"></div>
+<div class="tracking" aria-hidden="true"></div>
+<div class="vignette" aria-hidden="true"></div>
+<div id="flash" aria-hidden="true"></div>
+<div class="osd" id="rec" aria-hidden="true"><span class="dot">●</span> REC <span id="tc">00:00:00</span></div>
+<div class="osd" id="osd-play" aria-hidden="true">PLAY ▶ <span id="osd-date">NOV.14 1999</span></div>
+<div class="osd" id="osd-mode" aria-hidden="true">SP</div>
+
+<main class="stage">
+  <aside class="notebook" id="notebook" aria-label="探索者手帳"></aside>
+  <section class="folder">
+    <div class="tab">CASE No.0347 ／ 民俗生物調査室</div>
+    <article class="paper" id="paper" aria-live="polite"></article>
+  </section>
+</main>
+
+<div class="overlay hidden" id="dice" role="dialog" aria-modal="true" aria-labelledby="d-label">
+  <div class="slip">
+    <div class="slip-h" id="d-title">技能判定</div>
+    <div class="slip-label" id="d-label"></div>
+    <div class="slip-target" id="d-target"></div>
+    <div class="d-num" id="d-num">--</div>
+    <div class="d-sub">1D100</div>
+    <div class="d-res" id="d-res"></div>
+    <div class="d-extra" id="d-extra"></div>
+    <button class="btn" id="d-btn">ダイスを振る</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ================= 基本ユーティリティ ================= */
+const $ = (s) => document.querySelector(s);
+const paper = $("#paper");
+const nb = $("#notebook");
+const d = (n) => Math.floor(Math.random() * n) + 1;
+function rollExpr(expr) {
+  expr = String(expr).trim();
+  if (/^\d+$/.test(expr)) return +expr;
+  const m = expr.match(/^(\d+)d(\d+)([+-]\d+)?$/);
+  if (!m) return 0;
+  let t = 0;
+  for (let i = 0; i < +m[1]; i++) t += d(+m[2]);
+  return t + (m[3] ? +m[3] : 0);
+}
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const DEAD = { dead: true };
+const store = {
+  get(k, f) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : f; } catch (e) { return f; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+};
+
+/* ================= ノイズ演出 ================= */
+const noise = $("#noise");
+const nctx = noise.getContext("2d");
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+function drawNoise() {
+  const img = nctx.createImageData(noise.width, noise.height);
+  const a = img.data;
+  for (let i = 0; i < a.length; i += 4) {
+    const v = Math.random() * 255;
+    a[i] = a[i + 1] = a[i + 2] = v; a[i + 3] = 255;
+  }
+  // 横方向のトラッキングノイズ
+  if (Math.random() < 0.25) {
+    const y = Math.floor(Math.random() * noise.height);
+    for (let x = 0; x < noise.width; x++) {
+      const i = (y * noise.width + x) * 4;
+      a[i] = a[i + 1] = a[i + 2] = 255;
+    }
+  }
+  nctx.putImageData(img, 0, 0);
+}
+setInterval(drawNoise, reduceMotion ? 400 : 70);
+drawNoise();
+let glitchTimer = null;
+function glitch(ms = 450) {
+  if (reduceMotion) ms = Math.min(ms, 200);
+  document.body.classList.add("glitch");
+  clearTimeout(glitchTimer);
+  glitchTimer = setTimeout(() => document.body.classList.remove("glitch"), ms);
+}
+function flashRed() {
+  const f = $("#flash");
+  f.classList.remove("on"); void f.offsetWidth; f.classList.add("on");
+}
+// 時折の映像の乱れ（正気度が低いほど頻繁に）
+setInterval(() => {
+  const unstable = document.body.classList.contains("unstable");
+  if (Math.random() < (unstable ? 0.35 : 0.06)) glitch(unstable ? 380 : 220);
+}, 2500);
+// タイムコード
+const t0 = Date.now();
+setInterval(() => {
+  const s = Math.floor((Date.now() - t0) / 1000);
+  const p = (n) => String(n).padStart(2, "0");
+  $("#tc").textContent = `${p(Math.floor(s / 3600))}:${p(Math.floor(s / 60) % 60)}:${p(s % 60)}`;
+}, 500);
+
+/* ================= 探索者 ================= */
+const SKILLS = ["目星", "聞き耳", "隠密", "追跡", "回避", "博物学", "説得", "応急手当"];
+const JOBS = {
+  biologist: { name: "生物学者", bonus: { 博物学: 25, 目星: 15 }, desc: "博物学+25 / 目星+15" },
+  hunter:    { name: "猟師",     bonus: { 追跡: 25, 隠密: 15 },   desc: "追跡+25 / 隠密+15" },
+  reporter:  { name: "記者",     bonus: { 説得: 20, 聞き耳: 20 }, desc: "説得+20 / 聞き耳+20" },
+  rescuer:   { name: "山岳救助隊員", bonus: { 回避: 20, 応急手当: 20 }, desc: "回避+20 / 応急手当+20" }
+};
+function rollBase() {
+  const sk = {};
+  SKILLS.forEach((k) => (sk[k] = 30 + d(10) + d(10)));
+  return { sk, hp: 10 + d(6), san: 30 + d(10) + d(10) + d(10) };
+}
+let draft = { name: "真壁 恭一", job: "biologist", base: rollBase() };
+let g = null;
+
+function newGame() {
+  const job = JOBS[draft.job];
+  const sk = {};
+  SKILLS.forEach((k) => (sk[k] = Math.min(90, draft.base.sk[k] + (job.bonus[k] || 0))));
+  g = {
+    name: draft.name, nameH: esc(draft.name), job: job.name, sk,
+    hp: draft.base.hp, mhp: draft.base.hp, san: draft.base.san, msan: draft.base.san,
+    flags: {}, done: {}, carry: [], log: [], checks: 0, wins: 0, scene: null
+  };
+  updateSheet();
+}
+
+const CLUES = {
+  rule: "老婆の言いつけ「名を呼ばれても答えるな」",
+  notebook: "榊原の手記（あれは火を嫌う）",
+  map: "古い地形図（鳴沢への旧道）",
+  sample: "【証拠】未知の体毛サンプル",
+  camera: "【証拠】榊原のビデオカメラ",
+  knowMimic: "声の主は人間ではない",
+  knowNest: "巣は鳴沢上流の岩屋",
+  footage: "【証拠】ヒトマネの接近映像",
+  relic: "榊原の結婚指輪"
+};
+
+/* ================= 手帳の描画 ================= */
+let prevHp = null, prevSan = null;
+function updateSheet() {
+  if (!g) {
+    nb.innerHTML = `<h2>探索者手帳</h2><p style="font-size:16px;line-height:28px">（未記入）<br>右の登録票に記入し、調査を開始すること。</p>`;
+    return;
+  }
+  const hpPct = Math.max(0, g.hp / g.mhp * 100);
+  const sanPct = Math.max(0, g.san / g.msan * 100);
+  const clues = Object.keys(CLUES).filter((k) => g.flags[k]);
+  nb.innerHTML = `
+    <h2>探索者手帳</h2>
+    <div class="nb-name">${g.nameH}</div>
+    <div class="nb-job">職業：${g.job}</div>
+    <div class="meter"><div class="meter-h"><span>耐久力 HP</span><span id="nb-hp">${Math.max(0, g.hp)} / ${g.mhp}</span></div>
+      <div class="bar ${hpPct <= 35 ? "low" : ""}"><i style="width:${hpPct}%"></i></div></div>
+    <div class="meter"><div class="meter-h"><span>正気度 SAN</span><span id="nb-san">${Math.max(0, g.san)} / ${g.msan}</span></div>
+      <div class="bar san ${sanPct <= 40 ? "low" : ""}"><i style="width:${sanPct}%"></i></div></div>
+    <div class="skills">${SKILLS.map((k) => `<div><span>${k}</span><b>${g.sk[k]}</b></div>`).join("")}</div>
+    <div class="nb-sec"><span>― 手がかり・証拠 ―</span>
+      <ul class="clues">${clues.length ? clues.map((k) => `<li>${CLUES[k]}</li>`).join("") : `<li class="none">まだ何もない</li>`}</ul></div>
+    <div class="nb-sec"><span>― 判定記録 ―</span>
+      <div class="nb-log">${g.log.slice(-6).reverse().join("<br>") || "―"}</div></div>`;
+  if (prevHp !== null && g.hp !== prevHp) $("#nb-hp").classList.add("changed");
+  if (prevSan !== null && g.san !== prevSan) $("#nb-san").classList.add("changed");
+  prevHp = g.hp; prevSan = g.san;
+  document.body.classList.toggle("unstable", sanPct <= 40);
+}
+
+/* ================= ダイス判定 ================= */
+function diceModal({ title, label, target, after }) {
+  return new Promise((resolve) => {
+    const ov = $("#dice"), num = $("#d-num"), btn = $("#d-btn"), res = $("#d-res"), extra = $("#d-extra");
+    $("#d-title").textContent = title;
+    $("#d-label").textContent = label;
+    $("#d-target").textContent = `目標値 ${target} 以下で成功`;
+    num.textContent = "--"; res.innerHTML = ""; extra.textContent = "";
+    btn.textContent = "ダイスを振る"; btn.disabled = false;
+    ov.classList.remove("hidden");
+    btn.focus();
+    btn.onclick = () => {
+      btn.disabled = true;
+      num.classList.add("rolling");
+      const iv = setInterval(() => (num.textContent = String(d(100)).padStart(2, "0")), 45);
+      setTimeout(() => {
+        clearInterval(iv);
+        num.classList.remove("rolling");
+        const r = d(100);
+        num.textContent = r === 100 ? "00" : String(r).padStart(2, "0");
+        const crit = r <= 5, fumble = r >= 96;
+        const ok = crit || (r <= target && !fumble);
+        let word = ok ? "成功" : "失敗";
+        if (crit) word = "決定的成功"; if (fumble) word = "致命的失敗";
+        res.innerHTML = `<span class="stamp ${ok ? "blue" : ""}">${word}</span>`;
+        if (!ok) { glitch(300); }
+        extra.textContent = after ? after(r, ok) : "";
+        btn.textContent = "手帳に記録する";
+        btn.disabled = false;
+        btn.focus();
+        btn.onclick = () => { ov.classList.add("hidden"); resolve({ r, ok, crit, fumble }); };
+      }, reduceMotion ? 200 : 950);
+    };
+  });
+}
+async function check(skill, mod = 0) {
+  const target = Math.max(1, Math.min(95, g.sk[skill] + mod));
+  const modTxt = mod ? `（補正 ${mod > 0 ? "+" : ""}${mod}）` : "";
+  const res = await diceModal({ title: "技能判定", label: `〈${skill}〉${modTxt}`, target });
+  g.checks++; if (res.ok) g.wins++;
+  const word = res.crit ? "決定的成功" : res.fumble ? "致命的失敗" : res.ok ? "成功" : "失敗";
+  g.log.push(`<span class="${res.ok ? "ok" : "ng"}">${skill} ${target} → ${res.r} ${word}</span>`);
+  g.carry.push(`<p class="roll">▸ 〈${skill}〉 目標値${target} … 出目 ${res.r}　<span class="${res.ok ? "ok" : "ng"}">${word}</span></p>`);
+  updateSheet();
+  return res;
+}
+async function sanCheck(okLoss, ngLoss, reason) {
+  let loss = 0;
+  const res = await diceModal({
+    title: "正気度ロール", label: reason, target: g.san,
+    after: (r, ok) => { loss = rollExpr(ok ? okLoss : ngLoss); return loss ? `正気度 −${loss}（${ok ? okLoss : ngLoss}）` : "正気度 減少なし"; }
+  });
+  g.san -= loss;
+  g.log.push(`<span class="${res.ok ? "ok" : "ng"}">SAN ${okLoss}/${ngLoss} → ${res.r} −${loss}</span>`);
+  g.carry.push(`<p class="roll">▸ 正気度ロール（${esc(reason)}） 出目 ${res.r}　<span class="${res.ok ? "ok" : "ng"}">${res.ok ? "成功" : "失敗"}</span>　<span class="dmg">SAN −${loss}</span></p>`);
+  if (loss) glitch(300 + loss * 120);
+  updateSheet();
+  if (g.san <= 0) throw DEAD;
+  return res;
+}
+function hurt(expr, reason) {
+  const n = rollExpr(expr);
+  g.hp -= n;
+  g.carry.push(`<p><span class="dmg">― ${reason}：HP −${n}</span></p>`);
+  g.log.push(`<span class="ng">負傷 −${n}</span>`);
+  flashRed(); glitch(350);
+  updateSheet();
+  if (g.hp <= 0) throw DEAD;
+}
+function heal(expr) {
+  const n = Math.min(rollExpr(expr), g.mhp - g.hp);
+  g.hp += n;
+  g.carry.push(`<p><span class="dmg" style="color:#1f3a7a">― 応急手当：HP +${n}</span></p>`);
+  updateSheet();
+}
+function say(...lines) { lines.forEach((l) => g.carry.push(`<p>${l}</p>`)); }
+const N = () => g.nameH;
+const V = (s) => `<span class="voice">${s}</span>`;
+
+/* ================= シナリオ ================= */
+const SCENES = {
+  intro: {
+    code: "00", place: "調査指示書", time: "1999.11.12",
+    text: () => [
+      `<span class="field">［閲覧制限］</span>本ファイルは民俗生物調査室が保管する未確認生物調査記録である。閲覧は担当調査員に限る。`,
+      `<span class="field">［対象］</span>通称<em>「ヒトマネ」</em>。人の声を真似るとされる、正体不明の大型生物。`,
+      `<span class="field">［発生地］</span>北陸地方・八重樫山（やえがしやま）山中。麓に樫ノ沢集落（戸数十二）。`,
+      `<span class="field">［経緯］</span>昨秋より「夜、死んだ家族の声で名を呼ばれた」という住民の証言が相次ぐ。本年十一月九日、地元猟師・榊原 透（58）が単独入山したのち消息を絶つ。最後の無線交信は次のとおり。`,
+      `<span class="voice">「……女房が呼んでる。ちょっと行ってくる」</span>`,
+      `榊原の妻・ミツ子は、三年前に病没している。`,
+      `<span class="field">［指示］</span>調査員 ${N()} は現地に赴き、対象の実在を示す証拠（<em>映像</em>および<em>生体試料</em>等）を確保すること。なお、前任の調査員二名は<span class="redact">　消息不明　</span>。`,
+      `<span class="dim">※調査員の安全は保証されない。</span>`
+    ],
+    choices: () => [{ label: "ファイルを閉じ、現地へ向かう", run: async () => "village" }]
+  },
+
+  village: {
+    code: "01", place: "樫ノ沢集落", time: "11.14　13:20",
+    text: () => {
+      const left = 2 - (g.flags.va || 0);
+      const t = [
+        `バスを降りると、集落は昼間だというのに静まり返っていた。軒先に吊るされた干し柿だけが風に揺れている。`,
+        `どの家の戸口にも、なぜか古い鈴がぶら下がっていた。風が吹いても、鈴は鳴らない。舌が抜き取られているのだ。`
+      ];
+      if (left > 0) t.push(`日没は十六時半。入山前に調べられるのは、あと<em>${left}か所</em>だろう。`);
+      else t.push(`日が傾き始めた。これ以上、集落に留まっている時間はない。`);
+      return t;
+    },
+    choices: () => {
+      const can = (g.flags.va || 0) < 2;
+      return [
+        { id: "v_old", once: true, if: can, label: "集落最年長の老婆を訪ね、話を聞く", skill: "説得",
+          run: async () => {
+            g.flags.va = (g.flags.va || 0) + 1;
+            const r = await check("説得");
+            if (r.ok) {
+              g.flags.rule = true;
+              say(`老婆は長いこと黙っていたが、やがて囲炉裏の火を見つめたまま口を開いた。`,
+                `${V("「あれはな、ヒトマネ様いうて、昔からおる。声をくれてやったらいかん。名を呼ばれても、答えるな。振り返るな。それさえ守りゃ、あれは何もせん」")}`,
+                `${V("「榊原の透は、優しすぎたんよ」")}`);
+            } else {
+              say(`老婆は戸を半分だけ開け、すぐに閉めた。障子越しに、かすれた声が聞こえる。`,
+                `${V("「山で名を呼ばれたら……」")}`, `その先は、風の音にかき消されて聞き取れなかった。`);
+            }
+            return "village";
+          } },
+        { id: "v_hut", once: true, if: can, label: "榊原の作業小屋を調べる", skill: "目星",
+          run: async () => {
+            g.flags.va = (g.flags.va || 0) + 1;
+            const r = await check("目星");
+            if (r.ok) {
+              g.flags.notebook = true;
+              say(`散乱した薬莢の下、作業台の引き出しの裏に、手帳が貼り付けてあった。榊原の几帳面な字。`,
+                `${V("「十月二日。またミツ子の声。あれはミツ子ではない。返事をした山口のせがれの声を、翌週あれが使っていた。あれは答えた者の声を覚える」")}`,
+                `${V("「火を焚いておけば降りてこない。あれは火を嫌う」")}`,
+                `最後の頁には、震える字でこうあった。${V("「それでも、もう一度だけ声が聞きたい」")}`);
+            } else {
+              say(`小屋の中は荒れていた。猟銃の手入れ道具、空の一升瓶、色褪せた夫婦の写真。手がかりになりそうなものは見つからない。`);
+            }
+            return "village";
+          } },
+        { id: "v_map", once: true, if: can, label: "公民館の郷土資料を調べる", skill: "博物学",
+          run: async () => {
+            g.flags.va = (g.flags.va || 0) + 1;
+            const r = await check("博物学");
+            if (r.ok) {
+              g.flags.map = true;
+              say(`明治期の村誌に「山ノ声」という項があった。<em>「人ノ声ヲ真似ル物アリ。答フル者ハ帰ラズ」</em>。`,
+                `添付の古い地形図には、現在の地図から消えた<em>鳴沢（なりさわ）</em>への旧道が記されている。この道を使えば、山中で迷わずに済むだろう。`);
+            } else {
+              say(`郷土資料は虫に食われ、ほとんど読めなかった。かろうじて「山ノ声」という見出しだけが判読できる。`);
+            }
+            return "village";
+          } },
+        { label: can ? "調査を切り上げて入山する" : "入山する", run: async () => "trail" }
+      ];
+    }
+  },
+
+  trail: {
+    code: "02", place: "八重樫山・旧林道終点", time: "11.14　15:10",
+    text: () => [
+      `林道の終点に、榊原の軽トラックが停められたままになっていた。荷台には落ち葉が積もり、フロントガラスは内側から曇っている。`,
+      `ぬかるんだ斜面に、それはあった。<em>足跡</em>。人間の素足によく似ている——ただし、指が六本あり、そのどれもが異様に長い。歩幅は二メートル近い。`,
+      `足跡は沢筋に沿って、山の奥へと続いている。`
+    ],
+    choices: () => [
+      { id: "t_look", once: true, label: "足跡の周囲を詳しく調べる", skill: "目星",
+        run: async () => {
+          const r = await check("目星");
+          if (r.ok) {
+            g.flags.sample = true;
+            say(`倒木の棘に、灰色の毛の束が引っかかっていた。獣毛にしては細く、人の髪にしては硬い。慎重に採取瓶へ収める。`,
+              `瓶を光にかざしたとき、毛の根元に皮膚片が付いているのが見えた。<em>まだ温かい</em>気がした。`);
+            await sanCheck("0", "1", "未知の生物の痕跡");
+          } else {
+            say(`足跡の周囲を這うように調べたが、目につくものはなかった。時間だけが過ぎていく。`);
+          }
+          return "trail";
+        } },
+      { label: "足跡を追って山へ分け入る", skill: "追跡", mod: () => (g.flags.map ? 20 : 0),
+        run: async () => {
+          const r = await check("追跡", g.flags.map ? 20 : 0);
+          if (r.ok) {
+            g.flags.sawCamp = true;
+            say(g.flags.map ? `古地図の旧道と足跡は、ほぼ同じ道筋をたどっていた。迷うことなく、日没前に沢へ出る。`
+              : `足跡を見失わないよう慎重に進む。日没直前、木々の向こうに沢の音が聞こえてきた。`);
+            return "hunter_camp";
+          }
+          say(`足跡は岩場で途切れていた。辺りを探し回るうちに、自分がどちらから来たのかもわからなくなっていた。`);
+          return "lost";
+        } }
+    ]
+  },
+
+  lost: {
+    code: "03", place: "山中（現在地不明）", time: "11.14　17:05",
+    text: () => [
+      `森は驚くほど早く暗くなる。懐中電灯の輪の外は、もう何も見えない。`,
+      `木々の間で、何かが枝を踏む音がする。こちらが歩けば歩き、止まれば止まる。<em>ひとつではない</em>ようにも思える。`,
+      `これ以上の移動は危険だ。ここで夜を明かすしかない。`
+    ],
+    choices: () => [
+      { label: "火を起こし、野営の準備をする",
+        run: async () => {
+          await sanCheck("0", "1d3", "闇の中の気配");
+          return "night";
+        } }
+    ]
+  },
+
+  hunter_camp: {
+    code: "04", place: "鳴沢・榊原の野営地",
+    time: () => (g.flags.nightDone ? "11.15　06:40" : "11.14　16:20"),
+    text: () => {
+      const t = [];
+      if (g.flags.nightDone) t.push(`夜明けとともに沢を下ると、見覚えのない河原に出た。そこが目的の場所だった。`);
+      t.push(
+        `沢が開けた河原に、潰れたテントがあった。榊原のものに間違いない。ポールは内側から折れ、布地には長い裂け目が<em>六本</em>、平行に走っている。`,
+        `散乱した装備の中に、片方だけの長靴が転がっていた。`,
+        `河原の砂には、何か重いものを引きずった跡が、沢の上流へ向かって伸びている。`
+      );
+      return t;
+    },
+    choices: () => [
+      { id: "h_look", once: true, label: "野営地を詳しく調べる", skill: "目星",
+        run: async () => {
+          const r = await check("目星");
+          if (r.ok) {
+            g.flags.camera = true;
+            say(`テントの下敷きになって、家庭用のビデオカメラが残されていた。バッテリーはわずかに残っている。テープは最後まで巻かれていない。`);
+            return "footage1";
+          }
+          say(`装備をかき分けていたとき、指先が何か硬いものに触れた。白く、細く、節のあるもの。`,
+            `<em>人間の指の骨</em>だった。きれいに肉が削ぎ落とされている。`);
+          await sanCheck("0", "1d3", "人骨の発見");
+          return "hunter_camp";
+        } },
+      { id: "h_track", once: true, if: !g.flags.knowNest, label: "引きずった跡を追跡する", skill: "追跡",
+        run: async () => {
+          const r = await check("追跡");
+          if (r.ok) {
+            g.flags.knowNest = true;
+            say(`跡は沢を遡り、苔むした岩壁の裂け目に吸い込まれていた。<em>岩屋</em>——あれの巣だろう。場所は覚えた。`);
+          } else {
+            say(`跡は浅瀬で水に消えた。上流のどこかへ向かったことしかわからない。`);
+          }
+          return "hunter_camp";
+        } },
+      g.flags.nightDone
+        ? { label: "沢を遡り、上流へ向かう", run: async () => "cave_out" }
+        : { label: "日が暮れた。ここで野営する", run: async () => "night" }
+    ]
+  },
+
+  footage1: {
+    code: "04-A", place: "回収映像／榊原所有ビデオカメラ", time: "1999.11.09　23:41",
+    footage: { date: "NOV.09 1999", time: "23:41:07" },
+    text: () => [
+      `画面は暗い。焚き火の明かりが、榊原の横顔を下から照らしている。`,
+      `榊原「……また来た。聞こえるか。ほら」`,
+      `（遠く、闇の向こうから、女の声）「とおるさん」`,
+      `榊原「ミツ子だ。……いや、違う。違うんだ。わかってる」`,
+      `「とおるさん。さむいよ。とおるさん」`,
+      `榊原は長いこと黙っている。やがて、カメラを地面に置いたまま立ち上がる。`,
+      `榊原「……ちょっと、行ってくる」`,
+      `足音が遠ざかる。十数秒の静寂。焚き火の爆ぜる音だけ。`,
+      `<span class="face">不意に、画面の端から何かが覗き込む。人の顔に似ている。だが目が縦に三つ並び、口が耳の下まで裂けている。</span>`,
+      `それは、榊原の声で言った。「ちょっと、いってくる」`,
+      `――　映像はここで途切れている　――`
+    ],
+    choices: () => [
+      { label: "停止ボタンを押す",
+        run: async () => {
+          await sanCheck("1", "1d4", "記録映像の視聴");
+          say(`カメラを鞄にしまう。手の震えがしばらく止まらなかった。`);
+          return "hunter_camp";
+        } }
+    ]
+  },
+
+  night: {
+    code: "05", place: "野営地", time: "11.15　02:13",
+    text: () => {
+      const t = [`焚き火の爆ぜる音だけが響いている。`];
+      if (g.flags.notebook) t.push(`榊原の手記を思い出し、薪は多めにくべておいた。炎は高く、明るい。`);
+      t.push(
+        `寝袋の中でまどろみかけたとき、声がした。`,
+        `${V(`「${N()}」`)}`,
+        `母の声だった。子どもの頃、夕飯に呼ぶときの、少し間延びした呼び方。`,
+        `${V(`「${N()}。どこにいるの。暗いよ。返事して」`)}`,
+        `声は闇の向こう、焚き火の明かりが届かないあたりから聞こえてくる。`
+      );
+      return t;
+    },
+    choices: () => [
+      { id: "n_listen", once: true, label: "声に耳を澄ます", skill: "聞き耳",
+        run: async () => {
+          const r = await check("聞き耳");
+          if (r.ok) {
+            g.flags.knowMimic = true;
+            say(`違和感に気づいた。声は地面からではなく、<em>地上五メートルほどの木の上</em>から降ってくる。`,
+              `それに、息継ぎの間がまったくない。人間の喉で出せる声ではない。`);
+          } else {
+            say(`間違いなく母の声だった。心臓が痛いほど鳴っている。母は、ここにいるはずがないのに。`);
+            await sanCheck("0", "1", "母の声");
+          }
+          return "night";
+        } },
+      { id: "n_aid", once: true, if: g.hp < g.mhp, label: "傷の手当てをしながら様子をうかがう", skill: "応急手当",
+        run: async () => {
+          const r = await check("応急手当");
+          if (r.ok) { say(`包帯を巻き直し、消毒をする。痛みが少し和らいだ。`); heal("1d3"); }
+          else say(`手が震えて、うまく包帯が巻けない。`);
+          return "night";
+        } },
+      { label: "返事をする",
+        run: async () => {
+          g.flags.answered = true;
+          g.flags.nightDone = true;
+          if (g.flags.rule) say(`老婆の言葉が頭をよぎった。それでも——声が出てしまった。`);
+          say(`「……お母さん？」`, `声が止んだ。森がしんと静まり返る。`,
+            `次の瞬間、頭上の枝が大きくしなり、<em>灰色の長い腕</em>が焚き火の明かりの中へ伸びてきた。`);
+          await sanCheck("1", "1d6", "ヒトマネの目撃");
+          const r = await check("回避");
+          if (r.ok) {
+            say(`転がるように身をかわす。爪が寝袋を引き裂いた。それは闇の中へ退いていった。`);
+            hurt("1", "かすり傷");
+          } else {
+            say(`爪が肩口を深く抉った。悲鳴を上げると、闇の中から<em>自分と同じ悲鳴</em>が返ってきた。`);
+            hurt("1d6+1", "爪による裂傷");
+          }
+          say(`夜明けまで、声は${N()}の声で、${N()}の名を呼び続けた。`);
+          return g.flags.sawCamp ? "cave_out" : "hunter_camp";
+        } },
+      { label: "沈黙を守り、火を絶やさない",
+        skill: g.flags.rule || g.flags.notebook ? null : "隠密", auto: g.flags.rule || g.flags.notebook,
+        run: async () => {
+          g.flags.nightDone = true;
+          if (g.flags.rule || g.flags.notebook) {
+            say(g.flags.rule ? `答えてはならない。振り返ってはならない。老婆の言葉を胸の中で繰り返す。`
+              : `あれは火を嫌う。榊原の手記を信じ、薪をくべ続ける。`,
+              `声は何度も名前を呼び、やがて泣き声に変わり、夜明け前にふっと止んだ。`);
+          } else {
+            const r = await check("隠密");
+            if (r.ok) {
+              say(`息を殺し、身じろぎもせずに夜をやり過ごす。声は夜明け前に止んだ。`);
+            } else {
+              say(`薪が崩れる音に、声がぴたりと止んだ。`, `ゆっくりと、何かが木から降りてくる気配。焚き火の明かりの縁に、<em>縦に並んだ三つの目</em>が光った。`);
+              await sanCheck("1", "1d4", "闇の中の目");
+              say(`それはしばらくこちらを見つめていたが、炎がはぜた拍子に闇へ消えた。`);
+            }
+          }
+          return g.flags.sawCamp ? "cave_out" : "hunter_camp";
+        } },
+      { label: "気配を殺して、声の主を追う", skill: "隠密",
+        run: async () => {
+          g.flags.nightDone = true;
+          const r = await check("隠密");
+          if (r.ok) {
+            g.flags.knowNest = true;
+            say(`月明かりの下、木々の間を渡っていく<em>細長い影</em>を見た。人の倍はある手足を、蜘蛛のように折り畳んで動いている。`,
+              `それは沢を遡り、岩壁の裂け目へと消えた。巣の場所がわかった。`);
+            await sanCheck("0", "1d4", "遠目に見たヒトマネ");
+          } else {
+            say(`足元の枝が折れた。声がぴたりと止み、上から何かが落ちてくる。`);
+            await sanCheck("1", "1d4", "ヒトマネとの遭遇");
+            const e = await check("回避");
+            if (e.ok) say(`転がって避け、野営地まで這うように逃げ帰った。`);
+            else { say(`背中に衝撃。地面に叩きつけられる。`); hurt("1d6", "打撲"); }
+          }
+          return g.flags.sawCamp ? "cave_out" : "hunter_camp";
+        } }
+    ]
+  },
+
+  cave_out: {
+    code: "06", place: "鳴沢上流・岩屋", time: "11.15　08:10",
+    text: () => [
+      g.flags.knowNest ? `記憶を頼りに沢を遡る。迷わずにたどり着けた。` : `沢を遡った先、羊歯に覆われた岩壁の裂け目を見つけたのは、ほとんど偶然だった。`,
+      `苔むした岩壁に、洞窟が口を開けている。獣の臭いと、甘ったるい腐臭。`,
+      `そして——中から<em>声</em>が聞こえる。男の声、女の声、子どもの声。何人もの声が、低く、同時に、意味のない言葉を繰り返している。寝言のように。`
+    ],
+    choices: () => [
+      { id: "c_look", once: true, label: "入口の周辺を観察する", skill: "目星",
+        run: async () => {
+          const r = await check("目星");
+          if (r.ok) {
+            g.flags.sleeping = true;
+            say(`入口の地面に残る足跡は、どれも明け方に<em>中へ向かうもの</em>ばかりだった。あれは夜行性で、昼は眠っているらしい。`);
+            if (!g.flags.sample) { g.flags.sample = true; say(`岩の角に、灰色の体毛と皮膚片がこびりついていた。採取瓶に収める。`); }
+          } else {
+            say(`入口を観察したが、湿った岩と苔以外、何も読み取れなかった。`);
+          }
+          return "cave_out";
+        } },
+      { label: "洞窟に忍び込む", skill: "隠密", mod: () => (g.flags.knowNest ? 10 : 0),
+        run: async () => {
+          const r = await check("隠密", g.flags.knowNest ? 10 : 0);
+          if (r.ok) say(`足音を殺し、闇の中へ入る。声は途切れない。気づかれてはいない。`);
+          else { g.flags.alerted = true; say(`足元の小石が転がり、乾いた音が洞窟に反響した。中の声が、<em>一斉に止んだ</em>。`); }
+          await sanCheck("1", "1d6", "岩屋の光景");
+          return "cave_in";
+        } },
+      { label: "これ以上は危険だ。調査を打ち切り下山する", run: async () => "escape" }
+    ]
+  },
+
+  cave_in: {
+    code: "07", place: "岩屋内部", time: "11.15　08:25",
+    text: () => {
+      const t = [
+        `懐中電灯の光を絞って奥へ進む。`,
+        `壁際に、物が並べられていた。片方だけの長靴。子ども用の赤い傘。携帯ラジオ。眼鏡。どれも几帳面に、等間隔で。`,
+        `最奥に、それは丸まっていた。灰色の、毛の薄い皮膚。折り畳まれた手足は、伸ばせば三メートルはあるだろう。`,
+        `胸が上下するたび、裂けた口の奥から声が漏れる。${V("「……女房が、呼んでる」「おーい」「とおるさん」")}`
+      ];
+      if (g.flags.answered) t.push(`そして、${V(`「${N()}」`)}——<em>自分自身の声</em>だった。`);
+      t.push(g.flags.alerted ? `眠りは浅い。耳らしき器官が、ぴくりとこちらを向いている。` : `それは眠っている。今のところは。`);
+      return t;
+    },
+    choices: () => [
+      { id: "i_film", once: true, label: "カメラを回し、接近して撮影する", skill: "隠密",
+        mod: () => (g.flags.alerted ? -20 : 0) + (g.flags.sleeping ? 20 : 0),
+        run: async () => {
+          const r = await check("隠密", (g.flags.alerted ? -20 : 0) + (g.flags.sleeping ? 20 : 0));
+          if (r.ok) {
+            g.flags.footage = true;
+            say(`一メートルの距離まで近づき、ファインダー越しに全身を収める。縦に並んだ三つの瞼、喉の奥で震える無数の襞。<em>決定的な映像</em>だ。`);
+            return "cave_in";
+          }
+          say(`録画開始の電子音が、岩屋に響いた。`, `声が止んだ。三つの目が、同時に開いた。`);
+          return await wake();
+        } },
+      { id: "i_sample", once: true, if: !g.flags.sample, label: "体毛と組織のサンプルを採取する", skill: "博物学",
+        run: async () => {
+          const r = await check("博物学");
+          if (r.ok) {
+            g.flags.sample = true;
+            say(`抜け落ちた体毛と、脱皮したらしい皮膚の一部を手早く採取する。それは身じろぎもしない。`);
+            return "cave_in";
+          }
+          say(`ピンセットが皮膚に触れた。灰色の手足が、ばね仕掛けのように跳ねた。`);
+          hurt("1d3", "払いのけられた");
+          return await wake();
+        } },
+      { id: "i_relic", once: true, label: "並べられた遺品を調べる", skill: "目星",
+        run: async () => {
+          const r = await check("目星");
+          if (r.ok) {
+            g.flags.relic = true;
+            say(`長靴の中に、指輪がひとつ入っていた。内側に刻印——<em>「透・ミツ子」</em>。榊原の結婚指輪だ。そっとポケットにしまう。`);
+          } else {
+            say(`遺品はどれも湿って黒ずみ、持ち主を示すものは見つからなかった。`);
+          }
+          return "cave_in";
+        } },
+      { if: g.flags.rule || g.flags.notebook, label: "記録を消去し、何も見なかったことにする", auto: true,
+        run: async () => "end_pact" },
+      { label: "気づかれる前に洞窟を出て、下山する", run: async () => "escape" }
+    ]
+  },
+
+  confront: {
+    code: "08", place: "岩屋内部", time: "11.15　08:31",
+    text: () => {
+      const t = [
+        `それは起き上がった。天井に頭が届くほど背を伸ばし、縦に並んだ三つの目でこちらを見下ろす。`,
+        `裂けた口が開き、言葉が出てくる。`
+      ];
+      if (g.flags.answered) t.push(`${V(`「${N()}。こっちにおいで」`)}——<em>自分の声</em>で。`);
+      else t.push(`${V(`「${N()}。どこにいるの。暗いよ」`)}——母の声で。`);
+      t.push(`出口までは十メートル。`);
+      return t;
+    },
+    choices: () => [
+      { label: "全力で出口へ走る", skill: "回避",
+        run: async () => {
+          const r = await check("回避");
+          if (r.ok) say(`振り下ろされた腕をくぐり抜け、光の差す方へ飛び出した。`);
+          else { say(`背中を爪が薙いだ。それでも足は止めない。`); hurt("1d6+1", "背中の裂傷"); }
+          return "escape";
+        } },
+      { if: g.flags.notebook, label: "発炎筒に火をつけ、かざす", auto: true,
+        run: async () => {
+          say(`赤い炎が岩屋を照らした瞬間、それは甲高い悲鳴を上げて身を縮めた。<em>榊原の声</em>の悲鳴だった。`,
+            `炎をかざしたまま後退し、外へ出る。`);
+          return "escape";
+        } },
+      { if: g.flags.rule, label: "目を伏せ、決して答えない", auto: true,
+        run: async () => {
+          say(`目を伏せる。唇を噛む。答えない。振り返らない。`,
+            `それは長いあいだ、顔のすぐ前で呼び続けた。湿った息が頬にかかる。`,
+            `やがて、興味を失ったように、それは奥の暗がりへ戻っていった。`);
+          await sanCheck("0", "1d3", "至近距離の呼び声");
+          return "escape";
+        } },
+      { label: "声をかけ、敵意がないことを示す", skill: "説得", mod: () => -20,
+        run: async () => {
+          const r = await check("説得", -20);
+          if (r.ok) {
+            say(`「傷つけるつもりはない」——そう言うと、それは首を傾げ、同じ言葉をこちらの声で繰り返した。`,
+              `${V("「きずつける、つもりは、ない」")}`, `それは道を開けた。理解したのか、ただ真似ただけなのか。`);
+          } else {
+            say(`声を出した瞬間、それの口が大きく開いた。<em>声を、覚えられた</em>。`);
+            g.flags.answered = true;
+            hurt("1d6", "体当たり");
+          }
+          return "escape";
+        } }
+    ]
+  },
+
+  escape: {
+    code: "09", place: "八重樫山・下山路", time: "11.15　09:40",
+    text: () => {
+      const t = [
+        `沢沿いを駆け下りる。肺が焼けるように痛い。`,
+        `背後から声が追ってくる。母の声、榊原の声、知らない子どもの声。` + (g.flags.answered ? `そして、<em>自分自身の声</em>。` : ``),
+        `${V("「待って」「おーい」「どこへ行くの」「ねえ、こっちを見て」")}`,
+        `声は、少しずつ近づいている。`
+      ];
+      return t;
+    },
+    choices: () => [
+      { label: "来た道を正確にたどって下る", skill: "追跡", mod: () => (g.flags.map ? 20 : 0),
+        run: async () => {
+          const r = await check("追跡", g.flags.map ? 20 : 0);
+          if (r.ok) {
+            say(`見覚えのある倒木、榊原の軽トラック。林道に出たとたん、声はふっと途切れた。`);
+          } else {
+            say(`道を間違えた。崖に行き当たり、引き返そうとしたとき——すぐ後ろで、息遣いが聞こえた。`);
+            const e = await check("回避");
+            if (e.ok) say(`斜面を転がり落ちるようにして逃れ、気づけば林道に倒れ込んでいた。`);
+            else { say(`何かに足首を掴まれ、岩に叩きつけられた。もがいて振りほどき、這うように林道へ出る。`); hurt("1d6", "転落と打撲"); }
+          }
+          return finish();
+        } },
+      { if: g.flags.rule, label: "振り返らず、答えず、ただ歩く", auto: true,
+        run: async () => {
+          say(`走るのをやめた。答えない。振り返らない。ただ前を見て歩く。`,
+            `声は耳元まで近づき、何度も名を呼び——林道に出たところで、ふっと消えた。`);
+          return finish();
+        } }
+    ]
+  },
+
+  /* ---------- エンディング ---------- */
+  end_true: {
+    ending: { code: "A", title: "確証", stamp: "受理" },
+    place: "調査報告書（最終）", time: "1999.12.03",
+    text: () => {
+      const t = [
+        `提出された映像と生体試料は、調査室始まって以来の<em>決定的資料</em>として扱われた。`,
+        `試料の解析結果——既知のいかなる霊長類・哺乳類とも遺伝的に一致せず。喉頭部に、人間の約四十倍の発声襞を有すると推定される。`,
+        `報告書は上層部へ送られ、八重樫山一帯は「調査のため」立入禁止となった。`
+      ];
+      if (g.flags.relic) t.push(`榊原の指輪は、樫ノ沢の老婆に預けた。老婆は黙って受け取り、仏壇のミツ子の写真の前に置いた。`);
+      if (g.flags.answered) t.push(
+        `――追記――`,
+        `報告書を提出した夜、アパートのドアの外から、声がした。`,
+        `${V(`「${N()}。開けて」`)}`,
+        `<em>わたしの声</em>だった。`);
+      else t.push(`ただ、ときおり思う。あの山には今も、榊原の声が残っているのだろうか、と。`);
+      return t;
+    }
+  },
+  end_pact: {
+    ending: { code: "B", title: "沈黙の協定", stamp: "非公開" },
+    place: "調査報告書（最終）", time: "1999.11.20",
+    text: () => {
+      const t = [
+        `カメラの録画データを、それの目の前で消去した。採取瓶の中身も、岩屋の地面に返した。`,
+        `それは三つの目を開き、じっとこちらを見ていた。やがて、榊原の声で、たった一言だけ言った。`,
+        `${V("「かえれ」")}`,
+        `下山路は驚くほど静かだった。誰も名を呼ばなかった。`,
+        `報告書にはこう記した。<em>「該当生物の存在は確認できず」</em>。`
+      ];
+      if (g.flags.relic) t.push(`榊原の指輪だけは、樫ノ沢の老婆に届けた。${V("「……置いてきたかね」")}老婆はそう言って、初めて少しだけ笑った。`);
+      t.push(`それ以来、樫ノ沢で声の報告は途絶えている。`, `ただ、冬の夜、ラジオの砂嵐の向こうから、男の声が「もういい」と呟くのを聞いた者がいるという。`);
+      return t;
+    }
+  },
+  end_unknown: {
+    ending: { code: "C", title: "真偽不明", stamp: "保留" },
+    place: "調査報告書（最終）", time: "1999.11.25",
+    text: () => {
+      const ev = [g.flags.footage && "接近映像", g.flags.camera && "榊原のビデオテープ", g.flags.sample && "体毛サンプル"].filter(Boolean);
+      const t = [`${N()}は生還した。`];
+      if (ev.length) t.push(`持ち帰った資料——${ev.join("、")}——は検討会議にかけられたが、「単独では捏造の可能性を排除できない」として、実在の証明には至らなかった。`);
+      else t.push(`しかし、持ち帰れたのは、自分の記憶と、手帳の走り書きだけだった。`);
+      t.push(
+        `報告書は「真偽不明」の朱印を押され、地下書庫のキャビネットに収められた。前任者たちのファイルの隣に。`,
+        `樫ノ沢では、今も夜になると、死んだ家族の声で名を呼ばれるという。`
+      );
+      if (g.flags.answered) t.push(`そして最近、集落の子どもが「知らない人の声がした」と話している。<br>その声の主の名は——${N()}、だそうだ。`);
+      return t;
+    }
+  },
+  end_lost: {
+    ending: { code: "D", title: "調査員消息不明", stamp: "捜索打切" },
+    place: "捜索報告書", time: "1999.12.10",
+    text: () => [
+      `十一月十八日、調査員 ${N()} との連絡が途絶えたため、捜索隊が編成された。`,
+      `鳴沢上流付近で、調査員の手帳と破損した懐中電灯が発見された。手帳の最後の頁の筆跡は乱れ、判読できたのは次の一文のみである。`,
+      `${V("「あれは　わたしの声を　おぼえた」")}`,
+      `調査員の行方は、現在も判明していない。`,
+      `なお、捜索打ち切り後も、八重樫山の登山者から<em>「若い調査員風の人物の声で、名を呼ばれた」</em>という報告が寄せられている。`
+    ]
+  },
+  end_mad: {
+    ending: { code: "E", title: "記録者錯乱", stamp: "閲覧禁止" },
+    place: "診療記録（抜粋）", time: "1999.12.01",
+    text: () => [
+      `十一月十六日、樫ノ沢集落の住民が、林道を歩く ${N()} を保護した。`,
+      `外傷は軽微。ただし、意思の疎通は困難であった。`,
+      `患者は昼夜を問わず、様々な人物の声色で、様々な人名を呼び続けている。母親の声。年配の男性の声。幼い子どもの声。`,
+      `手帳には、同じ一文がびっしりと書き込まれていた。`,
+      `${V("「こたえなきゃ　こたえなきゃ　こたえなきゃ」")}`,
+      `担当医の所見——<span class="redact">　　　　　　　　　　　　　　　　</span>`,
+      `<span class="dim">※本記録は調査室長の判断により閲覧禁止とする。</span>`
+    ]
+  }
+};
+
+async function wake() {
+  g.flags.woke = true;
+  await sanCheck("1", "1d8", "ヒトマネの覚醒");
+  return "confront";
+}
+function finish() {
+  if (g.san <= 15) {
+    g.carry.push(`<p>山を下りてからも、声は耳の奥で鳴り止まなかった。</p>`);
+    return "end_mad";
+  }
+  if (g.flags.footage && (g.flags.sample || g.flags.camera)) return "end_true";
+  return "end_unknown";
+}
+
+/* ================= 進行エンジン ================= */
+let busy = false;
+function goto(id) {
+  if (g.hp <= 0) id = "end_lost";
+  else if (g.san <= 0) id = "end_mad";
+  g.scene = id;
+  render(id);
+  glitch(260);
+  const top = paper.getBoundingClientRect().top + window.scrollY - 70;
+  if (window.scrollY > top) window.scrollTo({ top, behavior: reduceMotion ? "auto" : "smooth" });
+}
+async function choose(c, btns) {
+  if (busy) return;
+  busy = true;
+  btns.forEach((b) => (b.disabled = true));
+  if (c.id) g.done[c.id] = true;
+  let next;
+  try { next = await c.run(); }
+  catch (e) { if (e !== DEAD) throw e; next = g.hp <= 0 ? "end_lost" : "end_mad"; }
+  busy = false;
+  goto(next || g.scene);
+}
+const val = (v) => (typeof v === "function" ? v() : v);
+
+function header(s, idx) {
+  return `
+    <div class="clip"></div>
+    <span class="stamp secret">極秘</span>
+    <div class="file-head"><span class="place">${val(s.place)}</span><span>FILE 0347-${s.code || idx}</span></div>
+    <div class="file-sub"><span>記録日時：${val(s.time)}</span><span>調査員：${g ? g.nameH : "―"}</span></div>`;
+}
+function carryHtml(label = "手帳の記録") {
+  if (!g.carry.length) return "";
+  const h = `<div class="carry" aria-label="${label}">${g.carry.join("")}</div>`;
+  g.carry = [];
+  return h;
+}
+function render(id) {
+  const s = SCENES[id];
+  if (s.ending) return renderEnding(s);
+  let html = header(s);
+  html += carryHtml();
+  const lines = s.text();
+  if (s.footage) {
+    html += `<div class="footage"><div class="f-osd"><span><span class="dot">●</span> PLAY</span><span>${s.footage.date}　${s.footage.time}</span></div>
+      ${lines.map((l, i) => `<p style="animation:inkin .5s ${i * 0.35}s both">${l}</p>`).join("")}</div><div class="body"></div>`;
+  } else {
+    html += `<div class="body">${lines.map((l, i) => `<p style="animation-delay:${i * 0.18}s">${l}</p>`).join("")}</div>`;
+  }
+  const list = s.choices().filter((c) => (c.if === undefined || c.if) && !(c.once && g.done[c.id]));
+  html += `<ul class="choices">${list.map((c, i) => {
+    let tag = "";
+    if (c.skill) {
+      const mod = c.mod ? c.mod() : 0;
+      const t = Math.max(1, Math.min(95, g.sk[c.skill] + mod));
+      tag = `<span class="tag">〔${c.skill} ${t}%〕</span>`;
+    } else if (c.auto) tag = `<span class="tag auto">〔判定なし〕</span>`;
+    return `<li style="animation-delay:${(lines.length * 0.18 + i * 0.1).toFixed(2)}s"><button data-i="${i}">${c.label}${tag}</button></li>`;
+  }).join("")}</ul>`;
+  paper.innerHTML = html;
+  const btns = [...paper.querySelectorAll(".choices button")];
+  btns.forEach((b) => (b.onclick = () => choose(list[+b.dataset.i], btns)));
+}
+
+const ENDINGS = { A: "確証", B: "沈黙の協定", C: "真偽不明", D: "調査員消息不明", E: "記録者錯乱" };
+function renderEnding(s) {
+  const e = s.ending;
+  const seen = store.get("cryptid0347_endings", {});
+  seen[e.code] = true;
+  store.set("cryptid0347_endings", seen);
+  const ev = Object.keys(CLUES).filter((k) => g.flags[k]).map((k) => CLUES[k]);
+  let html = header({ ...s, code: "END-" + e.code });
+  html += carryHtml("最後の記録");
+  html += `<div class="end-stamp"><span class="stamp big ${e.code === "A" || e.code === "B" ? "blue" : ""}">${e.stamp}</span></div>`;
+  html += `<div class="body"><p class="c"><span class="field">ENDING ${e.code}</span><br><strong style="font-size:1.4em;letter-spacing:.2em">${e.title}</strong></p>`;
+  html += s.text().map((l, i) => `<p style="animation-delay:${i * 0.3}s">${l}</p>`).join("") + `</div>`;
+  html += `<div class="summary"><h3>― 調査結果 ―</h3><table>
+    <tr><td>調査員</td><td>${g.nameH}（${g.job}）</td></tr>
+    <tr><td>最終状態</td><td>HP ${Math.max(0, g.hp)}/${g.mhp}　SAN ${Math.max(0, g.san)}/${g.msan}</td></tr>
+    <tr><td>技能判定</td><td>${g.checks}回中 ${g.wins}回成功</td></tr>
+    <tr><td>入手情報</td><td>${ev.length ? ev.join("<br>") : "なし"}</td></tr>
+    </table>
+    <h3 style="margin-top:12px">― 保管済みファイル ${Object.keys(seen).length} / 5 ―</h3>
+    <div class="archive">${Object.entries(ENDINGS).map(([k, v]) => `<span class="${seen[k] ? "got" : ""}">${k}：${seen[k] ? v : "？？？"}</span>`).join("")}</div>
+  </div>
+  <div class="btn-row"><button class="btn" id="again">同じ探索者で再調査</button><button class="btn ghost" id="fresh">新しい探索者を登録</button></div>`;
+  paper.innerHTML = html;
+  glitch(900);
+  $("#again").onclick = () => { newGame(); goto("intro"); };
+  $("#fresh").onclick = () => { g = null; prevHp = prevSan = null; updateSheet(); document.body.classList.remove("unstable"); renderCreate(); };
+}
+
+/* ================= 探索者登録 ================= */
+function renderCreate() {
+  const b = draft.base;
+  const job = JOBS[draft.job];
+  paper.innerHTML = `
+    <div class="clip"></div>
+    <span class="stamp secret">極秘</span>
+    <div class="file-head"><span class="place">未確認生物調査記録 第0347号</span><span>FORM-7 探索者登録票</span></div>
+    <div class="file-sub"><span>民俗生物調査室</span><span>1999.11.12 受付</span></div>
+    <div class="body">
+      <p>山奥で目撃された「人の声を真似る」謎の生物の調査に、あなたは探索者として派遣される。以下の登録票に記入せよ。</p>
+    </div>
+    <div class="form-row"><label for="f-name">氏名</label><input type="text" id="f-name" maxlength="16" value="${esc(draft.name)}" autocomplete="off"></div>
+    <div class="form-row"><label>職業</label><div class="jobs">
+      ${Object.entries(JOBS).map(([k, j]) => `<label><input type="radio" name="job" value="${k}" ${k === draft.job ? "checked" : ""}>${j.name}<small>${j.desc}</small></label>`).join("")}
+    </div></div>
+    <div class="form-row" style="display:block"><label>能力値</label>
+      <div class="stat-grid" style="margin-top:6px">
+        <div><span>耐久力 HP</span><b>${b.hp}</b></div>
+        <div><span>正気度 SAN</span><b>${b.san}</b></div>
+        ${SKILLS.map((k) => `<div><span>${k}</span><b>${Math.min(90, b.sk[k] + (job.bonus[k] || 0))}</b></div>`).join("")}
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn ghost" id="reroll">能力値を振り直す</button>
+      <button class="btn" id="start">調査ファイルを開く</button>
+    </div>
+    <div class="rules">
+      <strong>判定のルール</strong><br>
+      ・技能判定は <b>1D100</b> を振り、技能値以下なら成功。01〜05は決定的成功、96〜00は致命的失敗。<br>
+      ・恐ろしいものを見ると<b>正気度ロール</b>（現在SAN以下で成功）。失敗すると大きく正気度を失う。<br>
+      ・HPが0になれば消息不明、SANが0になれば錯乱。エンディングは全5種。
+    </div>`;
+  const nameEl = $("#f-name");
+  nameEl.oninput = () => (draft.name = nameEl.value);
+  paper.querySelectorAll("input[name=job]").forEach((r) => (r.onchange = () => { draft.job = r.value; renderCreate(); }));
+  $("#reroll").onclick = () => { draft.base = rollBase(); glitch(250); renderCreate(); };
+  $("#start").onclick = () => {
+    draft.name = nameEl.value.trim() || "名無しの調査員";
+    newGame();
+    goto("intro");
+  };
+}
+
+updateSheet();
+renderCreate();
+</script>
+</body>
+</html>
