@@ -82,8 +82,13 @@ copied into the nginx image, so after `docker compose up -d --build` it is
 available at `http://<PC-LAN-IP>:8080/game.html` (or the Tailscale IP from
 outside the house), and linked from the portfolio top page.
 
-- Fight waves of enemies in an arena with a sword: 3-hit combo (the 3rd hit is
-  a spin attack), invincible dash, and jump.
+- Hunt monsters in a rocky arena at sunset with a greatsword: 3-hit combo
+  (the 3rd hit is a spin attack), invincible dodge roll, and jump. Every 3rd
+  wave a large wyvern lands and fights with bites, tail spins and charges.
+- Realistic-style visuals are generated entirely in code, with no image or
+  model files: procedural scale/rock/ground/metal textures with normal maps,
+  ACES tone mapping, a sky-based environment map, shadows, and wind-blown
+  grass drawn as a single instanced mesh.
 - Smartphone: drag the left half of the screen for a virtual joystick, drag
   the right half to rotate the camera, and use the ATTACK / JUMP / DASH buttons.
   Landscape is recommended.
