@@ -99,7 +99,7 @@ body.unstable .paper .body p { animation: jitter 6s infinite; }
   display: grid; grid-template-columns: 290px 1fr; gap: 28px; align-items: start;
 }
 @media (max-width: 860px) {
-  .stage { grid-template-columns: 1fr; padding-top: 48px; gap: 18px; }
+  .stage { grid-template-columns: 1fr; padding-top: 48px; gap: 46px; }
 }
 
 /* ===== 探索者手帳 ===== */
@@ -161,7 +161,7 @@ body.unstable .paper .body p { animation: jitter 6s infinite; }
   box-shadow: 2px 3px 0 var(--paper-dark), 4px 6px 0 #d4c49c, 0 2px 10px rgba(0,0,0,.3);
   line-height: 1.95; font-size: 16.5px;
 }
-@media (max-width: 600px) { .paper { padding: 64px 18px 28px; font-size: 15.5px; } }
+@media (max-width: 600px) { .paper { padding: 88px 18px 28px; font-size: 15.5px; } }
 .clip {
   position: absolute; top: -18px; right: 40px; width: 22px; height: 64px;
   border: 3px solid #8b8f96; border-radius: 12px; border-bottom-color: #6f737a; z-index: 2;
@@ -239,6 +239,7 @@ body.unstable .paper .body p { animation: jitter 6s infinite; }
 .footage .face { color: #fff; letter-spacing: 2px; animation: flick .18s steps(2) infinite; }
 @keyframes flick { 50% { opacity: .55; } }
 .footage + .body { margin-top: 0; }
+@media (max-width: 600px) { .footage { font-size: 18px; padding: 40px 16px 24px; margin: 0 0 10px; } }
 
 /* ===== 登録票 ===== */
 .form-row { display: flex; gap: 12px; align-items: baseline; margin: 0 0 14px; flex-wrap: wrap; }
@@ -1110,7 +1111,7 @@ async function wake() {
   return "confront";
 }
 function finish() {
-  if (g.san <= 15) {
+  if (g.san <= Math.max(15, Math.floor(g.msan * 0.4))) {
     g.carry.push(`<p>山を下りてからも、声は耳の奥で鳴り止まなかった。</p>`);
     return "end_mad";
   }
