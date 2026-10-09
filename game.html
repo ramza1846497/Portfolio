@@ -1782,25 +1782,38 @@ function damagePlayer(dmg, from, heavy) {
 // ---------- input ----------
 const keys = {};
 const input = { x: 0, y: 0, atkHeld: false, jump: false, dash: false };
+// some keyboards and browsers report an empty code; fall back to the key name
+const KEY_FALLBACK = { w: 'KeyW', a: 'KeyA', s: 'KeyS', d: 'KeyD', j: 'KeyJ', k: 'KeyK', f: 'KeyF', r: 'KeyR', i: 'KeyI', q: 'KeyQ', e: 'KeyE', ' ': 'Space' };
+const codeOf = (e) => e.code || KEY_FALLBACK[(e.key || '').toLowerCase()] || e.key;
 addEventListener('keydown', (e) => {
-  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
+  const code = codeOf(e);
+  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(code)) e.preventDefault();
+  // auto-repeat keeps a held key registered, so a key cleared by a focus change comes back without re-pressing
+  keys[code] = true;
   if (e.repeat) return;
-  keys[e.code] = true;
-  if (state === 'menu' && (e.code === 'Escape' || e.code === 'KeyI')) { closePanel(); return; }
-  if (state === 'title' && e.code === 'Enter') { startGame(!$('contBtn').hidden); return; }
+  if (state === 'menu' && (code === 'Escape' || code === 'KeyI')) { closePanel(); return; }
+  if (state === 'title' && code === 'Enter') { startGame(!$('contBtn').hidden); return; }
   if (state !== 'play') return;
-  if (e.code === 'KeyF') doAct();
-  if (e.code === 'KeyR') usePotion();
-  if (e.code === 'KeyI') openPanel('inv');
-  if (e.code === 'Space') input.jump = true;
-  if (e.code === 'KeyJ') { input.atkHeld = true; startAttack(); }
-  if (e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'KeyK') input.dash = true;
+  if (code === 'KeyF') doAct();
+  if (code === 'KeyR') usePotion();
+  if (code === 'KeyI') openPanel('inv');
+  if (code === 'Space') input.jump = true;
+  if (code === 'KeyJ') { input.atkHeld = true; startAttack(); }
+  if (code === 'ShiftLeft' || code === 'ShiftRight' || code === 'KeyK') input.dash = true;
 });
 addEventListener('keyup', (e) => {
-  keys[e.code] = false;
-  if (e.code === 'KeyJ') input.atkHeld = false;
+  const code = codeOf(e);
+  keys[code] = false;
+  if (code === 'KeyJ') input.atkHeld = false;
 });
-addEventListener('blur', () => { for (const k in keys) keys[k] = false; input.atkHeld = false; releaseStick(); });
+function clearHeldInput() {
+  for (const k in keys) keys[k] = false;
+  input.atkHeld = false;
+  input.x = input.y = 0;
+}
+// a lost focus only clears held keys; a finger still on the stick keeps steering on its next move
+addEventListener('blur', clearHeldInput);
+document.addEventListener('visibilitychange', () => { if (document.hidden) { clearHeldInput(); releaseStick(); camId = null; } });
 
 const stickEl = $('stick'), knobEl = $('knob');
 let stickId = null, stickOx = 0, stickOy = 0, camId = null, camLx = 0, camLy = 0, camMoved = 0, mouseDownAt = 0;
@@ -1814,16 +1827,19 @@ canvas.addEventListener('pointerdown', (e) => {
   if (state !== 'play') return;
   e.preventDefault();
   const mouse = e.pointerType === 'mouse';
-  if (!mouse && e.clientX < innerWidth * 0.5 && stickId === null) {
+  // a new touch always takes over, so a stick or camera drag whose release event was lost never blocks input
+  if (!mouse && e.clientX < innerWidth * 0.5) {
     stickId = e.pointerId; stickOx = e.clientX; stickOy = e.clientY;
+    input.x = input.y = 0;
     stickEl.style.left = stickOx + 'px'; stickEl.style.top = stickOy + 'px';
+    knobEl.style.transform = '';
     stickEl.hidden = false;
-  } else if (camId === null) {
+  } else {
     camId = e.pointerId; camLx = e.clientX; camLy = e.clientY; camMoved = 0; mouseDownAt = performance.now();
-  } else return;
+  }
   try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
 });
-canvas.addEventListener('pointermove', (e) => {
+addEventListener('pointermove', (e) => {
   if (e.pointerId === stickId) {
     let dx = e.clientX - stickOx, dy = e.clientY - stickOy;
     const d = Math.hypot(dx, dy);
@@ -1848,8 +1864,9 @@ function pointerEnd(e) {
     if (e.pointerType === 'mouse' && camMoved < 6 && performance.now() - mouseDownAt < 300 && e.type === 'pointerup') startAttack();
   }
 }
-canvas.addEventListener('pointerup', pointerEnd);
-canvas.addEventListener('pointercancel', pointerEnd);
+// listen on the window too, in case pointer capture is not honoured
+addEventListener('pointerup', pointerEnd);
+addEventListener('pointercancel', pointerEnd);
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 document.addEventListener('touchmove', (e) => { if ((!$('overlay').contains(e.target) || $('overlay').hidden) && !$('sheet').contains(e.target)) e.preventDefault(); }, { passive: false });
 document.addEventListener('gesturestart', (e) => e.preventDefault());
