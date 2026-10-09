@@ -11,6 +11,8 @@
 - Added node_exporter to monitor home PC memory usage, with a Grafana dashboard
 - Made the dashboard viewable from a smartphone, both on the home Wi-Fi and from
   outside the house over a Tailscale VPN
+- Made "Blade Arena", a 3D action game that runs in a smartphone browser,
+  and served it from the same nginx container
 ## Environment
 - OS: Ubuntu 24.04
 - Platform: WSL2 on Windows
@@ -72,3 +74,19 @@ fresh install and won't override it. Reset it directly instead:
 ```
 docker compose exec grafana grafana-cli admin reset-admin-password <new-password>
 ```
+
+## Blade Arena (3D action game for smartphones)
+
+`game.html` is a single-file 3D action game built with Three.js (WebGL). It is
+copied into the nginx image, so after `docker compose up -d --build` it is
+available at `http://<PC-LAN-IP>:8080/game.html` (or the Tailscale IP from
+outside the house), and linked from the portfolio top page.
+
+- Fight waves of enemies in an arena with a sword: 3-hit combo (the 3rd hit is
+  a spin attack), invincible dash, and jump.
+- Smartphone: drag the left half of the screen for a virtual joystick, drag
+  the right half to rotate the camera, and use the ATTACK / JUMP / DASH buttons.
+  Landscape is recommended.
+- PC: WASD to move, J or click to attack, Space to jump, Shift to dash,
+  Q/E or mouse drag to rotate the camera.
+- Three.js is loaded from cdnjs, so the browser needs internet access.
