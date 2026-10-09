@@ -93,8 +93,12 @@ canvas#c { position: fixed; inset: 0; width: 100%; height: 100%; display: block;
 #btnPotion { width: 54px; height: 54px; right: 176px; bottom: 6px; font-size: 13px; line-height: 1.1; }
 #btnPotion small { display: block; font-size: 11px; color: var(--dim); }
 
+#focusHint { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); pointer-events: none;
+  font-family: var(--display); font-size: 20px; letter-spacing: 0.2em; padding: 14px 28px; color: var(--ink);
+  background: var(--panel); border: 1px solid var(--bronze); text-shadow: 0 1px 2px #000; }
 #hint { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); transform: translateX(-50%);
-  font-size: 12px; color: var(--dim); pointer-events: none; white-space: nowrap; text-shadow: 0 1px 2px #000; }
+  width: min(92vw, 640px); text-align: center; line-height: 1.6;
+  font-size: 12px; color: var(--dim); pointer-events: none; text-shadow: 0 1px 2px #000; }
 
 /* base / inventory panel */
 #panel { position: fixed; inset: 0; display: grid; place-items: center; padding: 16px; background: rgba(8, 6, 4, 0.55); }
@@ -181,7 +185,8 @@ canvas#c { position: fixed; inset: 0; width: 100%; height: 100%; display: block;
   <button class="btn" id="btnJump" type="button">跳躍</button>
   <button class="btn" id="btnAtk" type="button">斬</button>
 </div>
-<div id="hint" hidden>WASD 移動 · J/クリック 攻撃 · Space ジャンプ · Shift 回避 · F 採取/拠点 · R 回復薬 · I 持ち物 · Q/E 視点</div>
+<div id="hint" hidden>クリックでマウス操作 · マウス 視点 · 左クリック/J 攻撃 · 右クリック/Shift 回避 · WASD 移動 · Space ジャンプ · F 採取/拠点 · R 回復薬 · I 持ち物 · Esc 解除</div>
+<div id="focusHint" hidden>クリックして再開</div>
 
 <div id="panel" hidden>
   <div class="sheet" id="sheet"></div>
@@ -1823,10 +1828,30 @@ function releaseStick() {
   stickEl.hidden = true;
   knobEl.style.transform = '';
 }
+// Desktop: a click locks the mouse to the game (like a PC game), so the cursor cannot wander off the page
+// and take keyboard focus with it. While locked, the mouse turns the camera, left button attacks, right button dodges.
+const locked = () => document.pointerLockElement === canvas;
+let lockClick = false;
+function requestLock() {
+  if (isTouch || !canvas.requestPointerLock || locked()) return;
+  try { const r = canvas.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (err) { /* pointer lock unavailable: drag to look instead */ }
+}
+function releaseLock() { if (locked() && document.exitPointerLock) document.exitPointerLock(); }
+document.addEventListener('pointerlockchange', () => { if (!locked()) input.atkHeld = false; });
 canvas.addEventListener('pointerdown', (e) => {
   if (state !== 'play') return;
   e.preventDefault();
   const mouse = e.pointerType === 'mouse';
+  if (mouse) {
+    if (locked()) {
+      if (e.button === 0) { input.atkHeld = true; startAttack(); }
+      else if (e.button === 2) input.dash = true;
+      return;
+    }
+    // the click that locks the mouse only grabs it; it does not also swing the sword
+    if (canvas.requestPointerLock) lockClick = true;
+    requestLock();
+  }
   // a new touch always takes over, so a stick or camera drag whose release event was lost never blocks input
   if (!mouse && e.clientX < innerWidth * 0.5) {
     stickId = e.pointerId; stickOx = e.clientX; stickOy = e.clientY;
@@ -1840,6 +1865,11 @@ canvas.addEventListener('pointerdown', (e) => {
   try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
 });
 addEventListener('pointermove', (e) => {
+  if (locked()) {
+    yaw -= (e.movementX || 0) * 0.0035;
+    pitch = Math.min(1.1, Math.max(0.12, pitch + (e.movementY || 0) * 0.0025));
+    return;
+  }
   if (e.pointerId === stickId) {
     let dx = e.clientX - stickOx, dy = e.clientY - stickOy;
     const d = Math.hypot(dx, dy);
@@ -1857,11 +1887,13 @@ addEventListener('pointermove', (e) => {
   }
 });
 function pointerEnd(e) {
+  if (e.pointerType === 'mouse' && locked()) { if (e.button === 0) input.atkHeld = false; if (camId === e.pointerId) camId = null; lockClick = false; return; }
   if (e.pointerId === stickId) releaseStick();
   if (e.pointerId === camId) {
     camId = null;
     // a quick mouse click without dragging attacks on desktop
-    if (e.pointerType === 'mouse' && camMoved < 6 && performance.now() - mouseDownAt < 300 && e.type === 'pointerup') startAttack();
+    if (e.pointerType === 'mouse' && !lockClick && camMoved < 6 && performance.now() - mouseDownAt < 300 && e.type === 'pointerup') startAttack();
+    lockClick = false;
   }
 }
 // listen on the window too, in case pointer capture is not honoured
@@ -2559,6 +2591,7 @@ function applyEquipment() {
 // ---------- base menu & inventory ----------
 let panelMode = null;
 function openPanel(mode) {
+  releaseLock();
   if (state !== 'play') return;
   panelMode = mode;
   state = 'menu';
@@ -2705,6 +2738,14 @@ function startGame(cont) {
   setControlsVisible(true);
   banner('辺境の拠点', $('goalText').textContent);
 }
+function updateFocusHint() {
+  const show = state === 'play' && !isTouch && !document.hasFocus();
+  if ($('focusHint').hidden === show) $('focusHint').hidden = !show;
+}
+addEventListener('focus', updateFocusHint);
+addEventListener('blur', updateFocusHint);
+// try to take focus back as soon as the mouse returns to the game
+document.addEventListener('pointerover', () => { if (state === 'play' && !document.hasFocus()) { try { window.focus(); } catch (err) { /* not allowed */ } } });
 function setControlsVisible(v) {
   $('hud').hidden = !v;
   $('buttons').hidden = !v || !isTouch;
@@ -2861,6 +2902,7 @@ function frame(now) {
       if (P.deadT > 3.4) respawnAtBase();
     }
     updateHud(dt);
+    updateFocusHint();
     mapT -= realDt;
     if (mapT <= 0) { mapT = 0.1; drawMinimap(); }
     saveT += dt;
