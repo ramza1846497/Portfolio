@@ -85,6 +85,10 @@ outside the house), and linked from the portfolio top page.
 - Hunt monsters in a rocky arena at sunset with a greatsword: 3-hit combo
   (the 3rd hit is a spin attack), invincible dodge roll, and jump. Every 3rd
   wave a large wyvern lands and fights with bites, tail spins and charges.
+- Animation is driven by keyframed full-body actions (wind-up, strike,
+  follow-through with root motion) layered over procedural locomotion with
+  acceleration, turning and body lean; monsters move with inertia, track the
+  hunter with their heads, and have whip-like tails and hit-recoil springs.
 - Realistic-style visuals are generated entirely in code, with no image or
   model files: procedural scale/rock/ground/metal textures with normal maps,
   ACES tone mapping, a sky-based environment map, shadows, and wind-blown
