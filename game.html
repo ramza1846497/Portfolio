@@ -625,7 +625,7 @@ function buildWorldTextures() {
 }
 
 const trees = [], nodes = [], herbs = [], chunks = [], falling = [], shakers = [];
-let water = null, grass = null, fireLight = null, fireSprites = [], mapCanvas = null;
+let terrain = null, water = null, grass = null, fireLight = null, fireSprites = [], mapCanvas = null;
 const grassCenter = new THREE.Vector2(1e9, 1e9);
 const structures = {};
 const grassUniform = { value: 0 };
@@ -640,10 +640,10 @@ function buildTerrain() {
     const x = p.getX(i), z = p.getZ(i);
     const ix = Math.round((x + WORLD_HALF) / GRID), iz = Math.round((z + WORLD_HALF) / GRID);
     p.setY(i, HEIGHTS[iz * GN + ix]);
-    uv.setXY(i, x / 5, z / 5);
+    uv.setXY(i, x / 3.5, z / 3.5);
   }
   geo.computeVertexNormals();
-  const n = geo.attributes.normal, colors = new Float32Array(p.count * 3);
+  const n = geo.attributes.normal, colors = new Float32Array(p.count * 3), tmix = new Float32Array(p.count * 2);
   mapCanvas = document.createElement('canvas');
   mapCanvas.width = mapCanvas.height = GN;
   const mctx = mapCanvas.getContext('2d'), img = mctx.createImageData(GN, GN);
@@ -651,14 +651,18 @@ function buildTerrain() {
     const x = p.getX(i), y = p.getY(i), z = p.getZ(i), ny = n.getY(i);
     const g = fbm(x * 0.04, z * 0.04, 3);
     let c = [lerp(0.3, 0.48, smooth(0.4, 0.7, g)), lerp(0.37, 0.44, smooth(0.4, 0.7, g)), lerp(0.16, 0.24, smooth(0.4, 0.7, g))];
-    const mix = (t, r, gg, b) => { c = [lerp(c[0], r, t), lerp(c[1], gg, t), lerp(c[2], b, t)]; };
-    mix(smooth(0.55, 0.7, forestAt(x, z)) * 0.8, 0.2, 0.23, 0.12);
+    // bare: how much this spot is rock, sand, dirt or snow rather than grassy ground
+    let bare = 0;
+    const mix = (t, r, gg, b, isBare) => { c = [lerp(c[0], r, t), lerp(c[1], gg, t), lerp(c[2], b, t)]; if (isBare !== false) bare = Math.max(bare, t); };
+    const forest = smooth(0.55, 0.7, forestAt(x, z)) * 0.8;
+    mix(forest, 0.2, 0.23, 0.12, false);
     mix(smooth(BASE.r + 10, BASE.r - 6, Math.hypot(x - BASE.x, z - BASE.z)), 0.42, 0.34, 0.23);
     mix(Math.max(smooth(0.86, 0.68, ny), smooth(55, 140, x) * smooth(8, 20, y)), 0.46, 0.43, 0.39);
     mix(smooth(NEST.r + 8, NEST.r - 6, Math.hypot(x - NEST.x, z - NEST.z)), 0.3, 0.24, 0.19);
     mix(smooth(WATER_Y + 1.6, WATER_Y + 0.3, y), 0.6, 0.54, 0.4);
     mix(smooth(WATER_Y, WATER_Y - 2, y), 0.3, 0.3, 0.25);
     mix(smooth(45, 62, y), 0.86, 0.87, 0.9);
+    tmix[i * 2] = 1 - bare; tmix[i * 2 + 1] = 1 - forest * 0.55;
     const L = lin(c[0], c[1], c[2]);
     colors[i * 3] = L[0]; colors[i * 3 + 1] = L[1]; colors[i * 3 + 2] = L[2];
     // minimap pixel (water drawn blue)
@@ -669,7 +673,8 @@ function buildTerrain() {
   }
   mctx.putImageData(img, 0, 0);
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  const terrain = new THREE.Mesh(geo, std(0xffffff, 0, 0.95, TEX.detail, { vertexColors: true }));
+  geo.setAttribute('tmix', new THREE.BufferAttribute(tmix, 2));
+  terrain = new THREE.Mesh(geo, std(0xffffff, 0, 0.95, TEX.detail, { vertexColors: true }));
   terrain.receiveShadow = true;
   scene.add(terrain);
 
@@ -988,9 +993,51 @@ function buildStructure(key, built) {
   structures[key].group = g;
 }
 
+// Photo-scanned ground (textures/ground/*.jpg) on grassy terrain, blended with the vertex-coloured
+// procedural ground on rock, sand, dirt and snow. Without the files the procedural ground stays.
+function useGroundPhoto(colorTex, normalTex) {
+  const mat = terrain.material, avg = photoAverage(colorTex.image);
+  mat.map = colorTex;
+  mat.normalMap = normalTex;
+  mat.normalScale.set(1, 1);
+  mat.onBeforeCompile = (sh) => {
+    sh.uniforms.detailMap = { value: TEX.detail.map };
+    sh.uniforms.photoAvg = { value: avg };
+    sh.vertexShader = 'attribute vec2 tmix;\nvarying vec2 vTmix;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvTmix = tmix;');
+    sh.fragmentShader = 'uniform sampler2D detailMap;\nuniform vec3 photoAvg;\nvarying vec2 vTmix;\n' + sh.fragmentShader
+      .replace('#include <map_fragment>', [
+        // two samples at different scales hide the tiling
+        'vec3 photo = mapTexelToLinear(texture2D(map, vUv)).rgb;',
+        'vec3 photo2 = mapTexelToLinear(texture2D(map, vUv * 0.29 + vec2(0.37, 0.71))).rgb;',
+        // keep the photo's local light and dark, but take the hue from the biome colour
+        'vec3 pn = mix(vec3(1.0), mix(photo, photo2, 0.4) / photoAvg, 1.6);',
+        'vec3 det = mapTexelToLinear(texture2D(detailMap, vUv * 0.7)).rgb;',
+        'diffuseColor.rgb *= vColor * mix(det, pn, vTmix.x);',
+      ].join('\n'))
+      .replace('#include <color_fragment>', '');
+  };
+  mat.needsUpdate = true;
+}
+// average colour of the photo in linear space, used to turn it into a relative detail layer
+function photoAverage(img) {
+  const c = document.createElement('canvas'); c.width = c.height = 16;
+  const g = c.getContext('2d');
+  g.drawImage(img, 0, 0, 16, 16);
+  const d = g.getImageData(0, 0, 16, 16).data, sum = [0, 0, 0];
+  for (let i = 0; i < d.length; i += 4) for (let k = 0; k < 3; k++) sum[k] += Math.pow(d[i + k] / 255, 2.2);
+  return new THREE.Vector3(sum[0] / 256 || 0.1, sum[1] / 256 || 0.1, sum[2] / 256 || 0.1);
+}
+function loadGroundPhoto() {
+  const L = new THREE.TextureLoader();
+  const prep = (t, srgb) => { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = ANISO; if (srgb) t.encoding = THREE.sRGBEncoding; return t; };
+  L.load('textures/ground/color.jpg', (c) => {
+    L.load('textures/ground/normal.jpg', (n) => useGroundPhoto(prep(c, true), prep(n)), undefined, () => useGroundPhoto(prep(c, true), TEX.detail.normalMap));
+  }, undefined, () => { /* no photo textures shipped: keep the procedural ground */ });
+}
 function buildWorld() {
   buildWorldTextures();
   buildTerrain();
+  loadGroundPhoto();
   buildForest();
   buildRocksAndNodes();
   buildHerbs();

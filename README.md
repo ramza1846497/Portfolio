@@ -108,4 +108,8 @@ outside the house), and linked from the portfolio top page.
   procedural textures with normal maps, a height-mapped terrain with
   vertex-coloured biomes, instanced forests and grass, ACES tone mapping and
   a sky-based environment map.
+- Optional photo-scanned textures live in `textures/` (CC0, from Poly Haven).
+  `textures/ground/color.jpg` and `normal.jpg` are blended into grassy terrain
+  as a detail layer under the biome colours; if the files are missing the
+  game falls back to its procedural ground.
 - Three.js is loaded from cdnjs, so the browser needs internet access.
