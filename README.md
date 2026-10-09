@@ -75,27 +75,37 @@ fresh install and won't override it. Reset it directly instead:
 docker compose exec grafana grafana-cli admin reset-admin-password <new-password>
 ```
 
-## Blade Arena (3D action game for smartphones)
+## Blade Arena (3D open-world hunting game for smartphones)
 
 `game.html` is a single-file 3D action game built with Three.js (WebGL). It is
 copied into the nginx image, so after `docker compose up -d --build` it is
 available at `http://<PC-LAN-IP>:8080/game.html` (or the Tailscale IP from
 outside the house), and linked from the portfolio top page.
 
-- Hunt monsters in a rocky arena at sunset with a greatsword: 3-hit combo
-  (the 3rd hit is a spin attack), invincible dodge roll, and jump. Every 3rd
-  wave a large wyvern lands and fights with bites, tail spins and charges.
-- Animation is driven by keyframed full-body actions (wind-up, strike,
-  follow-through with root motion) layered over procedural locomotion with
-  acceleration, turning and body lean; monsters move with inertia, track the
-  hunter with their heads, and have whip-like tails and hit-recoil springs.
-- Realistic-style visuals are generated entirely in code, with no image or
-  model files: procedural scale/rock/ground/metal textures with normal maps,
-  ACES tone mapping, a sky-based environment map, shadows, and wind-blown
-  grass drawn as a single instanced mesh.
-- Smartphone: drag the left half of the screen for a virtual joystick, drag
-  the right half to rotate the camera, and use the ATTACK / JUMP / DASH buttons.
+- An open world (about 400 m across) around a base camp: a northern forest,
+  rocky eastern highlands with iron ore, a southern lake, and a wyvern's nest
+  in the west.
+- Gather materials by cutting trees and rocks with the greatsword and picking
+  herbs, then build a workbench, forge and watchtower at the base, brew
+  potions, and upgrade the sword and armor. A goal tracker guides the
+  progression up to hunting the wyvern; progress is saved in the browser
+  (localStorage).
+- Raptors roam in packs and hunt the player inside their territory; the wyvern
+  guards its nest. The base is a safe zone, and fainting sends the player back
+  to the campfire.
+- Smartphone: drag the left half of the screen to move, drag the right half to
+  rotate the camera, and use the 斬 (attack) / 回避 (dodge) / 跳躍 (jump) /
+  薬 (potion) buttons plus the context button (採取 gather, 拠点 base menu).
   Landscape is recommended.
-- PC: WASD to move, J or click to attack, Space to jump, Shift to dash,
+- PC: WASD to move, J or click to attack, Space to jump, Shift to dodge,
+  F to gather / open the base menu, R for a potion, I for the inventory,
   Q/E or mouse drag to rotate the camera.
+- Animation is driven by keyframed full-body actions (wind-up, strike,
+  follow-through with root motion) layered over procedural locomotion;
+  monsters move with inertia, track the hunter with their heads, and have
+  whip-like tails and hit-recoil springs.
+- Visuals are generated entirely in code, with no image or model files:
+  procedural textures with normal maps, a height-mapped terrain with
+  vertex-coloured biomes, instanced forests and grass, ACES tone mapping and
+  a sky-based environment map.
 - Three.js is loaded from cdnjs, so the browser needs internet access.
