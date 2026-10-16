@@ -81,14 +81,39 @@ function handleEvent(type, p) {
 }
 
 // ---------- ポインタロック ----------
-function requestLock() {
-  try {
-    const p = canvas.requestPointerLock();
-    if (p && typeof p.catch === 'function') p.catch(() => showPause());
-  } catch {
+// マウスを固定できない環境（埋め込み表示など）では、右ドラッグで見回す方式に切り替える
+let everLocked = false;
+let freeLook = false;
+
+function lockFailed() {
+  if (everLocked) {
     showPause();
+    return;
+  }
+  if (!freeLook) {
+    freeLook = true;
+    controls.setDragLook(true);
+    hud.setNote('この画面ではマウスを固定できないため、右ボタンを押しながらドラッグで見回します');
+  }
+  if (mode === 'paused' || mode === 'play') {
+    mode = 'play';
+    $('screen-pause').hidden = true;
   }
 }
+
+function requestLock() {
+  if (freeLook) {
+    lockFailed();
+    return;
+  }
+  try {
+    const p = canvas.requestPointerLock();
+    if (p && typeof p.catch === 'function') p.catch(lockFailed);
+  } catch {
+    lockFailed();
+  }
+}
+document.addEventListener('pointerlockerror', lockFailed);
 
 function showPause() {
   if (mode === 'play' || mode === 'paused') {
@@ -98,6 +123,7 @@ function showPause() {
 }
 
 controls.look.addEventListener('lock', () => {
+  everLocked = true;
   if (mode === 'result' || mode === 'title') return;
   mode = 'play';
   $('screen-pause').hidden = true;
@@ -187,7 +213,14 @@ function renderStartButtons() {
   box.onclick = (e) => {
     const action = e.target.closest('[data-action]')?.dataset.action;
     if (action === 'continue') startGame(save);
-    if (action === 'new' && (!save || window.confirm('セーブを消して最初から始めますか？'))) startGame(newGameSave());
+    if (action === 'new' && !save) startGame(newGameSave());
+    // セーブがあるときは、2回押して確認する
+    if (action === 'new' && save) {
+      const btn = e.target.closest('[data-action]');
+      btn.dataset.action = 'new-confirm';
+      btn.textContent = 'もう一度押すと、セーブを消して最初から始めます';
+    }
+    if (action === 'new-confirm') startGame(newGameSave());
   };
 }
 
@@ -209,7 +242,16 @@ document.addEventListener('mouseup', () => {
   holding = false;
 });
 window.addEventListener('keydown', (e) => {
-  if (e.code === 'Escape' && openPanelName) closePanel();
+  if (e.code === 'Escape' && openPanelName) {
+    closePanel();
+    return;
+  }
+  if (e.code === 'Escape' && freeLook && mode === 'play') {
+    holding = false;
+    controls.releaseAll();
+    showPause();
+    return;
+  }
   if (mode !== 'play') return;
   if (e.code === 'KeyQ') game.drop();
   if (e.code === 'Enter' && game.state.phase === 'prep') game.openStore();

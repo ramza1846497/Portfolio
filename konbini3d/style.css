@@ -97,6 +97,7 @@ button { font: inherit; color: inherit; }
   padding: 6px 14px; background: rgba(35, 48, 43, 0.8); border-radius: 999px; font-weight: 700; text-shadow: none;
 }
 .hud__keys { position: absolute; bottom: 12px; left: 12px; font-size: 12px; opacity: 0.85; }
+.hud__note { margin-top: 4px; color: #ffe39c; font-weight: 700; }
 
 /* ---------- 3D上のラベル ---------- */
 .labels { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }

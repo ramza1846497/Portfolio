@@ -10,6 +10,8 @@ const dir = new THREE.Vector3();
 
 export function createPlayerControls(camera, dom) {
   const look = new PointerLockControls(camera, dom);
+  // ロックできないときは main.js が見回し方を切り替えるので、three.js のエラー表示は止める
+  dom.ownerDocument.removeEventListener('pointerlockerror', look._onPointerlockError);
   const keys = { KeyW: false, KeyA: false, KeyS: false, KeyD: false, ArrowUp: false, ArrowLeft: false, ArrowDown: false, ArrowRight: false };
   const pos = { x: 0, z: 0 };
   const forward = { x: 0, z: -1 };
@@ -25,6 +27,31 @@ export function createPlayerControls(camera, dom) {
   };
   window.addEventListener('blur', releaseAll);
   look.addEventListener('unlock', releaseAll);
+
+  // ポインタロックが使えないとき用：右ボタンを押しながらドラッグで見回す
+  let dragLook = false;
+  let dragging = false;
+  const euler = new THREE.Euler(0, 0, 0, 'YXZ');
+  dom.addEventListener('contextmenu', (e) => {
+    if (dragLook) e.preventDefault();
+  });
+  dom.addEventListener('mousedown', (e) => {
+    if (dragLook && e.button === 2) dragging = true;
+  });
+  window.addEventListener('mouseup', (e) => {
+    if (e.button === 2) dragging = false;
+  });
+  window.addEventListener('mousemove', (e) => {
+    if (!dragLook || !dragging || document.pointerLockElement) return;
+    euler.setFromQuaternion(camera.quaternion);
+    euler.y -= e.movementX * 0.005;
+    euler.x = Math.max(-1.5, Math.min(1.5, euler.x - e.movementY * 0.005));
+    camera.quaternion.setFromEuler(euler);
+  });
+  function setDragLook(on) {
+    dragLook = on;
+    dragging = false;
+  }
 
   function reset(spawn) {
     pos.x = spawn.x;
@@ -53,5 +80,5 @@ export function createPlayerControls(camera, dom) {
     camera.position.set(pos.x, EYE_HEIGHT, pos.z);
   }
 
-  return { look, pos, forward, reset, update, releaseAll };
+  return { look, pos, forward, reset, update, releaseAll, setDragLook };
 }

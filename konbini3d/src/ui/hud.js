@@ -25,7 +25,7 @@ export function createHud(root) {
     <div class="hud__hint" id="hud-hint"><div class="hud__hint-title"></div><div class="hud__hint-action"></div></div>
     <div class="hud__pops" id="hud-pops"></div>
     <div class="hud__hand" id="hud-hand" hidden></div>
-    <div class="hud__keys">WASD 移動　クリック 使う（長押しで連続補充）　Q 下ろす　Esc 一時停止</div>
+    <div class="hud__keys">WASD 移動　クリック 使う（長押しで連続補充）　Q 下ろす　Esc 一時停止<div class="hud__note" id="hud-note" hidden></div></div>
   `;
   const $ = (id) => root.querySelector(`#${id}`);
   const els = {
@@ -80,9 +80,15 @@ export function createHud(root) {
     el.addEventListener('animationend', () => el.remove());
   }
 
+  function setNote(text) {
+    const el = root.querySelector('#hud-note');
+    el.textContent = text;
+    el.hidden = !text;
+  }
+
   function setVisible(v) {
     root.hidden = !v;
   }
 
-  return { update, toast, pop, setVisible };
+  return { update, toast, pop, setVisible, setNote };
 }
