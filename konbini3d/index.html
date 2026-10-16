@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>まいにちマート3D</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E%F0%9F%8F%AA%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+      }
+    }
+  </script>
+  <script type="module" src="src/main.js"></script>
+</head>
+<body>
+  <canvas id="view"></canvas>
+  <div id="labels" class="labels"></div>
+  <div id="hud" class="hud" hidden></div>
+
+  <div id="panel-register" class="panel" hidden></div>
+  <div id="panel-order" class="panel" hidden></div>
+  <div id="panel-fryer" class="panel" hidden></div>
+
+  <div id="screen-start" class="overlay">
+    <div class="overlay__box start">
+      <p class="start__store">🏪 まいにちマート</p>
+      <h1>ワンオペ店員シミュレーター</h1>
+      <p class="start__lead">品出し、レジ、からあげ揚げ、床掃除、発注。ひとりでお店を回して、1日の利益を出そう。</p>
+      <table class="keys">
+        <tr><th>W A S D</th><td>移動</td></tr>
+        <tr><th>マウス</th><td>見回す（画面をクリックで操作開始）</td></tr>
+        <tr><th>左クリック</th><td>調べる・持つ・置く・使う（棚の補充は長押しで連続）</td></tr>
+        <tr><th>Q</th><td>持っている物を下ろす</td></tr>
+        <tr><th>Enter</th><td>開店前の準備中に、すぐ開店する</td></tr>
+        <tr><th>Esc</th><td>一時停止 ／ パネルを閉じる</td></tr>
+      </table>
+      <div class="start__buttons" id="start-buttons"><p class="start__loading" id="start-loading">読み込み中…</p></div>
+      <p class="start__note">PCのブラウザ（キーボードとマウス）向けです。</p>
+    </div>
+  </div>
+
+  <div id="screen-pause" class="overlay overlay--light" hidden>
+    <div class="overlay__box pause">
+      <h2>一時停止中</h2>
+      <p>画面をクリックすると再開します</p>
+    </div>
+  </div>
+
+  <div id="screen-result" class="overlay" hidden></div>
+
+  <script>
+    // three.js（CDN）を読み込めなかったときの案内
+    setTimeout(function () {
+      if (!window.__konbiniReady) {
+        var el = document.getElementById('start-loading');
+        if (el) el.textContent = '3D表示のライブラリ（three.js）を読み込めませんでした。ネットワーク接続を確認して、簡易サーバー経由で開いてください。';
+      }
+    }, 10000);
+  </script>
+</body>
+</html>
