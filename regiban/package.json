@@ -1,0 +1,8 @@
+{
+  "name": "regiban",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}
