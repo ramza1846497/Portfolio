@@ -1,81 +1,107 @@
 // 客タイプの定義と生成。タイプごとの違いはここのデータで表現し、ゲーム側に分岐を書かない。
 
-import { minCoins, formatYen } from './money.js';
+import { formatYen, isRealisticPayment, sumMoney, minCoins as breakdownOf } from './money.js';
 import { pickProducts, sumPrices } from './products.js';
 
 // 客が払うときに使う金種（1万円札あり）
 const PAY_DENOMINATIONS = [10000, 5000, 1000, 500, 100, 50, 10, 5, 1];
 
-// 開始30秒以降は難しくなる
-export const LATE_AFTER_SEC = 30;
-const ITEM_RANGE = { early: [1, 2], late: [1, 4] };
-const DEFAULT_PAY_DELAY_MS = 600;
-
-const ceilTo = (value, unit) => Math.ceil(value / unit) * unit;
-// value より大きい unit の倍数
-const aboveTo = (value, unit) => ceilTo(value + 1, unit);
-
 function moneyName(value) {
   return value >= 1000 ? `${formatYen(value)}札` : `${value}円玉`;
 }
 
+// 出したお金の配列 → 「千円札×1 10円玉×2」のような表示
+function describeGiven(given) {
+  const counts = new Map();
+  for (const v of given) counts.set(v, (counts.get(v) ?? 0) + 1);
+  return [...counts.keys()].sort((a, b) => b - a).map((v) => `${moneyName(v)}×${counts.get(v)}`).join(' ');
+}
+
+// 金額をできるだけ少ない枚数のお金にする
+function asMoney(amount) {
+  const { breakdown } = breakdownOf(amount, PAY_DENOMINATIONS);
+  return Object.entries(breakdown).flatMap(([d, n]) => Array(n).fill(Number(d)));
+}
+
 export function describeMoney(amount) {
-  const { breakdown } = minCoins(amount, PAY_DENOMINATIONS);
-  return Object.keys(breakdown)
-    .map(Number)
-    .sort((a, b) => b - a)
-    .map((d) => `${moneyName(d)}×${breakdown[d]}`)
-    .join(' ');
+  return describeGiven(asMoney(amount));
 }
 
-// 合計より大きい切りのいい額で払う
-function payRound(total, rng) {
-  const options = [
-    { unit: 1000, weight: 6 },
-    { unit: 500, weight: 2 },
-    { unit: 100, weight: 1 },
+function payment(given) {
+  return { paid: sumMoney(given), given, label: describeGiven(given) };
+}
+
+// 候補のうち現実的なものから重み付きで選ぶ。どれも当てはまらなければ、合計以上の一番小さいお札（硬貨）1枚で払う
+function choose(total, rng, candidates) {
+  const ok = candidates.filter((c) => c.weight > 0 && isRealisticPayment(total, c.given));
+  if (ok.length) return payment(rng.weighted(ok, (c) => c.weight).given);
+  const single = [500, 1000, 5000, 10000].find((v) => v >= total);
+  return payment([single]);
+}
+
+// 切りのいい額で払う：千円札（足りなければ枚数を増やす）、5千円札、500円玉、100円玉だけ など
+function roundCandidates(total) {
+  return [
+    { given: Array(Math.ceil(total / 1000)).fill(1000), weight: 6 },
+    { given: [5000], weight: total < 5000 ? 1 : 0 },
+    { given: [500], weight: total <= 500 ? 2 : 0 },
+    { given: Array(Math.ceil(total / 100)).fill(100), weight: total <= 400 ? 1 : 0 },
+    { given: [10000], weight: total > 1000 ? 0.5 : 0.2 },
   ];
-  if (total < 5000) options.push({ unit: 5000, weight: 1 });
-  const { unit } = rng.weighted(options, (o) => o.weight);
-  const paid = aboveTo(total, unit);
-  return { paid, label: describeMoney(paid) };
 }
 
-// 端数を足して、お釣りが切りよくなるように払う（520円に1020円など）
+function payRound(total, rng) {
+  return choose(total, rng, roundCandidates(total));
+}
+
+// 端数を足して、お釣りの枚数が減るように払う（520円に1020円 → お釣り500円玉1枚）
 function paySmallChange(total, rng) {
-  const fractions = [total % 500, total % 100, total % 10].filter((r) => r > 0);
-  if (fractions.length === 0) return payRound(total, rng);
-  const fraction = rng.pick(fractions);
-  const base = aboveTo(total, 1000);
-  return {
-    paid: base + fraction,
-    label: `${describeMoney(base)} ＋ ${describeMoney(fraction)}`,
-  };
+  const bills = Array(Math.ceil(total / 1000)).fill(1000);
+  const plain = breakdownOf(sumMoney(bills) - total).count;
+  const candidates = [];
+  for (const unit of [10, 50, 100, 500]) {
+    const fraction = total % unit;
+    if (fraction === 0) continue;
+    const given = [...bills, ...asMoney(fraction)];
+    // お釣りの枚数が実際に減り、現実的な払い方だけを候補にする
+    if (breakdownOf(sumMoney(given) - total).count < plain && isRealisticPayment(total, given)) candidates.push({ given, weight: 1 });
+  }
+  return candidates.length ? choose(total, rng, candidates) : payRound(total, rng);
 }
 
-// 10円玉と1円玉を大量に出す
+// 小銭ジャラジャラ：100円玉・10円玉・1円玉を数えながら、ちょうどの金額を出す
 function payCoins(total, rng) {
-  const paid = total + rng.int(0, 25);
-  const ones = (paid % 10) + 10 * rng.int(0, 1);
-  const tens = (paid - ones) / 10;
-  const parts = [];
-  if (tens > 0) parts.push(`10円玉×${tens}`);
-  if (ones > 0) parts.push(`1円玉×${ones}`);
-  return { paid, label: parts.join(' ') };
+  const given = [];
+  let rest = total;
+  const hundreds = Math.max(0, Math.floor(rest / 100) - rng.int(2, 5));
+  for (let i = 0; i < hundreds; i++) given.push(100);
+  rest -= hundreds * 100;
+  const ones = (rest % 10) + (rest >= 10 && rng.next() < 0.5 ? 10 : 0);
+  for (let i = 0; i < (rest - ones) / 10; i++) given.push(10);
+  for (let i = 0; i < ones; i++) given.push(1);
+  return payment(given);
 }
 
 function payBigBill() {
-  return { paid: 10000, label: describeMoney(10000) };
+  return payment([10000]);
 }
 
-// 「あ、これも」：追加した商品の分を100円単位で上乗せして払う
-function payAddOn(previous, addedPrice) {
-  const extra = ceilTo(addedPrice, 100);
-  return {
-    paid: previous.paid + extra,
-    label: `${previous.label} ＋ ${describeMoney(extra)}`,
-  };
+// 「あ、これも」：追加した商品の分を足して払う。足し方が不自然なら、払い直す
+function payAddOn(previous, addedPrice, rng, newTotal) {
+  const extras = [asMoney(Math.ceil(addedPrice / 100) * 100), [1000], [500]];
+  const candidates = extras.map((extra) => ({ given: [...previous.given, ...extra], weight: 1 }));
+  const ok = candidates.filter((c) => isRealisticPayment(newTotal, c.given));
+  if (ok.length) {
+    const given = rng.weighted(ok, (c) => c.weight).given;
+    return { ...payment(given), label: `${previous.label} ＋ ${describeGiven(given.slice(previous.given.length))}` };
+  }
+  return payRound(newTotal, rng);
 }
+
+// 開始30秒以降は難しくなる
+export const LATE_AFTER_SEC = 30;
+const ITEM_RANGE = { early: [1, 2], late: [1, 4] };
+const DEFAULT_PAY_DELAY_MS = 600;
 
 export const CUSTOMER_TYPES = Object.freeze([
   {
@@ -192,6 +218,6 @@ export function addItemTo(customer, rng) {
     added,
     items,
     total: sumPrices(items),
-    payment: customer.type.addItem.pay(customer.payment, added.price, rng),
+    payment: customer.type.addItem.pay(customer.payment, added.price, rng, sumPrices(items)),
   };
 }

@@ -1,55 +1,83 @@
 // 客タイプの定義。タイプごとの違いはここのデータ（数値・フラグ・支払い関数・セリフ）で表す。
 
-import { minCoins, formatYen } from '../logic/money.js';
+import { formatYen, isRealisticPayment, sumMoney, minCoins as breakdownOf } from '../logic/money.js';
 
 const PAY_DENOMINATIONS = [10000, 5000, 1000, 500, 100, 50, 10, 5, 1];
-const ceilTo = (value, unit) => Math.ceil(value / unit) * unit;
-const aboveTo = (value, unit) => ceilTo(value + 1, unit);
 
 function moneyName(value) {
   return value >= 1000 ? `${formatYen(value)}札` : `${value}円玉`;
 }
 
+// 出したお金の配列 → 「千円札×1 10円玉×2」のような表示
+function describeGiven(given) {
+  const counts = new Map();
+  for (const v of given) counts.set(v, (counts.get(v) ?? 0) + 1);
+  return [...counts.keys()].sort((a, b) => b - a).map((v) => `${moneyName(v)}×${counts.get(v)}`).join(' ');
+}
+
+// 金額をできるだけ少ない枚数のお金にする
+function asMoney(amount) {
+  const { breakdown } = breakdownOf(amount, PAY_DENOMINATIONS);
+  return Object.entries(breakdown).flatMap(([d, n]) => Array(n).fill(Number(d)));
+}
+
 export function describeMoney(amount) {
-  const { breakdown } = minCoins(amount, PAY_DENOMINATIONS);
-  return Object.keys(breakdown)
-    .map(Number)
-    .sort((a, b) => b - a)
-    .map((d) => `${moneyName(d)}×${breakdown[d]}`)
-    .join(' ');
+  return describeGiven(asMoney(amount));
 }
 
-// 合計より大きい切りのいい額で払う
-function payRound(total, rng) {
-  const options = [
-    { unit: 1000, weight: 6 },
-    { unit: 500, weight: 2 },
-    { unit: 100, weight: 1 },
+function payment(given) {
+  return { paid: sumMoney(given), given, label: describeGiven(given) };
+}
+
+// 候補のうち現実的なものから重み付きで選ぶ。どれも当てはまらなければ、合計以上の一番小さいお札（硬貨）1枚で払う
+function choose(total, rng, candidates) {
+  const ok = candidates.filter((c) => c.weight > 0 && isRealisticPayment(total, c.given));
+  if (ok.length) return payment(rng.weighted(ok, (c) => c.weight).given);
+  const single = [500, 1000, 5000, 10000].find((v) => v >= total);
+  return payment([single]);
+}
+
+// 切りのいい額で払う：千円札（足りなければ枚数を増やす）、5千円札、500円玉、100円玉だけ など
+function roundCandidates(total) {
+  return [
+    { given: Array(Math.ceil(total / 1000)).fill(1000), weight: 6 },
+    { given: [5000], weight: total < 5000 ? 1 : 0 },
+    { given: [500], weight: total <= 500 ? 2 : 0 },
+    { given: Array(Math.ceil(total / 100)).fill(100), weight: total <= 400 ? 1 : 0 },
+    { given: [10000], weight: total > 1000 ? 0.5 : 0.2 },
   ];
-  if (total < 5000) options.push({ unit: 5000, weight: 1 });
-  const { unit } = rng.weighted(options, (o) => o.weight);
-  const paid = aboveTo(total, unit);
-  return { paid, label: describeMoney(paid) };
 }
 
-// 端数を足して、お釣りが切りよくなるように払う（520円に1020円など）
+function payRound(total, rng) {
+  return choose(total, rng, roundCandidates(total));
+}
+
+// 端数を足して、お釣りの枚数が減るように払う（520円に1020円 → お釣り500円玉1枚）
 function paySmallChange(total, rng) {
-  const fractions = [total % 500, total % 100, total % 10].filter((r) => r > 0);
-  if (fractions.length === 0) return payRound(total, rng);
-  const fraction = rng.pick(fractions);
-  const base = aboveTo(total, 1000);
-  return { paid: base + fraction, label: `${describeMoney(base)} ＋ ${describeMoney(fraction)}` };
+  const bills = Array(Math.ceil(total / 1000)).fill(1000);
+  const plain = breakdownOf(sumMoney(bills) - total).count;
+  const candidates = [];
+  for (const unit of [10, 50, 100, 500]) {
+    const fraction = total % unit;
+    if (fraction === 0) continue;
+    const given = [...bills, ...asMoney(fraction)];
+    // お釣りの枚数が実際に減り、現実的な払い方だけを候補にする
+    if (breakdownOf(sumMoney(given) - total).count < plain && isRealisticPayment(total, given)) candidates.push({ given, weight: 1 });
+  }
+  return candidates.length ? choose(total, rng, candidates) : payRound(total, rng);
 }
 
-// 10円玉と1円玉を大量に出す
+// 小銭ジャラジャラ：100円玉・10円玉・1円玉を数えながら、ちょうどの金額を出す
 function payCoins(total, rng) {
-  const paid = total + rng.int(0, 25);
-  const ones = (paid % 10) + 10 * rng.int(0, 1);
-  const tens = (paid - ones) / 10;
-  const parts = [];
-  if (tens > 0) parts.push(`10円玉×${tens}`);
-  if (ones > 0) parts.push(`1円玉×${ones}`);
-  return { paid, label: parts.join(' ') };
+  const given = [];
+  let rest = total;
+  const hundreds = Math.max(0, Math.floor(rest / 100) - rng.int(2, 5));
+  for (let i = 0; i < hundreds; i++) given.push(100);
+  rest -= hundreds * 100;
+  const ones = (rest % 10) + (rest >= 10 && rng.next() < 0.5 ? 10 : 0);
+  for (let i = 0; i < (rest - ones) / 10; i++) given.push(10);
+  for (let i = 0; i < ones; i++) given.push(1);
+  return payment(given);
 }
 
 // patience: レジ列で待てる秒数、payDelay: 支払いにかかる秒数

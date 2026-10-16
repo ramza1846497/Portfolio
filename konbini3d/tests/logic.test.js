@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { calcChange, minCoins, judge, JUDGE, formatYen } from '../src/logic/money.js';
+import { calcChange, minCoins, judge, JUDGE, formatYen, isRealisticPayment } from '../src/logic/money.js';
 import { createRng, mulberry32 } from '../src/logic/rng.js';
 import { CUSTOMER_TYPES } from '../src/data/customerTypes.js';
 import { PRODUCTS, FRY_BATCH, SNACK_BY_ID } from '../src/data/products.js';
@@ -62,9 +62,28 @@ test('客タイプの支払い：預かり≧合計、お釣りは1万円未満�
     }
   }
   const sc = CUSTOMER_TYPES.find((t) => t.id === 'smallchange');
-  const fixed = { pick: (l) => l.find((r) => r === 20), int: () => 0, weighted: (l) => l[0], next: () => 0 };
-  assert.equal(sc.pay(520, fixed).paid, 1020);
-  assert.match(CUSTOMER_TYPES.find((t) => t.id === 'coins').pay(437, createRng(2)).label, /^(10円玉×\d+ ?)?(1円玉×\d+)?$/);
+  assert.equal(sc.pay(520, createRng(1)).paid, 1020);
+  const coins = CUSTOMER_TYPES.find((t) => t.id === 'coins').pay(437, createRng(2));
+  assert.equal(coins.paid, 437);
+  assert.ok(coins.given.filter((v) => v <= 10).length >= 10, coins.label);
+});
+
+test('支払い：現実ではありえない払い方をしない（490円に1490円など）', () => {
+  assert.equal(isRealisticPayment(490, [1000, 100, 100, 100, 100, 50, 10, 10, 10, 10]), false);
+  assert.equal(isRealisticPayment(490, [100, 100, 100, 100, 100, 100]), false); // 600円 → お釣りに100円玉
+  assert.equal(isRealisticPayment(520, [1000, 10, 10]), true);
+  assert.equal(isRealisticPayment(490, [1000]), true);
+  assert.equal(isRealisticPayment(2000, [1000, 1000, 1000]), false);
+  assert.equal(isRealisticPayment(500, [100]), false);
+  for (const type of CUSTOMER_TYPES) {
+    const rng = createRng(9);
+    for (let total = 1; total < 6000; total++) {
+      const p = type.pay(total, rng);
+      assert.ok(isRealisticPayment(total, p.given), `${type.id}: ${total}円に${p.label}`);
+    }
+  }
+  const sc = CUSTOMER_TYPES.find((t) => t.id === 'smallchange');
+  for (let seed = 0; seed < 50; seed++) assert.notEqual(sc.pay(490, createRng(seed)).paid, 1490);
 });
 
 // ---------- 在庫 ----------
@@ -300,6 +319,11 @@ function runDay(game, dt = 0.05, bot = cashierBot) {
       else info.still = 0;
       assert.ok(info.still < 4, `customer ${c.id} (${c.state}) stuck at ${c.x.toFixed(2)},${c.z.toFixed(2)}`);
       info.walked = c.walked;
+      // 押し合って行ったり来たりしているだけでも見つけられるよう、同じ目的地へ歩く時間の上限も見る
+      const leg = `${c.state}>${c.targetId}`;
+      if (info.leg !== leg) Object.assign(info, { leg, legTime: 0 });
+      if (['toShelf', 'toQueue', 'leaving'].includes(c.state)) info.legTime += dt;
+      assert.ok(info.legTime < 25, `customer ${c.id} (${leg}) did not arrive in 25s, at ${c.x.toFixed(2)},${c.z.toFixed(2)}`);
       seen.set(c.id, info);
     }
     // 列の並び：状態の queue と各客の queueIndex が一致し、同じ場所に2人並ばない
@@ -321,6 +345,32 @@ test('1日の通し：客が来て買い物し、会計され、22時以降に�
   assert.equal(r.discrepancy, 0);
   assert.equal(game.state.money - startMoney, r.profit);
   assert.ok(r.rate >= 80, `rate ${r.rate}`);
+});
+
+test('1日の通し：会計がゆっくりでも列が詰まらない（いろいろなシード）', () => {
+  // 先頭に着いてから10秒かけて会計する店員。列が長くなり、帰る客と並ぶ客が行き交う
+  for (let seed = 200; seed < 215; seed++) {
+    const game = new Game({ seed });
+    let wait = 0;
+    runDay(game, 1 / 30, (g) => {
+      const s = g.state;
+      if (seed % 2) for (const id of Object.keys(s.inventory.shelves)) s.inventory.shelves[id] = SHELF_CAPACITY;
+      if (!g.openRegister()) return;
+      wait += 1 / 30;
+      const co = s.checkout;
+      if (co.phase === 'scan' && wait > 10) {
+        co.items.forEach((_, i) => g.regScan(i));
+        co.hot.forEach((_, i) => g.regHot(i));
+        g.regPay();
+      } else if (co.phase === 'change') {
+        for (const v of trayFor(co.change)) g.regAddMoney(v);
+        g.regGive();
+        wait = 0;
+      }
+    });
+    assert.equal(game.state.phase, 'result');
+    assert.ok(game.state.result.sales > 0);
+  }
 });
 
 test('1日の通し：レジを放置すると客は待ちきれずに帰り、商品は棚に戻る', () => {

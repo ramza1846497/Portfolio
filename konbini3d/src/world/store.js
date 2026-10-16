@@ -101,8 +101,9 @@ for (let layer = 0; layer < 2; layer++) {
   }
 }
 
-// レジ待ちの列（先頭がレジの前）
-export const QUEUE_SLOTS = Array.from({ length: 6 }, (_, i) => ({ x: REGISTER_POS.x + i * 0.8, z: 1.85 }));
+// レジ待ちの列（先頭がレジの前）。列には通路側の「入口」(QUEUE_ENTRIES) から近づく
+export const QUEUE_SLOTS = Array.from({ length: 6 }, (_, i) => ({ id: `queue${i}`, x: REGISTER_POS.x + i * 0.8, z: 1.85 }));
+export const QUEUE_ENTRIES = QUEUE_SLOTS.map((q, i) => ({ id: `queueEntry${i}`, x: q.x, z: 0.95 }));
 
 // 客の移動に使う経由点
 export const WAYPOINTS = [
@@ -115,7 +116,8 @@ export const WAYPOINTS = [
   { id: 'backM', x: -1.0, z: -1.45 },
   { id: 'backW', x: -5.3, z: -1.45 },
   ...SHELF_SECTIONS.map((s) => ({ id: s.pickNode, ...s.pickSpot })),
-  ...QUEUE_SLOTS.map((q, i) => ({ id: `queue${i}`, ...q })),
+  // 列の場所そのものは経由点にしない（列の上を通り抜ける経路を作らない）
+  ...QUEUE_ENTRIES,
 ];
 
 // 汚れが出る場所（売り場の通路）

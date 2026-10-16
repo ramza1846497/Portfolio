@@ -1,7 +1,7 @@
 // 客の生成と行動。位置などの状態だけを扱い、見た目は entityView.js が反映する。
 
 import { PRODUCTS, HOTSNACKS } from '../data/products.js';
-import { CUSTOMER_OBSTACLES, CUSTOMER_RADIUS, QUEUE_SLOTS, SECTION_BY_PRODUCT, WAYPOINTS } from '../world/store.js';
+import { CUSTOMER_OBSTACLES, CUSTOMER_RADIUS, QUEUE_SLOTS, QUEUE_ENTRIES, SECTION_BY_PRODUCT, WAYPOINTS } from '../world/store.js';
 import { planPath } from '../world/waypoints.js';
 import { resolveCircle } from '../world/collision.js';
 import { takeFromShelf, returnToShelf } from './inventory.js';
@@ -11,6 +11,9 @@ const PICK_TIME = 1.0;
 const ARRIVE_EPS = 0.12;
 const SEPARATION = 0.62;
 const LINE_SEC = 3;
+// 進めない時間がこれを超えたら、少しの間ほかの客をすり抜けて抜け出す
+const STUCK_SEC = 1.5;
+const GHOST_SEC = 1.5;
 
 const OUT = WAYPOINTS.find((w) => w.id === 'out');
 const MOVING = new Set(['toShelf', 'toQueue', 'leaving']);
@@ -29,10 +32,25 @@ function say(c, lines, rng) {
   c.lineTimer = LINE_SEC;
 }
 
-function goTo(game, c, nodeId) {
-  c.path = planPath(game.graph, c.x, c.z, nodeId);
+function setPath(c, path, targetId) {
+  c.path = path;
   c.pathIndex = 0;
-  c.targetId = nodeId;
+  c.targetId = targetId;
+  c.bestDist = Infinity;
+  c.stuck = 0;
+}
+
+function goTo(game, c, nodeId) {
+  setPath(c, planPath(game.graph, c.x, c.z, nodeId), nodeId);
+}
+
+// 列の i 番目へ。すでに列に並んでいて前に詰めるだけなら、まっすぐ進む。
+// それ以外は通路側の入口まで行ってから列に入る（列の横をすり抜けない）
+function goToSlot(game, c, i) {
+  const slot = QUEUE_SLOTS[i];
+  const inLine = c.z > QUEUE_ENTRIES[i].z + 0.5 && c.x >= slot.x - 0.2;
+  const path = inLine ? [slot] : [...planPath(game.graph, c.x, c.z, QUEUE_ENTRIES[i].id), slot];
+  setPath(c, path, slot.id);
 }
 
 function pickWants(rng, [lo, hi]) {
@@ -70,6 +88,9 @@ export function spawnCustomer(game, type) {
     queueIndex: -1,
     inCheckout: false,
     walked: 0,
+    bestDist: Infinity,
+    stuck: 0,
+    ghost: 0,
   };
   say(c, type.lines.enter, rng);
   goTo(game, c, SECTION_BY_PRODUCT[c.wants[0]].pickNode);
@@ -87,7 +108,16 @@ function walk(c, dt) {
     const d = Math.hypot(dx, dz);
     if (d < ARRIVE_EPS) {
       c.pathIndex += 1;
+      c.bestDist = Infinity;
+      c.stuck = 0;
       continue;
+    }
+    // 次の経由点に近づけているか
+    if (d < c.bestDist - 0.05) {
+      c.bestDist = d;
+      c.stuck = 0;
+    } else {
+      c.stuck += dt;
     }
     if (budget <= 0) return false;
     const step = Math.min(budget, d);
@@ -131,7 +161,7 @@ function joinQueue(game, c) {
   c.patience = c.patienceMax;
   c.state = 'toQueue';
   say(c, c.type.lines.queue, game.rng);
-  goTo(game, c, `queue${c.queueIndex}`);
+  goToSlot(game, c, c.queueIndex);
 }
 
 export function leaveQueue(game, c) {
@@ -143,7 +173,7 @@ export function leaveQueue(game, c) {
     if (other && other.queueIndex !== i) {
       other.queueIndex = i;
       other.state = 'toQueue';
-      goTo(game, other, `queue${i}`);
+      goToSlot(game, other, i);
     }
   });
 }
@@ -191,6 +221,12 @@ function attemptPick(game, c) {
 
 function updateOne(game, c, dt) {
   if (c.lineTimer > 0) c.lineTimer -= dt;
+  if (c.ghost > 0) c.ghost -= dt;
+  if (MOVING.has(c.state) && c.stuck > STUCK_SEC) {
+    c.ghost = GHOST_SEC;
+    c.stuck = 0;
+    c.bestDist = Infinity;
+  }
   switch (c.state) {
     case 'toShelf':
       if (walk(c, dt)) {
@@ -245,6 +281,8 @@ function separate(customers, dt) {
       const nx = dx / d;
       const nz = dz / d;
       const overlap = SEPARATION - d;
+      // すり抜け中の客とは押し合わない
+      if (a.ghost > 0 || b.ghost > 0) continue;
       const wa = MOVING.has(a.state) ? 1 : 0.15;
       const wb = MOVING.has(b.state) ? 1 : 0.15;
       const sum = wa + wb;
@@ -259,11 +297,15 @@ function separate(customers, dt) {
   }
 }
 
-// 相手が進行方向の前にいたら右によける
+// 相手が進行方向の前にいたら横によける。相手が少しでも左右にずれていればその反対側へ、真正面なら右へ
 function sidestep(self, ox, oz, weight, dt) {
   if (weight < 1 || self.fx * ox + self.fz * oz <= 0.3) return;
-  self.x += -self.fz * 1.2 * dt;
-  self.z += self.fx * 1.2 * dt;
+  const rx = -self.fz;
+  const rz = self.fx;
+  const side = rx * ox + rz * oz;
+  const sign = side > 0.15 ? -1 : 1;
+  self.x += rx * sign * 1.2 * dt;
+  self.z += rz * sign * 1.2 * dt;
 }
 
 const tmp = { x: 0, z: 0 };

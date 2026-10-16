@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Game, SHIFT_MS, scoreForSuccess } from '../src/game.js';
 import { CUSTOMER_TYPES, createCustomer, addItemTo, difficultyAt } from '../src/customers.js';
-import { calcChange, minCoins, JUDGE } from '../src/money.js';
+import { calcChange, minCoins, JUDGE, isRealisticPayment } from '../src/money.js';
 import { createRng } from '../src/rng.js';
 import { loadHighScore, saveHighScore } from '../src/storage.js';
 
@@ -104,9 +104,11 @@ test('customers: 全タイプの支払いが妥当（預かり≧合計、お釣
       const change = calcChange(c.total, c.payment.paid);
       assert.ok(change < 10000, `${type.id}: change ${change}`);
       minCoins(change);
+      assert.ok(isRealisticPayment(c.total, c.payment.given), `${type.id}: ${c.total}円に${c.payment.label}`);
       if (type.addItem) {
         const next = addItemTo(c, rng);
-        assert.ok(next.total > c.total && next.payment.paid > c.payment.paid);
+        assert.ok(next.total > c.total);
+        assert.ok(isRealisticPayment(next.total, next.payment.given), `add: ${next.total}円に${next.payment.label}`);
         assert.ok(calcChange(next.total, next.payment.paid) < 10000);
       }
     }
@@ -119,17 +121,22 @@ test('customers: タイプごとの支払い方', () => {
     const big = at('bigbill');
     assert.equal(big.payment.paid, 10000);
     assert.ok(big.items.length <= 2);
-    assert.match(at('coins').payment.label, /^(10円玉×\d+ ?)?(1円玉×\d+)?$/);
+    assert.match(at('coins').payment.label, /^(100円玉×\d+ ?)?(10円玉×\d+ ?)?(1円玉×\d+)?$/);
+    assert.equal(at('coins').payment.paid, at('coins').total);
     const n = at('normal');
     assert.ok(n.payment.paid > n.total);
     const sc = at('smallchange');
-    const scChange = sc.payment.paid - sc.total;
-    if (sc.total % 10 !== 0) assert.equal(scChange % 10, 0);
+    // 端数を足して払ったときは、千円札だけで払うよりお釣りの枚数が少ない
+    if (sc.payment.given.some((v) => v < 1000)) {
+      const plain = minCoins(Math.ceil(sc.total / 1000) * 1000 - sc.total).count;
+      assert.ok(minCoins(sc.payment.paid - sc.total).count < plain, `${sc.total}円に${sc.payment.label}`);
+    }
   }
   // 設計書の例：520円に1020円払い
-  const rng = { pick: (list) => list.find((r) => r === 20), int: () => 0, weighted: (l) => l[0] };
-  const sc = CUSTOMER_TYPES.find((t) => t.id === 'smallchange').pay(520, rng);
-  assert.equal(sc.paid, 1020);
+  const sc = CUSTOMER_TYPES.find((t) => t.id === 'smallchange');
+  assert.equal(sc.pay(520, createRng(1)).paid, 1020);
+  // 490円に1490円のような払い方はしない
+  for (let seed = 0; seed < 50; seed++) assert.notEqual(sc.pay(490, createRng(seed)).paid, 1490);
 });
 
 test('customers: 開始直後は「あ、これも」客が出ず、30秒以降は出る', () => {

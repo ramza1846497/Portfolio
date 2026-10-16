@@ -58,3 +58,12 @@ export function judge(trayItems, changeAmount, denominations = CHANGE_DENOMINATI
 export function formatYen(amount) {
   return `${String(amount).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}円`;
 }
+
+// 現実的な払い方か。お釣りに「客が出したのと同じ種類のお金」が入るなら、それは出さなくてよかったお金なので不自然とみなす
+// （490円に1490円 → お釣り1000円に出した千円札が入る、など）。given は出したお金の配列
+export function isRealisticPayment(total, given) {
+  const paid = sumMoney(given);
+  if (paid < total) return false;
+  const { breakdown } = minCoins(paid - total, [10000, ...CHANGE_DENOMINATIONS]);
+  return given.every((v) => !breakdown[v]);
+}
