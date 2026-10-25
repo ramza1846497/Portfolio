@@ -47,6 +47,8 @@ export function createMaterials(): Record<string, MaterialDef> {
     doorMetal: { material: lambert({ map: paintedMetalTexture('#58665f') }), texW: 1 },
     metalGray: { material: lambert({ map: paintedMetalTexture('#6b6f6a') }), texW: 1 },
     cubby: { material: lambert({ map: cubbyTexture() }), texW: 1.2, texH: 1.8 },
+    curtain: { material: lambert({ color: 0xcfd2c6, transparent: true, opacity: 0.93 }) },
+    blanket: { material: lambert({ color: 0x7d8796 }) },
     metal: { material: lambert({ color: 0x8d918f }) },
     frame: { material: lambert({ color: 0x7c807d }) },
     porcelain: { material: lambert({ color: 0xd9d6cc }) },

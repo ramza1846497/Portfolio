@@ -100,7 +100,12 @@ export const model: StagePart = {
       reactions: [
         {
           actions: [
-            { say: ['「理科室のきまり」', '一、薬品にさわらない。二、走らない。', '三、人体模型から　目をはなさない。', '四は、破られていて読めない。'] },
+            { say: ['「理科室のきまり」', '一、薬品にさわらない。二、走らない。', '三、人体模型から　目をはなさない。'] },
+            {
+              if: { note: 'n_tornRule' },
+              then: [{ say: ['四は破られている。……保健室に落ちていた紙切れが、その四番だ。'] }],
+              else: [{ say: ['四は、破られていて読めない。'] }],
+            },
             { note: 'n_scienceRule' },
           ],
         },
@@ -114,7 +119,10 @@ export const model: StagePart = {
     {
       id: 'blackboardScience',
       name: '理科室の黒板',
-      reactions: [{ actions: [{ say: ['てこの原理。支点・力点・作用点。', '隅に小さく「もうすぐ　みつかるよ」と書いてある。'] }] }],
+      reactions: [
+        { when: { flag: 'modelCalm' }, actions: [{ say: ['てこの原理。支点・力点・作用点。', '隅の小さな字が「みつけてくれて　ありがとう」に変わっている。'] }] },
+        { actions: [{ say: ['てこの原理。支点・力点・作用点。', '隅に小さく「もうすぐ　みつかるよ」と書いてある。'] }] },
+      ],
     },
     {
       id: 'lostbox',

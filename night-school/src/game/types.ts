@@ -64,7 +64,8 @@ export type Action =
   | { choice: { prompt?: string; options: ChoiceOption[] } }
   | { if: Cond; then: Action[]; else?: Action[] }
   | { run: string }
-  | { clear: true };
+  /** クリア画面へ。title / text でエンディングごとの文言を変えられる */
+  | { clear: true; title?: string; text?: string };
 
 export interface SequenceDef {
   prompt: string;

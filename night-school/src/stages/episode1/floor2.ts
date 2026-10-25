@@ -66,6 +66,7 @@ export function buildFloor2({ builder: b, lights }: BuildContext): void {
   b.collision.add(42.1, -1.5, 44, 1.5);
   b.hitbox('barricadeEast', [42.1, 0, -1.4], [43.9, 2.2, 1.4]);
   sign(b, '東階段', 43.88, 2.6, 0, -Math.PI / 2, 0.8);
+  notice(b, 'eastClosed', '使用禁止', ['東階段は', '老朽化のため', '使用できません'], [42.05, 1.15, 0.2], -Math.PI / 2);
 
   // 西端：下り階段（十三階段）と、壁の落書き
   stairwell(b, 0, true);

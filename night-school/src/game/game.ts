@@ -103,7 +103,7 @@ export class Game {
         actor.command?.(cmd);
       },
       shake: () => this.shake(),
-      clear: () => this.showClear(),
+      clear: (title, text) => this.showClear(title, text),
     });
     this.runner.onBusyChange = () => this.syncControls();
     this.keypad.onPress = (key, style) => (style === 'piano' ? this.audio.note(key) : this.audio.play('click'));
@@ -285,7 +285,7 @@ export class Game {
     app.classList.add('shake');
   }
 
-  private showClear(): void {
+  private showClear(title = '脱出成功', text = ''): void {
     this.cleared = true;
     this.syncControls();
     const sec = Math.floor(this.state.elapsedSeconds());
@@ -294,12 +294,12 @@ export class Game {
     screen.className = 'screen';
     screen.innerHTML = `
       <div class="episode">${this.stage.episode}　${this.stage.title}</div>
-      <h1>脱出成功</h1>
+      <h1>${title}</h1>
       <dl>
         <dt>調査時間</dt><dd>${time}</dd>
         <dt>記録数</dt><dd>${this.state.notes.length} / ${this.stage.notes.length}</dd>
       </dl>
-      <div class="sub">花子さんは、今夜も三番目の個室で待っている。</div>
+      <div class="sub">${text}</div>
       <div class="tap">タップでもう一度</div>`;
     screen.style.opacity = '0';
     screen.style.transition = 'opacity 1.5s';
@@ -352,11 +352,18 @@ export class Game {
     const objs = [...this.builder.occluders, ...this.builder.pickables];
     const hits = this.raycaster.intersectObjects(objs, true);
     let found: InteractableDef | null = null;
+    // 最初に当たった面と（ほぼ）同じ距離の物だけを見る。壁の向こうは調べられない。
+    // 見た目の箱と当たり箱がぴったり重なっている物（教卓など）は、当たり箱を優先する
+    let first = -1;
     for (const h of hits) {
       if (!isShown(h.object)) continue;
+      if (first < 0) first = h.distance;
+      else if (h.distance - first > 0.02) break;
       const id = findInteractId(h.object);
-      if (id) found = this.defs.get(id) ?? null;
-      break; // 最初に当たった物だけ（壁の向こうは調べられない）
+      if (id) {
+        found = this.defs.get(id) ?? null;
+        break;
+      }
     }
     if (found !== this.target) {
       this.target = found;

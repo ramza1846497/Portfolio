@@ -24,7 +24,7 @@ export interface RunnerHost {
   /** 画面を揺らす */
   shake(): void;
   /** クリア画面へ */
-  clear(): void;
+  clear(title?: string, text?: string): void;
 }
 
 const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -170,7 +170,7 @@ export class ScriptRunner {
       if (!script) throw new Error(`unknown script: ${a.run}`);
       await this.run(script);
     } else if ('clear' in a) {
-      this.host.clear();
+      this.host.clear(a.title, a.text);
       return true;
     }
     return false;

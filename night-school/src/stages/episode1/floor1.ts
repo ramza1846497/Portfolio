@@ -65,9 +65,8 @@ export function buildFloor1({ builder: b, lights }: BuildContext): void {
   b.hitbox('stairs1f', [-3.2, 0, OZ - 1.35], [0.1, 2.6, OZ + 1.35]);
   sign(b, '西階段', 0.4, 2.65, zN + 0.12, 0, 0.6);
 
-  // 保健室（入れない）
+  // 保健室（職員室の引き出しの鍵で開く）
   slidingDoor(b, 'nurseDoor', 12.4, zS - 0.05, 1.2, true);
-  b.box([12.3, 0, zS], [13.7, 2.2, zS + 0.1], 'dark');
   sign(b, '保健室', 13.0, 2.45, zS - 0.12, Math.PI, 0.7);
 
   lights.addFluorescent(6, H - 0.08, OZ, 'flicker');
@@ -78,9 +77,11 @@ export function buildFloor1({ builder: b, lights }: BuildContext): void {
 
   buildScience(b, lights);
   buildStaffRoom(b, lights);
+  buildNurseRoom(b, lights);
   buildEntrance(b, lights);
 
   b.spawn('f1Stairs', 1.0, OZ, -Math.PI / 2);
+  b.spawn('nurseOut', 13.0, OZ + 0.4, Math.PI);
 }
 
 /** 理科室：x 14〜26。奥（北東）の隅に人体模型 */
@@ -153,7 +154,83 @@ function buildStaffRoom(b: WorldBuilder, lights: BuildContext['lights']): void {
   wallPlane(b, noticeTexture('keybox', '鍵', ['理科室　　○', '職員室　　○', '音楽室　　－', '女子便所　－', '昇降口　　－']), 0.55, 0.7, [28.19, 1.6, OZ - 4.2], Math.PI / 2);
   b.hitbox('keybox', [28.1, 1.2, OZ - 4.7], [28.4, 2.0, OZ - 3.7]);
 
+  // 保健の先生の机：引き出しに四桁のダイヤル錠
+  officeDesk(b, 38.6, OZ - 4.9, false);
+  wallPlane(b, noticeTexture('nursePlate', '保健', ['']), 0.24, 0.12, [38.6, 0.85, OZ - 4.9 + 0.38], 0).scale.y = 0.6;
+  b.box([38.35, 0.45, OZ - 4.54], [38.85, 0.62, OZ - 4.52], 'dark');
+  b.box([38.55, 0.5, OZ - 4.52], [38.65, 0.57, OZ - 4.49], 'metal');
+  b.hitbox('nurseDrawer', [38.0, 0.3, OZ - 5.3], [39.2, 0.8, OZ - 4.5]);
+
   lights.addFluorescent(34, H - 0.08, OZ - 5.5, 'dim', Math.PI / 2, 2.2);
+}
+
+/**
+ * 保健室：x 11〜18, z OZ+1.5〜OZ+8.5（廊下の南側）。
+ * 奥のベッドだけカーテンが閉まっていて、誰かが眠っている。
+ */
+function buildNurseRoom(b: WorldBuilder, lights: BuildContext['lights']): void {
+  const x1 = 11;
+  const x2 = 18;
+  const z1 = OZ + 1.5;
+  const z2 = OZ + 8.5;
+  b.plane(x1, z1, x2, z2, 0, 'tilefloor');
+  b.plane(x1, z1, x2, z2, H, 'ceiling', false);
+  b.wallZ(x1, z1, z2, 'wall');
+  b.wallZ(x2, z1, z2, 'wall');
+  b.wallX(z2, x1, x2, 'wall', [{ from: 13.2, to: 15.4, bottom: 0.9, top: 2.4 }]);
+  windowPane(b, 'x', z2 + 0.06, 13.2, 15.4, 0.9, 2.4, -1);
+  moonPatch(b, 13.0, 15.2, z2 - 2.4, z2 - 0.2);
+
+  // 手前のベッド（空）
+  bed(b, z1 + 1.5);
+  b.hitbox('bedEmpty', [16.0, 0, z1 + 1.0], [17.9, 0.8, z1 + 2.0]);
+
+  // 奥のベッド：カーテンで囲まれている
+  const bz = z1 + 4.6;
+  bed(b, bz);
+  const curtainMat = 'curtain';
+  b.box([15.75, 0.35, bz - 1.2], [17.9, 2.1, bz - 1.17], curtainMat);
+  b.box([15.75, 0.35, bz + 1.17], [17.9, 2.1, bz + 1.2], curtainMat);
+  b.box([15.7, 2.1, bz - 1.2], [15.76, 2.14, bz + 1.2], 'metal');
+  b.collision.add(15.7, bz - 1.2, 17.9, bz + 1.2);
+  const front = new THREE.Group();
+  front.position.set(15.76, 0, bz - 1.17);
+  front.add(b.dynamicBox([0.03, 1.75, 2.34], [0, 1.225, 1.17], b.mat(curtainMat)));
+  b.interactable('bedCurtain', front);
+  b.openable('bedCurtain', front, 0, undefined, [0, 0, -1.9]);
+  // 眠っている人：頭まで布団をかぶり、短い黒髪だけが見える
+  b.box([16.15, 0.5, bz - 0.36], [17.45, 0.72, bz + 0.36], 'blanket');
+  b.box([17.35, 0.5, bz - 0.13], [17.62, 0.7, bz + 0.13], 'dark');
+  b.hitbox('sleeper', [16.1, 0.4, bz - 0.4], [17.7, 0.8, bz + 0.4]);
+
+  // 先生の机・薬品棚・体重計
+  b.box([11.2, 0, z1 + 1.2], [12.0, 0.72, z1 + 2.6], 'wood', { collide: true });
+  b.box([11.1, 0, z1 + 4.0], [11.55, 1.9, z1 + 6.2], 'locker', { collide: true });
+  b.box([11.56, 0.9, z1 + 4.1], [11.57, 1.8, z1 + 6.1], 'glassDark');
+  b.hitbox('medicine', [11.1, 0.8, z1 + 4.0], [11.7, 1.9, z1 + 6.2]);
+  b.box([12.6, 0, z1 + 6.6], [13.0, 0.08, z1 + 7.0], 'metal');
+  notice(b, 'nurserule', '保健室では', ['しずかに', '', 'ねている人を', 'おこさないこと'], [x1 + 0.12, 1.5, z1 + 3.2], Math.PI / 2, '#1a5a3a');
+
+  // 床に落ちた紙切れ（理科室のきまりの破れた四番）
+  const torn = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.3, 0.2),
+    new THREE.MeshLambertMaterial({ map: paperTexture('torn', ['四、ほけん室で', 'ねている子を', 'おこさないこと']) }),
+  );
+  torn.rotation.x = -Math.PI / 2;
+  torn.rotation.z = 0.5;
+  torn.position.set(13.4, 0.006, z1 + 1.3);
+  b.interactable('tornRule', torn);
+  torn.add(b.hitShape([0.4, 0.3, 0.12], [0, 0, 0]));
+
+  lights.addFluorescent(14.5, H - 0.08, z1 + 3.5, 'dim', Math.PI / 2, 1.8);
+}
+
+/** 保健室のベッド（頭が東側） */
+function bed(b: WorldBuilder, z: number): void {
+  b.box([16.0, 0, z - 0.45], [17.9, 0.42, z + 0.45], 'metalGray', { collide: true });
+  b.box([16.02, 0.42, z - 0.43], [17.88, 0.5, z + 0.43], 'porcelain');
+  b.box([17.45, 0.5, z - 0.3], [17.85, 0.6, z + 0.3], 'porcelain');
+  b.box([17.88, 0, z - 0.45], [17.92, 0.9, z + 0.45], 'metal');
 }
 
 /** 昇降口ホール：x 32〜44, z OZ+1.5〜OZ+10。下駄箱と、施錠された出口 */
@@ -222,6 +299,8 @@ export const NAV_1F: { nodes: [number, number][]; edges: [number, number][] } = 
     [38, OZ + 3.0], // 16 昇降口ホール
     [38, OZ + 8.4], // 17 出口の前
     [19.6, OZ - 2.3], // 18 理科室 廊下側の通路
+    [13.0, OZ], // 19 保健室の前
+    [13.0, OZ + 2.4], // 20 保健室の中
   ];
   const edges: [number, number][] = [
     [0, 1],
@@ -245,6 +324,9 @@ export const NAV_1F: { nodes: [number, number][]; edges: [number, number][] } = 
     [6, 16],
     [7, 16],
     [16, 17],
+    [1, 19],
+    [19, 2],
+    [19, 20],
   ];
   return { nodes, edges };
 })();
