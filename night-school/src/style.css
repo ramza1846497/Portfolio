@@ -170,6 +170,15 @@ button {
   line-height: 1.6;
 }
 
+/* 会話中・手帳を開いている間はボタン類を隠す */
+.hud.busy .hud-btn,
+.hud.busy .joy-hint,
+.hud.busy .target-label,
+.hud.busy .crosshair {
+  opacity: 0;
+  pointer-events: none;
+}
+
 /* PC ではタッチ用ボタンを小さく */
 @media (pointer: fine) {
   .btn-interact {

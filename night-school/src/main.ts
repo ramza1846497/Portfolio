@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import { Game } from './game/game';
 import { stages } from './stages';
 
@@ -29,5 +30,5 @@ title.addEventListener(
 
 // ?debug を付けると、テスト用にゲームへ触れるようにする
 if (new URLSearchParams(location.search).has('debug')) {
-  (window as unknown as { game: Game }).game = game;
+  Object.assign(window, { game, THREE });
 }

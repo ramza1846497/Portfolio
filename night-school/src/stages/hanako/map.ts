@@ -67,6 +67,8 @@ export function buildHanakoMap({ builder: b, lights }: BuildContext): void {
   const chain = b.dynamicBox([0.04, 0.5, 0.06], [0, 0, 0], 'metal');
   chain.position.set(43.78, 1.05, 0);
   exit.add(chain);
+  // 2 枚の扉の継ぎ目でも照準が外れないように
+  exit.add(b.hitShape([0.1, 2.4, 2.2], [43.84, 1.2, 0]));
   b.interactable('exit', exit);
   sign(b, '昇降口', 43.88, 2.68, 0, -Math.PI / 2, 1.0);
 
@@ -197,7 +199,7 @@ function classroom(b: WorldBuilder, label: string, x1: number, x2: number, board
 
   // 教卓
   b.box([x1 + 0.9, 0, -6.2], [x1 + 1.7, 1.0, -4.8], 'wood', { collide: true });
-  b.hitbox(podiumId, [x1 + 0.9, 0, -6.2], [x1 + 1.7, 1.02, -4.8]);
+  b.hitbox(podiumId, [x1 + 0.9, 0, -6.2], [x1 + 1.7, 1.0, -4.8]);
 
   // 机と椅子（黒板の方を向く）
   const cols = [x1 + 2.6, x1 + 4.8, x1 + 7.0];
@@ -365,6 +367,8 @@ function buildToilet(b: WorldBuilder, lights: BuildContext['lights']): void {
   const tag = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.006, 0.09), new THREE.MeshLambertMaterial({ color: 0xd8d0b0 }));
   tag.position.set(-0.07, 0, 0.02);
   key.add(tag);
+  // 小さくて狙いにくいので、見えない当たり箱を大きめに付ける
+  key.add(b.hitShape([0.45, 0.2, 0.45], [0.03, 0, 0]));
   key.position.set(10.1, 0.07, 7.0);
   key.rotation.y = 0.6;
   b.interactable('key', key);
@@ -380,7 +384,7 @@ function buildToilet(b: WorldBuilder, lights: BuildContext['lights']): void {
   b.hitbox('sink', [15.3, 0.7, 3.0], [15.9, 1.05, 5.9]);
   const mirror = new THREE.Mesh(new THREE.PlaneGeometry(2.7, 0.85), b.mat('mirror'));
   mirror.rotation.y = -Math.PI / 2;
-  mirror.position.set(15.885, 1.5, 4.45);
+  mirror.position.set(15.855, 1.5, 4.45);
   b.interactable('mirror', mirror);
   b.box([15.86, 1.05, 3.05], [15.9, 1.95, 5.85], 'frame');
 

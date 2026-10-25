@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 
+const FLASH_INTENSITY = 30;
+
 export type FixtureMode = 'steady' | 'flicker' | 'dim' | 'dead';
 
 interface Fixture {
@@ -36,7 +38,7 @@ export class LightRig {
     scene.add(this.ambient);
 
     // 懐中電灯：カメラの子にして、少し右下から照らす
-    const spot = new THREE.SpotLight(0xfff1d6, 38, 22, 0.5, 0.55, 1.6);
+    const spot = new THREE.SpotLight(0xfff1d6, FLASH_INTENSITY, 22, 0.5, 0.55, 1.6);
     spot.position.set(0.15, -0.15, 0.1);
     spot.target.position.set(0, -0.2, -5);
     camera.add(spot);
@@ -120,7 +122,7 @@ export class LightRig {
     }
     if (this.strobeLeft > 0 && !this.strobeOn) flash = 0.1;
     if (this.blackout) flash = 0;
-    this.flashlight.intensity = 38 * flash;
+    this.flashlight.intensity = FLASH_INTENSITY * flash;
     this.ambient.intensity = this.blackout ? 0.02 : this.ambientBase;
   }
 }

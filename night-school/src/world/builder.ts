@@ -156,6 +156,13 @@ export class WorldBuilder {
     return mesh;
   }
 
+  /** 見えない当たり箱（調べられる物の子にして、狙いやすくする） */
+  hitShape(size: Vec3, pos: Vec3): THREE.Mesh {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(size[0], size[1], size[2]), this.hitMat);
+    mesh.position.set(pos[0], pos[1], pos[2]);
+    return mesh;
+  }
+
   openable(name: string, pivot: THREE.Object3D, openRotY: number, colliderTag?: string): void {
     this.openables.set(name, { pivot, openRotY, colliderTag, progress: 0, opening: false });
   }
