@@ -32,6 +32,37 @@ export class CollisionWorld {
     for (const b of this.boxes) if (b.tag === tag) b.enabled = enabled;
   }
 
+  /** 線分 a→b が、半径 r だけ太らせた箱のどれかを横切るか（怪異の経路探索用） */
+  segmentBlocked(ax: number, az: number, bx: number, bz: number, r = 0): boolean {
+    const dx = bx - ax;
+    const dz = bz - az;
+    for (const b of this.boxes) {
+      if (b.enabled === false) continue;
+      // スラブ法
+      let t0 = 0;
+      let t1 = 1;
+      const slabs: [number, number, number, number][] = [
+        [ax, dx, b.minX - r, b.maxX + r],
+        [az, dz, b.minZ - r, b.maxZ + r],
+      ];
+      let hit = true;
+      for (const [o, d, lo, hi] of slabs) {
+        if (Math.abs(d) < 1e-9) {
+          if (o < lo || o > hi) hit = false;
+          continue;
+        }
+        let ta = (lo - o) / d;
+        let tb = (hi - o) / d;
+        if (ta > tb) [ta, tb] = [tb, ta];
+        t0 = Math.max(t0, ta);
+        t1 = Math.min(t1, tb);
+        if (t0 > t1) hit = false;
+      }
+      if (hit) return true;
+    }
+    return false;
+  }
+
   /** 位置 pos（x, z）を (dx, dz) だけ動かし、衝突を解決した結果を書き戻す */
   move(pos: { x: number; z: number }, dx: number, dz: number, r: number): void {
     // 大きな移動でのすり抜けを防ぐため細かく刻む

@@ -6,12 +6,13 @@ import { LightRig } from '../engine/lights';
 import { Player } from '../engine/player';
 import { Dialogue } from '../ui/dialogue';
 import { Hud } from '../ui/hud';
+import { Keypad } from '../ui/keypad';
 import { Notebook } from '../ui/notebook';
 import { WorldBuilder } from '../world/builder';
 import { createMaterials } from '../world/materials';
 import { ScriptRunner } from './runner';
 import { GameState } from './state';
-import type { InteractableDef, StageDef } from './types';
+import type { Actor, ActorContext, InteractableDef, StageDef } from './types';
 import { validateStage } from './validate';
 
 const INTERACT_DISTANCE = 2.5;
@@ -33,6 +34,13 @@ export class Game {
   readonly dialogue = new Dialogue();
   readonly notebook: Notebook;
   readonly runner: ScriptRunner;
+  readonly keypad = new Keypad();
+  private actors = new Map<string, Actor>();
+  /** 発火済みのトリガー */
+  private firedTriggers = new Set<string>();
+  /** いま中にいるトリガー（入り直したときだけ再発火させる） */
+  private insideTriggers = new Set<string>();
+  private losRay = new THREE.Raycaster();
   private raycaster = new THREE.Raycaster();
   private center = new THREE.Vector2(0, 0);
   private defs = new Map<string, InteractableDef>();
@@ -69,7 +77,11 @@ export class Game {
     this.builder.finalize();
     for (const d of stage.interactables) this.defs.set(d.id, d);
     if (import.meta.env.DEV) {
-      const errors = validateStage(stage, new Set(this.builder.named.keys()), new Set(this.builder.openables.keys()));
+      const errors = validateStage(stage, {
+        objects: new Set(this.builder.named.keys()),
+        openables: new Set(this.builder.openables.keys()),
+        spawns: new Set(this.builder.spawns.keys()),
+      });
       for (const e of errors) console.error(`[stage ${stage.id}] ${e}`);
     }
 
@@ -81,16 +93,37 @@ export class Game {
       audio: this.audio,
       lights: this.lights,
       hud: this.hud,
+      keypad: this.keypad,
       open: (name) => this.open(name),
+      teleport: (name) => this.teleport(name),
+      look: (name) => this.lookAt(name),
+      actorCommand: (id, cmd) => {
+        const actor = this.actors.get(id);
+        if (!actor) throw new Error(`unknown actor: ${id}`);
+        actor.command?.(cmd);
+      },
       shake: () => this.shake(),
       clear: () => this.showClear(),
     });
     this.runner.onBusyChange = () => this.syncControls();
+    this.keypad.onPress = (key, style) => (style === 'piano' ? this.audio.note(key) : this.audio.play('click'));
+
+    const actorCtx: ActorContext = {
+      builder: this.builder,
+      collision: this.collision,
+      camera: this.camera,
+      state: this.state,
+      audio: this.audio,
+      playerPos: this.player.pos,
+      lineOfSight: (from, to) => this.lineOfSight(from, to),
+      run: (actions) => void this.runner.start(actions),
+    };
+    for (const a of stage.actors ?? []) this.actors.set(a.id, a.create(actorCtx));
     this.notebook.onClose = () => this.syncControls();
     this.state.subscribe(() => this.syncState());
     this.syncState();
 
-    const s = stage.start;
+    const s = this.builder.spawns.get('start') ?? stage.start;
     this.player.place(s.x, s.z, s.yaw);
 
     window.addEventListener('resize', () => this.resize());
@@ -121,6 +154,7 @@ export class Game {
       if (a === 'notebook' || a === 'cancel') this.notebook.close();
       return;
     }
+    if (this.keypad.active) return;
     if (this.dialogue.active) {
       if (a === 'interact') this.dialogue.key('advance');
       else if (a === 'advance' || a === 'up' || a === 'down' || a === 'confirm') this.dialogue.key(a);
@@ -153,6 +187,10 @@ export class Game {
       const obj = this.builder.named.get(d.id);
       if (obj) obj.visible = this.state.test(d.visibleWhen);
     }
+    for (const v of this.stage.visibility ?? []) {
+      const obj = this.builder.named.get(v.id);
+      if (obj) obj.visible = this.state.test(v.when);
+    }
     const obj = this.stage.objectives.find((o) => this.state.test(o.when));
     this.hud.setObjective(obj?.text ?? '');
     this.hud.setNoteCount(this.state.unreadNotes.size);
@@ -166,6 +204,78 @@ export class Game {
     if (!o) throw new Error(`unknown openable: ${name}`);
     o.opening = true;
     if (o.colliderTag) this.collision.setEnabled(o.colliderTag, false);
+  }
+
+  private teleport(name: string): void {
+    const s = this.builder.spawns.get(name);
+    if (!s) throw new Error(`unknown spawn: ${name}`);
+    this.player.place(s.x, s.z, s.yaw);
+    // 移った先のトリガーがすぐ発火しないように、いる場所を「中にいる」扱いにする
+    this.insideTriggers.clear();
+    for (const t of this.stage.triggers ?? []) if (this.inArea(t.area)) this.insideTriggers.add(t.id);
+  }
+
+  private lookAt(name: string): Promise<void> {
+    const obj = this.builder.named.get(name);
+    if (!obj) throw new Error(`unknown object: ${name}`);
+    const target = new THREE.Box3().setFromObject(obj).getCenter(new THREE.Vector3());
+    const p = this.player;
+    const dx = target.x - p.pos.x;
+    const dz = target.z - p.pos.z;
+    let yaw = Math.atan2(-dx, -dz);
+    // 近い方向に回る
+    while (yaw - p.yaw > Math.PI) yaw -= Math.PI * 2;
+    while (yaw - p.yaw < -Math.PI) yaw += Math.PI * 2;
+    const pitch = Math.atan2(target.y - 1.5, Math.hypot(dx, dz));
+    const from = { yaw: p.yaw, pitch: p.pitch };
+    const start = performance.now();
+    const dur = 450;
+    return new Promise((resolve) => {
+      const step = () => {
+        const t = Math.min(1, (performance.now() - start) / dur);
+        const e = 1 - Math.pow(1 - t, 3);
+        p.yaw = from.yaw + (yaw - from.yaw) * e;
+        p.pitch = from.pitch + (pitch - from.pitch) * e;
+        if (t < 1) requestAnimationFrame(step);
+        else resolve();
+      };
+      requestAnimationFrame(step);
+    });
+  }
+
+  private inArea(a: { minX: number; maxX: number; minZ: number; maxZ: number }): boolean {
+    const p = this.player.pos;
+    return p.x >= a.minX && p.x <= a.maxX && p.z >= a.minZ && p.z <= a.maxZ;
+  }
+
+  /** 範囲に入ったトリガーを実行する */
+  private updateTriggers(): void {
+    for (const t of this.stage.triggers ?? []) {
+      const inside = this.inArea(t.area);
+      const entered = inside && !this.insideTriggers.has(t.id);
+      if (inside) this.insideTriggers.add(t.id);
+      else this.insideTriggers.delete(t.id);
+      if (!entered || this.runner.busy) continue;
+      if (t.once !== false && this.firedTriggers.has(t.id)) continue;
+      if (!this.state.test(t.when)) {
+        // 条件を満たしたら、範囲の中にいても次のフレームで発火できるように
+        this.insideTriggers.delete(t.id);
+        continue;
+      }
+      this.firedTriggers.add(t.id);
+      void this.runner.start(t.actions);
+      return;
+    }
+  }
+
+  /** 2 点の間に壁がないか */
+  private lineOfSight(from: THREE.Vector3, to: THREE.Vector3): boolean {
+    const dir = to.clone().sub(from);
+    const dist = dir.length();
+    if (dist < 1e-3) return true;
+    this.losRay.set(from, dir.normalize());
+    this.losRay.far = dist;
+    return this.losRay.intersectObjects(this.builder.occluders, false).length === 0;
   }
 
   private shake(): void {
@@ -209,8 +319,12 @@ export class Game {
     const dt = Math.min(this.timer.getDelta(), 0.05);
     this.input.update();
     this.player.update(dt);
-    this.lights.update(dt);
+    this.lights.update(dt, this.player.pos.z);
     this.updateOpenables(dt);
+    if (this.input.enabled) {
+      for (const a of this.actors.values()) a.update(dt);
+      this.updateTriggers();
+    }
     if (this.input.enabled) this.updateTarget();
     else if (this.target) {
       this.target = null;
@@ -228,6 +342,7 @@ export class Game {
       const t = o.progress;
       const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
       o.pivot.rotation.y = o.openRotY * ease;
+      o.pivot.position.set(o.basePos.x + o.slide[0] * ease, o.basePos.y + o.slide[1] * ease, o.basePos.z + o.slide[2] * ease);
     }
   }
 

@@ -1,13 +1,30 @@
 import type { Action, Cond, StageDef } from './types';
 
+/** マップ側で作られた物の名前 */
+export interface MapNames {
+  objects: Set<string>;
+  openables: Set<string>;
+  spawns: Set<string>;
+}
+
 /**
- * ステージデータの参照切れ（存在しないノート・スクリプト・扉など）を起動時に見つける。
+ * ステージデータの参照切れ（存在しないノート・スクリプト・扉・地点など）を起動時に見つける。
  * 開発中だけ呼ぶ。
  */
-export function validateStage(stage: StageDef, objectNames: Set<string>, openables: Set<string>): string[] {
+export function validateStage(stage: StageDef, map: MapNames): string[] {
   const errors: string[] = [];
   const notes = new Set(stage.notes.map((n) => n.id));
   const items = new Set(stage.items.map((i) => i.id));
+  const actors = new Set((stage.actors ?? []).map((a) => a.id));
+  const ids = new Set<string>();
+  for (const n of stage.notes) {
+    if (ids.has(`note:${n.id}`)) errors.push(`duplicate note "${n.id}"`);
+    ids.add(`note:${n.id}`);
+  }
+  for (const d of stage.interactables) {
+    if (ids.has(`obj:${d.id}`)) errors.push(`duplicate interactable "${d.id}"`);
+    ids.add(`obj:${d.id}`);
+  }
 
   const cond = (c: Cond | undefined, where: string): void => {
     if (!c) return;
@@ -23,9 +40,17 @@ export function validateStage(stage: StageDef, objectNames: Set<string>, openabl
     for (const a of list) {
       if ('note' in a && !notes.has(a.note)) errors.push(`${where}: unknown note "${a.note}"`);
       if ('give' in a && !items.has(a.give)) errors.push(`${where}: unknown item "${a.give}"`);
+      if ('take' in a && !items.has(a.take)) errors.push(`${where}: unknown item "${a.take}"`);
       if ('run' in a && !stage.scripts[a.run]) errors.push(`${where}: unknown script "${a.run}"`);
-      if ('open' in a && !openables.has(a.open)) errors.push(`${where}: unknown openable "${a.open}"`);
+      if ('open' in a && !map.openables.has(a.open)) errors.push(`${where}: unknown openable "${a.open}"`);
+      if ('teleport' in a && !map.spawns.has(a.teleport)) errors.push(`${where}: unknown spawn "${a.teleport}"`);
+      if ('look' in a && !map.objects.has(a.look)) errors.push(`${where}: unknown object "${a.look}"`);
+      if ('actor' in a && !actors.has(a.actor)) errors.push(`${where}: unknown actor "${a.actor}"`);
       if ('choice' in a) a.choice.options.forEach((o) => (cond(o.when, where), actions(o.actions, where)));
+      if ('sequence' in a) {
+        actions(a.sequence.correct, where);
+        actions(a.sequence.wrong, where);
+      }
       if ('if' in a) {
         cond(a.if, where);
         actions(a.then, where);
@@ -35,12 +60,20 @@ export function validateStage(stage: StageDef, objectNames: Set<string>, openabl
   };
 
   for (const d of stage.interactables) {
-    if (!objectNames.has(d.id)) errors.push(`interactable "${d.id}" has no object in the map`);
+    if (!map.objects.has(d.id)) errors.push(`interactable "${d.id}" has no object in the map`);
     cond(d.visibleWhen, d.id);
     d.names?.forEach((n) => cond(n.when, d.id));
     d.reactions.forEach((r) => (cond(r.when, d.id), actions(r.actions, d.id)));
   }
   for (const [name, list] of Object.entries(stage.scripts)) actions(list, `script ${name}`);
+  for (const t of stage.triggers ?? []) {
+    cond(t.when, `trigger ${t.id}`);
+    actions(t.actions, `trigger ${t.id}`);
+  }
+  for (const v of stage.visibility ?? []) {
+    if (!map.objects.has(v.id)) errors.push(`visibility: unknown object "${v.id}"`);
+    cond(v.when, `visibility ${v.id}`);
+  }
   actions(stage.intro, 'intro');
   stage.objectives.forEach((o) => cond(o.when, 'objectives'));
   return errors;

@@ -26,11 +26,14 @@ export interface Opening {
 
 export type Vec3 = [number, number, number];
 
-/** 開閉する物（個室の扉など）。open アクションで回転させる */
+/** 開閉する物（個室の扉など）。open アクションで回転・スライドさせる */
 export interface Openable {
   pivot: THREE.Object3D;
   /** 開いたときの Y 回転 */
   openRotY: number;
+  /** 開いたときの移動量（引き戸） */
+  slide: Vec3;
+  basePos: THREE.Vector3;
   /** 開いたら無効にする当たり判定のタグ */
   colliderTag?: string;
   progress: number;
@@ -46,6 +49,8 @@ export class WorldBuilder {
   /** 照準で調べられる物（userData.interactId を持つ） */
   readonly pickables: THREE.Object3D[] = [];
   readonly openables = new Map<string, Openable>();
+  /** teleport で使う地点 */
+  readonly spawns = new Map<string, { x: number; z: number; yaw: number }>();
   private pending = new Map<string, THREE.BufferGeometry[]>();
   private hitMat = new THREE.MeshBasicMaterial({ visible: false });
 
@@ -163,8 +168,12 @@ export class WorldBuilder {
     return mesh;
   }
 
-  openable(name: string, pivot: THREE.Object3D, openRotY: number, colliderTag?: string): void {
-    this.openables.set(name, { pivot, openRotY, colliderTag, progress: 0, opening: false });
+  openable(name: string, pivot: THREE.Object3D, openRotY: number, colliderTag?: string, slide: Vec3 = [0, 0, 0]): void {
+    this.openables.set(name, { pivot, openRotY, slide, basePos: pivot.position.clone(), colliderTag, progress: 0, opening: false });
+  }
+
+  spawn(name: string, x: number, z: number, yaw: number): void {
+    this.spawns.set(name, { x, z, yaw });
   }
 
   /** 結合して scene に追加する */

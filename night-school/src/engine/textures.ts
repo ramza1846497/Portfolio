@@ -387,3 +387,169 @@ export function paperTexture(key: string, lines: string[]): THREE.Texture {
     return toTexture(c, false);
   });
 }
+
+/** 貼り紙（タイトル＋本文）。accent で見出しの色を変える */
+export function noticeTexture(key: string, title: string, lines: string[], accent = '#7a0d0d'): THREE.Texture {
+  return cached('notice' + key, () => {
+    const [c, ctx] = makeCanvas(256, 340);
+    ctx.fillStyle = '#e6e0cc';
+    ctx.fillRect(0, 0, 256, 340);
+    grime(ctx, 256, 340, 30);
+    ctx.fillStyle = accent;
+    ctx.font = 'bold 26px serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(title, 128, 44);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#222';
+    ctx.font = '17px serif';
+    lines.forEach((l, i) => ctx.fillText(l, 18, 90 + i * 28));
+    return toTexture(c, false);
+  });
+}
+
+/** 壁の落書き（赤いなぐり書き） */
+export function scrawlTexture(key: string, lines: string[]): THREE.Texture {
+  return cached('scrawl' + key, () => {
+    const [c, ctx] = makeCanvas(512, 256);
+    ctx.clearRect(0, 0, 512, 256);
+    ctx.fillStyle = 'rgba(130,10,10,0.85)';
+    ctx.font = 'bold 54px serif';
+    lines.forEach((l, i) => {
+      ctx.save();
+      ctx.translate(20 + i * 30, 80 + i * 80);
+      ctx.rotate(-0.05 + rand() * 0.1);
+      ctx.fillText(l, 0, 0);
+      ctx.restore();
+    });
+    // 垂れ
+    for (let i = 0; i < 14; i++) {
+      const x = 30 + rand() * 450;
+      const y = 60 + rand() * 120;
+      ctx.fillRect(x, y, 2 + rand() * 2, 10 + rand() * 50);
+    }
+    const t = toTexture(c, false);
+    return t;
+  });
+}
+
+/** 下駄箱の正面：小さな扉のない棚が並ぶ（1 枚 = 幅 1.2m × 高さ 1.8m） */
+export function cubbyTexture(): THREE.Texture {
+  return cached('cubby', () => {
+    const [c, ctx] = makeCanvas(256, 384);
+    ctx.fillStyle = '#7d7a6c';
+    ctx.fillRect(0, 0, 256, 384);
+    const cols = 4;
+    const rows = 6;
+    for (let y = 0; y < rows; y++) {
+      for (let x = 0; x < cols; x++) {
+        const px = x * 64 + 5;
+        const py = y * 64 + 6;
+        ctx.fillStyle = '#121210';
+        ctx.fillRect(px, py, 54, 50);
+        // ところどころ上履きが残っている
+        if (rand() < 0.35) {
+          ctx.fillStyle = '#d8d6cc';
+          ctx.fillRect(px + 6, py + 34, 18, 14);
+          ctx.fillRect(px + 28, py + 34, 18, 14);
+          ctx.fillStyle = rand() < 0.5 ? '#2a4a9a' : '#9a2a2a';
+          ctx.fillRect(px + 6, py + 34, 18, 4);
+          ctx.fillRect(px + 28, py + 34, 18, 4);
+        }
+        ctx.fillStyle = '#e8e4d4';
+        ctx.fillRect(px + 14, py + 52, 26, 6);
+      }
+    }
+    grime(ctx, 256, 384, 30);
+    return toTexture(c);
+  });
+}
+
+/** ピアノの鍵盤 */
+export function keysTexture(): THREE.Texture {
+  return cached('keys', () => {
+    const [c, ctx] = makeCanvas(512, 64);
+    ctx.fillStyle = '#e8e4d8';
+    ctx.fillRect(0, 0, 512, 64);
+    const white = 36;
+    const w = 512 / white;
+    ctx.strokeStyle = '#777';
+    for (let i = 0; i <= white; i++) {
+      ctx.beginPath();
+      ctx.moveTo(i * w, 0);
+      ctx.lineTo(i * w, 64);
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#111';
+    for (let i = 0; i < white; i++) {
+      const n = i % 7;
+      if (n === 2 || n === 6) continue;
+      ctx.fillRect(i * w + w * 0.65, 0, w * 0.7, 38);
+    }
+    return toTexture(c, false);
+  });
+}
+
+/** 音楽室の肖像画（顔は影だけ。目だけ白く光る） */
+export function portraitTexture(name: string, seedOffset: number): THREE.Texture {
+  return cached('portrait' + name, () => {
+    const [c, ctx] = makeCanvas(160, 220);
+    ctx.fillStyle = '#5a4020';
+    ctx.fillRect(0, 0, 160, 220);
+    ctx.fillStyle = '#2b241c';
+    ctx.fillRect(10, 10, 140, 170);
+    const g = ctx.createRadialGradient(80, 80, 10, 80, 90, 90);
+    g.addColorStop(0, '#6a5a44');
+    g.addColorStop(1, '#2b241c');
+    ctx.fillStyle = g;
+    ctx.fillRect(10, 10, 140, 170);
+    // 髪と顔
+    ctx.fillStyle = seedOffset % 2 ? '#d8d2c0' : '#1a1612';
+    ctx.beginPath();
+    ctx.ellipse(80, 72, 46, 40 + (seedOffset % 3) * 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#b89b78';
+    ctx.beginPath();
+    ctx.ellipse(80, 88, 30, 38, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#1c1814';
+    ctx.fillRect(40, 130, 80, 50);
+    // 目
+    ctx.fillStyle = '#f4f0e0';
+    ctx.fillRect(66, 80, 9, 4);
+    ctx.fillRect(86, 80, 9, 4);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(69, 80, 3, 4);
+    ctx.fillRect(89, 80, 3, 4);
+    ctx.fillStyle = '#e6dcc0';
+    ctx.fillRect(30, 188, 100, 24);
+    ctx.fillStyle = '#222';
+    ctx.font = '14px serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(name, 80, 205);
+    grime(ctx, 160, 220, 15);
+    return toTexture(c, false);
+  });
+}
+
+/** 人体模型の右半身：筋肉と内臓 */
+export function muscleTexture(): THREE.Texture {
+  return cached('muscle', () => {
+    const [c, ctx] = makeCanvas(128, 256);
+    ctx.fillStyle = '#8c2a22';
+    ctx.fillRect(0, 0, 128, 256);
+    ctx.strokeStyle = 'rgba(230,180,160,0.5)';
+    for (let i = 0; i < 40; i++) {
+      ctx.beginPath();
+      const x = rand() * 128;
+      ctx.moveTo(x, 0);
+      ctx.bezierCurveTo(x + 10, 80, x - 10, 160, x + rand() * 10, 256);
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#b8742a';
+    ctx.fillRect(20, 110, 60, 40);
+    ctx.fillStyle = '#6a7a3a';
+    ctx.fillRect(30, 150, 50, 30);
+    return toTexture(c, false);
+  });
+}
+

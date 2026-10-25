@@ -2,7 +2,44 @@
  * Web Audio API で効果音をその場で合成する（音声ファイルは使わない）。
  * ブラウザの制約で、最初のタップ／クリックの中で unlock() を呼ぶ必要がある。
  */
-export type SfxName = 'step' | 'knock' | 'laugh' | 'hai' | 'creak' | 'pickup' | 'locked' | 'unlock' | 'stinger' | 'page' | 'drip';
+export type SfxName =
+  | 'step'
+  | 'knock'
+  | 'laugh'
+  | 'hai'
+  | 'creak'
+  | 'pickup'
+  | 'locked'
+  | 'unlock'
+  | 'stinger'
+  | 'page'
+  | 'drip'
+  | 'slam'
+  | 'thud'
+  | 'heartbeat'
+  | 'clap'
+  | 'whisper'
+  | 'fall'
+  | 'click';
+
+/** 音名 → 周波数（Hz） */
+export const NOTE_FREQ: Record<string, number> = {
+  ド: 261.63,
+  レ: 293.66,
+  ミ: 329.63,
+  ファ: 349.23,
+  ソ: 392.0,
+  ラ: 440.0,
+  シ: 493.88,
+  高いド: 523.25,
+};
+
+export interface PlayOptions {
+  /** 音量の倍率 */
+  gain?: number;
+  /** 左右 -1..1 */
+  pan?: number;
+}
 
 export class AudioEngine {
   private ctx: AudioContext | null = null;
@@ -12,6 +49,8 @@ export class AudioEngine {
   private noiseBuf!: AudioBuffer;
   private humGain: GainNode | null = null;
   private stepToggle = false;
+  private playGain = 1;
+  private playPan = 0;
 
   unlock(): void {
     if (this.ctx) {
@@ -51,10 +90,41 @@ export class AudioEngine {
     if (this.humGain && this.ctx) this.humGain.gain.setTargetAtTime(level * 0.03, this.ctx.currentTime, 0.05);
   }
 
-  play(name: SfxName): void {
+  play(name: SfxName, opts: PlayOptions = {}): void {
     const ctx = this.ctx;
     if (!ctx) return;
     const t = ctx.currentTime + 0.01;
+    this.playGain = opts.gain ?? 1;
+    this.playPan = opts.pan ?? 0;
+    try {
+      this.dispatch(name, t);
+    } finally {
+      this.playGain = 1;
+      this.playPan = 0;
+    }
+  }
+
+  /** ピアノの 1 音 */
+  note(name: string): void {
+    const ctx = this.ctx;
+    const f = NOTE_FREQ[name];
+    if (!ctx || !f) return;
+    const t = ctx.currentTime + 0.01;
+    const out = this.out(0.6);
+    // 倍音ごとに減衰の速さを変えて、打鍵らしくする
+    const partials: [number, number, number][] = [
+      [1, 0.5, 1.8],
+      [2, 0.22, 1.1],
+      [3, 0.1, 0.7],
+      [4, 0.05, 0.45],
+    ];
+    for (const [k, g, d] of partials) {
+      this.tone(t, d, f * k * (1 + (Math.random() - 0.5) * 0.002), out, g, 'sine');
+    }
+    this.noise(t, 0.03, out, 0.05, { type: 'bandpass', freq: f * 6, q: 2 });
+  }
+
+  private dispatch(name: SfxName, t: number): void {
     switch (name) {
       case 'step':
         return this.step(t);
@@ -78,6 +148,20 @@ export class AudioEngine {
         return this.page(t);
       case 'drip':
         return this.drip(t);
+      case 'slam':
+        return this.slam(t);
+      case 'thud':
+        return this.thud(t);
+      case 'heartbeat':
+        return this.heartbeat(t);
+      case 'clap':
+        return this.clap(t);
+      case 'whisper':
+        return this.whisperSfx(t);
+      case 'fall':
+        return this.fall(t);
+      case 'click':
+        return this.click(t);
     }
   }
 
@@ -98,7 +182,15 @@ export class AudioEngine {
   private out(wet = 0.5): AudioNode {
     const ctx = this.ctx!;
     const g = ctx.createGain();
-    g.connect(this.master);
+    g.gain.value = this.playGain;
+    if (this.playPan !== 0) {
+      const p = ctx.createStereoPanner();
+      p.pan.value = Math.max(-1, Math.min(1, this.playPan));
+      g.connect(p);
+      p.connect(this.master);
+    } else {
+      g.connect(this.master);
+    }
     const s = ctx.createGain();
     s.gain.value = wet;
     g.connect(s);
@@ -363,5 +455,76 @@ export class AudioEngine {
   private drip(t: number): void {
     const out = this.out(0.9);
     this.tone(t, 0.12, 1400, out, 0.12, 'sine', 600);
+  }
+
+  /** ピアノの蓋が閉まる：低音の不協和音 */
+  private slam(t: number): void {
+    const out = this.out(0.9);
+    for (const f of [55, 58.3, 82.4, 87.3, 116.5]) {
+      this.tone(t, 1.6, f, out, 0.18, 'triangle');
+      this.tone(t, 1.2, f * 2.01, out, 0.06, 'sine');
+    }
+    this.noise(t, 0.12, out, 0.5, { type: 'lowpass', freq: 500 });
+  }
+
+  /** 人体模型の足音：硬いプラスチックがぶつかる音 */
+  private thud(t: number): void {
+    const out = this.out(0.6);
+    this.tone(t, 0.14, 120, out, 0.5, 'sine', 60);
+    this.noise(t, 0.04, out, 0.3, { type: 'bandpass', freq: 2600, q: 4 });
+    this.tone(t + 0.02, 0.05, 900, out, 0.08, 'square', 700);
+  }
+
+  private heartbeat(t: number): void {
+    const out = this.out(0.1);
+    this.tone(t, 0.16, 60, out, 0.7, 'sine', 40);
+    this.tone(t + 0.22, 0.14, 55, out, 0.45, 'sine', 38);
+  }
+
+  /** まばらな拍手 */
+  private clap(t: number): void {
+    const out = this.out(1.0);
+    for (let i = 0; i < 9; i++) {
+      const st = t + i * 0.42 + Math.random() * 0.08;
+      this.noise(st, 0.05, out, 0.25 * (1 - i / 12), { type: 'bandpass', freq: 1500 + Math.random() * 600, q: 1.5 });
+    }
+  }
+
+  /** 耳元のささやき */
+  private whisperSfx(t: number): void {
+    const ctx = this.ctx!;
+    const out = this.out(0.8);
+    const src = ctx.createBufferSource();
+    src.buffer = this.noiseBuf;
+    src.loop = true;
+    const f = ctx.createBiquadFilter();
+    f.type = 'bandpass';
+    f.Q.value = 5;
+    const dur = 1.6;
+    f.frequency.setValueAtTime(900, t);
+    for (let i = 1; i <= 8; i++) f.frequency.linearRampToValueAtTime(700 + Math.random() * 1800, t + (dur * i) / 8);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.35, t + 0.2);
+    for (let i = 1; i <= 6; i++) g.gain.linearRampToValueAtTime(0.1 + Math.random() * 0.3, t + (dur * i) / 7);
+    g.gain.linearRampToValueAtTime(0, t + dur);
+    src.connect(f);
+    f.connect(g);
+    g.connect(out);
+    src.start(t, Math.random());
+    src.stop(t + dur + 0.05);
+  }
+
+  /** 遠くで何かが倒れる音 */
+  private fall(t: number): void {
+    const out = this.out(1.0);
+    this.noise(t, 0.6, out, 0.35, { type: 'lowpass', freq: 400 });
+    this.tone(t, 0.4, 80, out, 0.4, 'sine', 40);
+    for (let i = 1; i < 4; i++) this.noise(t + i * 0.13, 0.08, out, 0.15 / i, { type: 'bandpass', freq: 1200, q: 2 });
+  }
+
+  private click(t: number): void {
+    const out = this.out(0.1);
+    this.noise(t, 0.025, out, 0.25, { type: 'bandpass', freq: 3500, q: 3 });
   }
 }

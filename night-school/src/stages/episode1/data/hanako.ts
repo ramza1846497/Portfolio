@@ -1,8 +1,9 @@
-import type { Action, InteractableDef, ItemDef, NoteDef, StageDef } from '../../game/types';
+import type { Action, InteractableDef, StagePart } from '../../../game/types';
 
 /**
- * 第一話「トイレの花子さん」のデータ。
- * 調べられる物・会話文・フラグ条件はすべてここに書く（コードは触らない）。
+ * 怪異その一「トイレの花子さん」（2 階・女子トイレ）。
+ *
+ * 女子トイレは清掃中で施錠されている。鍵は音楽室のピアノ（piano.ts）から。
  *
  * 決まり：入口から三番目の個室を三回ノックし、
  *         「はなこさん、いらっしゃいますか」と呼びかける。
@@ -19,16 +20,11 @@ const PHRASE = 'はなこさん、いらっしゃいますか';
 const CORRECT_STALL = 3;
 const CORRECT_KNOCKS = 3;
 
-export const notes: NoteDef[] = [
+const notes: StagePart['notes'] = [
   {
-    id: 'n_exit',
-    title: '閉ざされた昇降口',
-    body: '昇降口は鎖と南京錠で閉ざされている。\n鍵がなければ外には出られない。',
-  },
-  {
-    id: 'n_seven',
-    title: '学校の七不思議',
-    body: '掲示板の古い貼り紙。\n一つ目は「トイレの花子さん」。名前が赤い丸で囲まれていた。',
+    id: 'n_toiletLocked',
+    title: '清掃中の女子トイレ',
+    body: '二階の女子トイレは、鎖と南京錠で閉ざされている。\n札には「清掃中・立入禁止」。',
   },
   {
     id: 'n_third',
@@ -46,13 +42,8 @@ export const notes: NoteDef[] = [
     body: '用具入れの扉の裏。\n「三番目の個室は使わないこと」と赤字で書き足されている。',
   },
   {
-    id: 'n_roll',
-    title: '2-Bの出席簿',
-    body: '最後の欄に、名字のない「花子」という名前。\n欠席の印が、何十年分も続いている。',
-  },
-  {
     id: 'n_wrong',
-    title: '決まりを破ると',
+    title: '呼び方を間違えると',
     body: '手順を間違えると、明かりが乱れ、子どもの笑い声がする。\nノックは最初から数え直しになるようだ。',
   },
   {
@@ -67,7 +58,7 @@ export const notes: NoteDef[] = [
   },
 ];
 
-export const items: ItemDef[] = [{ id: 'exitKey', name: '昇降口の鍵' }];
+const items: StagePart['items'] = [{ id: 'exitKey', name: '昇降口の鍵' }];
 
 /** 個室 n の「ノックする／呼びかける」メニュー */
 function stallMenu(n: number): Action[] {
@@ -115,10 +106,10 @@ function call(n: number): Action[] {
               ],
             },
             then: [{ run: 'hanakoAppears' }],
-            else: [{ run: 'wrong' }],
+            else: [{ run: 'hanakoWrong' }],
           },
         ]
-      : [{ run: 'wrong' }];
+      : [{ run: 'hanakoWrong' }];
   return [
     {
       if: { note: 'n_knock' },
@@ -147,22 +138,9 @@ function stall(n: number): InteractableDef {
   };
 }
 
-const scripts: StageDef['scripts'] = {
-  intro: [
-    { fx: 'fadeIn', duration: 2.5 },
-    {
-      say: [
-        '……ここは。',
-        '学校の、廊下だ。',
-        'いつの間に眠っていたんだろう。窓の外は、もう真っ暗だ。',
-        '早く帰らないと。……昇降口は、すぐ後ろの突き当たりだったはずだ。',
-      ],
-    },
-    { say: [{ text: '目的：校舎から脱出する', style: 'system' }] },
-  ],
-
+const scripts: StagePart['scripts'] = {
   /** 決まりを破ったとき */
-  wrong: [
+  hanakoWrong: [
     { wait: 500 },
     { sfx: 'laugh' },
     { fx: 'strobe', duration: 1.8 },
@@ -194,12 +172,19 @@ const scripts: StageDef['scripts'] = {
     { sfx: 'creak' },
     { open: 'stall3' },
     { wait: 1600 },
+    // 明かりが戻った一瞬だけ、個室の中に少女が立っている
+    { flag: 'hanakoShow' },
     { fx: 'lightsOn' },
+    { look: 'hanakoFigure' },
+    { wait: 500 },
+    { fx: 'flashFlicker', duration: 0.4 },
+    { wait: 350 },
+    { flag: 'hanakoShow', value: false },
     { flag: 'hanakoAnswered' },
     { flag: 'keyAppeared' },
     { note: 'n_hanako' },
     {
-      say: ['……明かりが戻った。', '三番目の個室の扉が、ひとりでに開いている。', '中には誰もいない。……床に、何か光る物が落ちている。'],
+      say: ['……今、誰かいた。', '三番目の個室の扉が、ひとりでに開いている。', '中には誰もいない。……床に、何か光る物が落ちている。'],
     },
   ],
 
@@ -210,73 +195,31 @@ const scripts: StageDef['scripts'] = {
   ])),
 };
 
-export const interactables: InteractableDef[] = [
+const interactables: InteractableDef[] = [
   {
-    id: 'exit',
-    name: '昇降口の扉',
+    id: 'toiletDoor',
+    name: '女子トイレの扉',
     reactions: [
+      { when: { flag: 'toiletOpen' }, actions: [{ say: ['扉は開いている。中はひんやりしている。'] }] },
       {
-        when: { item: 'exitKey' },
+        when: { item: 'toiletKey' },
         actions: [
           { sfx: 'unlock' },
-          { say: ['鍵を差し込むと、重たい音を立てて回った。', '鎖が床に落ちる。'] },
+          { take: 'toiletKey' },
+          { flag: 'toiletOpen' },
+          { open: 'toiletDoor' },
           { sfx: 'creak' },
-          { fx: 'fadeOut', duration: 2 },
-          { clear: true },
+          { say: ['南京錠が外れ、鎖が床に落ちた。', '扉が、内側へゆっくりと開いていく。'] },
         ],
-      },
-      {
-        when: { note: 'n_exit' },
-        actions: [{ sfx: 'locked' }, { say: ['やはり開かない。鍵を探さないと。'] }],
       },
       {
         actions: [
           { sfx: 'locked' },
-          { say: ['……開かない。', '扉の取っ手に鎖が巻かれ、南京錠で閉ざされている。', 'どこかに、鍵があるはずだ。'] },
-          { note: 'n_exit' },
+          { say: ['扉の取っ手に鎖が巻かれ、南京錠がかかっている。', '「清掃中・立入禁止」……こんな夜中に？', '……扉の向こうで、水の落ちる音がする。'] },
+          { note: 'n_toiletLocked' },
         ],
       },
     ],
-  },
-  {
-    id: 'barricade',
-    name: '積まれた机',
-    reactions: [
-      {
-        actions: [{ say: ['机が天井近くまで積み上げられていて、階段を降りられない。', '……誰が、こんなことを。'] }],
-      },
-    ],
-  },
-  {
-    id: 'window',
-    name: '窓',
-    reactions: [{ actions: [{ say: ['窓の外は、山の影と星だけ。', '鍵が錆びついていて、びくともしない。'] }] }],
-  },
-  {
-    id: 'board',
-    name: '掲示板',
-    reactions: [
-      { when: { note: 'n_seven' }, actions: [{ say: ['七不思議の貼り紙。一つ目は「トイレの花子さん」。'] }] },
-      {
-        actions: [
-          {
-            say: [
-              '掲示板に、古い貼り紙がある。',
-              '「学校の七不思議」……',
-              '一、トイレの花子さん。二、動く人体模型。三、音楽室のピアノ……',
-              '五つ目から先は、かすれて読めない。',
-              '花子さんの名前だけが、赤い丸で囲まれている。',
-            ],
-          },
-          { note: 'n_seven' },
-        ],
-      },
-    ],
-  },
-  {
-    id: 'blackboard2a',
-    name: '2-Aの黒板',
-    reactions: [{ actions: [{ say: ['日付と「自習」の文字。', '日直の名前のところだけ、きれいに消されている。'] }] }],
   },
   {
     id: 'podium2a',
@@ -309,20 +252,6 @@ export const interactables: InteractableDef[] = [
         actions: [
           { say: ['黒板いっぱいに、白いチョークで書かれている。', 'ノックは　三回', `そのあと「${PHRASE}」`, '……呼び出し方、だろうか。'] },
           { note: 'n_knock' },
-        ],
-      },
-    ],
-  },
-  {
-    id: 'podium2b',
-    name: '2-Bの教卓',
-    reactions: [
-      { when: { note: 'n_roll' }, actions: [{ say: ['出席簿が入っている。もう見たくない。'] }] },
-      {
-        actions: [
-          { say: ['引き出しに出席簿が入っている。', '最後の欄に……名字のない「花子」という名前。', '欠席の印が、ずっと、ずっと続いている。'] },
-          { fx: 'flashFlicker', duration: 0.5 },
-          { note: 'n_roll' },
         ],
       },
     ],
@@ -386,13 +315,13 @@ export const interactables: InteractableDef[] = [
   },
 ];
 
-export { scripts };
-
-export const objectives: StageDef['objectives'] = [
-  { when: { item: 'exitKey' }, text: '昇降口から脱出する' },
-  { when: { flag: 'keyAppeared' }, text: '三番目の個室を調べる' },
-  { when: { all: [{ note: 'n_third' }, { note: 'n_knock' }] }, text: '女子トイレで花子さんを呼び出す' },
-  { when: { note: 'n_seven' }, text: '花子さんについて調べる' },
-  { when: { note: 'n_exit' }, text: '鍵を探す（校舎を調べてみる）' },
-  { text: '校舎から脱出する' },
-];
+export const hanako: StagePart = {
+  notes,
+  items,
+  interactables,
+  scripts,
+  visibility: [
+    { id: 'hanakoFigure', when: { flag: 'hanakoShow' } },
+    { id: 'toiletChain', when: { notFlag: 'toiletOpen' } },
+  ],
+};

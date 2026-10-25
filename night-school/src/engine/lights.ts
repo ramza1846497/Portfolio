@@ -9,6 +9,7 @@ interface Fixture {
   tubeMat: THREE.MeshBasicMaterial;
   base: number;
   mode: FixtureMode;
+  z: number;
   /** ちらつき用の内部状態 */
   timer: number;
   on: boolean;
@@ -68,7 +69,7 @@ export class LightRig {
       light.position.set(x, y - 0.25, z);
       this.scene.add(light);
     }
-    this.fixtures.push({ light, tubeMat, base, mode, timer: Math.random() * 2, on: mode !== 'dead' });
+    this.fixtures.push({ light, tubeMat, base, mode, z, timer: Math.random() * 2, on: mode !== 'dead' });
   }
 
   setBlackout(on: boolean): void {
@@ -86,7 +87,11 @@ export class LightRig {
     this.flashFlicker = seconds;
   }
 
-  update(dt: number): void {
+  /**
+   * playerZ から離れた階の明かりは消しておく（光源の数を減らしてスマホの負荷を下げる）。
+   * 階は z を大きくずらして配置している前提。
+   */
+  update(dt: number, playerZ = 0): void {
     if (this.strobeLeft > 0) {
       this.strobeLeft -= dt;
       this.strobeTimer -= dt;
@@ -110,7 +115,10 @@ export class LightRig {
       let k = f.on ? 1 : 0;
       if (this.strobeLeft > 0) k = this.strobeOn ? 1.3 : 0;
       if (this.blackout) k = 0;
-      if (f.light) f.light.intensity = f.base * k;
+      if (f.light) {
+        f.light.intensity = f.base * k;
+        f.light.visible = Math.abs(f.z - playerZ) < 30;
+      }
       const lit = f.mode !== 'dead' && k > 0;
       f.tubeMat.color.setHex(lit ? (f.mode === 'dim' ? 0x9fb4b8 : 0xeaffff) : 0x2a2a2a);
     }

@@ -596,3 +596,99 @@ button {
   pointer-events: none;
   white-space: pre;
 }
+
+/* ---------- 鍵盤・ボタン入力 ---------- */
+
+.keypad {
+  position: fixed;
+  left: 50%;
+  bottom: calc(16px + var(--safe-b));
+  transform: translateX(-50%);
+  width: min(640px, calc(100% - 24px));
+  padding: 14px 14px 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  z-index: 33;
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  touch-action: none;
+}
+
+.keypad.on {
+  display: flex;
+}
+
+.keypad .prompt {
+  font-size: 15px;
+  color: var(--accent);
+}
+
+.keypad .slots {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+
+.keypad .slots span {
+  min-width: 34px;
+  height: 30px;
+  padding: 0 4px;
+  border-bottom: 1px solid var(--dim);
+  text-align: center;
+  font-size: 14px;
+  line-height: 30px;
+}
+
+.keypad .keys {
+  display: flex;
+  gap: 4px;
+}
+
+.keypad .keys button {
+  flex: 1;
+  min-width: 0;
+  height: 96px;
+  padding: 0 0 10px;
+  border: 1px solid #555;
+  border-radius: 0 0 5px 5px;
+  background: linear-gradient(#e9e5da, #cfcabd);
+  color: #222;
+  font-size: 14px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.keypad .keys button.hit {
+  background: linear-gradient(#bdb8aa, #a8a395);
+  transform: translateY(2px);
+}
+
+.keypad.click .keys button {
+  height: 56px;
+  border-radius: 4px;
+  background: #2a2a2e;
+  color: var(--fg);
+  align-items: center;
+  padding: 0;
+}
+
+.keypad .cancel {
+  align-self: flex-end;
+  padding: 6px 14px;
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+@media (max-height: 420px) {
+  .keypad .keys button {
+    height: 72px;
+  }
+}

@@ -2,6 +2,7 @@ import type { AudioEngine } from '../engine/audio';
 import type { LightRig } from '../engine/lights';
 import type { Dialogue } from '../ui/dialogue';
 import type { Hud } from '../ui/hud';
+import type { Keypad } from '../ui/keypad';
 import type { GameState } from './state';
 import type { Action, InteractableDef, Line } from './types';
 
@@ -12,8 +13,14 @@ export interface RunnerHost {
   audio: AudioEngine;
   lights: LightRig;
   hud: Hud;
+  keypad: Keypad;
   /** 開閉する物を開く */
   open(name: string): void;
+  /** spawn 地点へプレイヤーを移す */
+  teleport(spawn: string): void;
+  /** カメラを物の方へ向ける（向き終わるまで待つ） */
+  look(name: string): Promise<void>;
+  actorCommand(id: string, command: string): void;
   /** 画面を揺らす */
   shake(): void;
   /** クリア画面へ */
@@ -129,6 +136,26 @@ export class ScriptRunner {
       }
     } else if ('open' in a) {
       this.host.open(a.open);
+    } else if ('teleport' in a) {
+      this.host.teleport(a.teleport);
+    } else if ('look' in a) {
+      await this.host.look(a.look);
+    } else if ('melody' in a) {
+      const beat = 60000 / (a.tempo ?? 132);
+      for (const n of a.melody.split(/\s+/).filter(Boolean)) {
+        // 「-」は休符
+        if (n !== '-') audio.note(n);
+        await wait(beat);
+      }
+    } else if ('sequence' in a) {
+      const q = a.sequence;
+      const got = await this.host.keypad.ask(q.prompt, q.keys, q.answer.length, q.sound ?? 'click');
+      if (got) {
+        const ok = got.every((k, i) => k === q.answer[i]);
+        await this.run(ok ? q.correct : q.wrong);
+      }
+    } else if ('actor' in a) {
+      this.host.actorCommand(a.actor, a.command);
     } else if ('choice' in a) {
       const options = a.choice.options.filter((o) => state.test(o.when));
       const i = await dialogue.choose(
