@@ -1,0 +1,589 @@
+:root {
+  --fg: #e8e4d8;
+  --dim: #9a968a;
+  --accent: #c9a54a;
+  --danger: #b8322a;
+  --panel: rgba(8, 8, 10, 0.82);
+  --line: rgba(232, 228, 216, 0.25);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-t: env(safe-area-inset-top, 0px);
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+  color: var(--fg);
+  font-family: 'Hiragino Mincho ProN', 'Yu Mincho', 'Noto Serif JP', serif;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+  touch-action: none;
+}
+
+#app canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+/* ---------- HUD ---------- */
+
+.hud {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.crosshair {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 50%;
+  background: rgba(232, 228, 216, 0.55);
+  transition: transform 0.15s, background 0.15s;
+}
+
+.crosshair.on {
+  transform: scale(1.8);
+  background: var(--accent);
+  box-shadow: 0 0 6px rgba(201, 165, 74, 0.8);
+}
+
+.target-label {
+  position: absolute;
+  left: 50%;
+  top: calc(50% + 18px);
+  transform: translateX(-50%);
+  padding: 3px 12px;
+  font-size: 15px;
+  letter-spacing: 0.1em;
+  background: rgba(0, 0, 0, 0.55);
+  border-bottom: 1px solid var(--accent);
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.target-label.on {
+  opacity: 1;
+}
+
+.objective {
+  position: absolute;
+  left: calc(14px + var(--safe-l));
+  top: calc(12px + var(--safe-t));
+  font-size: 13px;
+  color: var(--dim);
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 4px #000;
+}
+
+.objective b {
+  color: var(--fg);
+  font-weight: normal;
+}
+
+.hud-btn {
+  position: absolute;
+  pointer-events: auto;
+  border: 1px solid var(--line);
+  background: rgba(10, 10, 12, 0.55);
+  letter-spacing: 0.1em;
+  touch-action: none;
+  cursor: pointer;
+}
+
+.btn-interact {
+  right: calc(22px + var(--safe-r));
+  bottom: calc(26px + var(--safe-b));
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  font-size: 17px;
+  opacity: 0.5;
+  transition: opacity 0.15s, border-color 0.15s;
+}
+
+.btn-interact.on {
+  opacity: 1;
+  border-color: var(--accent);
+  box-shadow: 0 0 14px rgba(201, 165, 74, 0.35);
+}
+
+.btn-interact:active {
+  transform: scale(0.95);
+}
+
+.btn-notebook {
+  right: calc(14px + var(--safe-r));
+  top: calc(12px + var(--safe-t));
+  padding: 8px 14px;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.btn-notebook .badge {
+  display: inline-block;
+  min-width: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #000;
+  font-size: 12px;
+  text-align: center;
+}
+
+.pc-help {
+  position: absolute;
+  right: calc(14px + var(--safe-r));
+  bottom: 12px;
+  font-size: 12px;
+  color: var(--dim);
+  text-align: right;
+  line-height: 1.6;
+}
+
+/* PC ではタッチ用ボタンを小さく */
+@media (pointer: fine) {
+  .btn-interact {
+    display: none;
+  }
+}
+
+@media (pointer: coarse) {
+  .pc-help {
+    display: none;
+  }
+}
+
+/* ---------- 仮想ジョイスティック ---------- */
+
+.joy-base {
+  position: fixed;
+  width: 120px;
+  height: 120px;
+  margin: -60px 0 0 -60px;
+  border-radius: 50%;
+  border: 1px solid rgba(232, 228, 216, 0.3);
+  background: radial-gradient(rgba(232, 228, 216, 0.08), rgba(232, 228, 216, 0.02));
+  pointer-events: none;
+  z-index: 11;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+.joy-base.active {
+  opacity: 1;
+}
+
+.joy-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: rgba(232, 228, 216, 0.35);
+  transform: translate(-50%, -50%);
+}
+
+.joy-hint {
+  position: absolute;
+  left: calc(26px + var(--safe-l));
+  bottom: calc(30px + var(--safe-b));
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  border: 1px dashed rgba(232, 228, 216, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: rgba(232, 228, 216, 0.35);
+}
+
+@media (pointer: fine) {
+  .joy-hint {
+    display: none;
+  }
+}
+
+/* ---------- 画面全体の演出 ---------- */
+
+.fade {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 20;
+  transition: opacity 0.6s;
+}
+
+.vignette {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 55%, rgba(0, 0, 0, 0.65) 100%);
+}
+
+.shake {
+  animation: shake 0.4s linear;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-6px, 3px); }
+  40% { transform: translate(5px, -4px); }
+  60% { transform: translate(-4px, -2px); }
+  80% { transform: translate(3px, 4px); }
+}
+
+/* ---------- タイトル ---------- */
+
+.screen {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 24px;
+  text-align: center;
+  background: radial-gradient(ellipse at center, #15161b 0%, #000 75%);
+  cursor: pointer;
+}
+
+.screen .episode {
+  font-size: 14px;
+  letter-spacing: 0.4em;
+  color: var(--dim);
+}
+
+.screen h1 {
+  margin: 0;
+  font-size: clamp(28px, 7vw, 46px);
+  font-weight: normal;
+  letter-spacing: 0.25em;
+  text-shadow: 0 0 18px rgba(184, 50, 42, 0.45);
+}
+
+.screen .sub {
+  font-size: 13px;
+  color: var(--dim);
+  line-height: 1.9;
+}
+
+.screen .tap {
+  margin-top: 20px;
+  font-size: 15px;
+  letter-spacing: 0.3em;
+  animation: blink 2.2s ease-in-out infinite;
+}
+
+.screen dl {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 6px 18px;
+  margin: 8px 0 0;
+  font-size: 16px;
+}
+
+.screen dt {
+  color: var(--dim);
+  text-align: right;
+}
+
+.screen dd {
+  margin: 0;
+  text-align: left;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 1; }
+}
+
+/* ---------- 会話 ---------- */
+
+.dialogue {
+  position: fixed;
+  left: 50%;
+  bottom: calc(18px + var(--safe-b));
+  transform: translateX(-50%);
+  width: min(720px, calc(100% - 28px));
+  min-height: 96px;
+  padding: 16px 20px 22px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  z-index: 30;
+  display: none;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.dialogue.on {
+  display: block;
+}
+
+.dialogue .speaker {
+  font-size: 13px;
+  color: var(--accent);
+  letter-spacing: 0.15em;
+  margin-bottom: 6px;
+  min-height: 1em;
+}
+
+.dialogue .text {
+  font-size: 17px;
+  line-height: 1.75;
+  white-space: pre-wrap;
+}
+
+.dialogue.whisper .text {
+  color: #b9c2cf;
+  font-style: italic;
+}
+
+.dialogue.ghost .text {
+  color: #e0b0aa;
+  font-size: 20px;
+  letter-spacing: 0.2em;
+  text-shadow: 0 0 8px rgba(184, 50, 42, 0.8);
+}
+
+.dialogue.system .text {
+  color: var(--accent);
+  font-size: 15px;
+}
+
+.dialogue .next {
+  position: absolute;
+  right: 14px;
+  bottom: 8px;
+  font-size: 12px;
+  color: var(--dim);
+  animation: blink 1.4s infinite;
+  display: none;
+}
+
+.dialogue.done .next {
+  display: block;
+}
+
+/* ---------- 選択肢 ---------- */
+
+.choices {
+  position: fixed;
+  left: 50%;
+  bottom: calc(132px + var(--safe-b));
+  transform: translateX(-50%);
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+  width: min(360px, calc(100% - 48px));
+  z-index: 31;
+}
+
+.choices.on {
+  display: flex;
+}
+
+.choices button {
+  padding: 13px 16px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-size: 16px;
+  letter-spacing: 0.08em;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.choices button.sel,
+.choices button:hover {
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.choices button::before {
+  content: '・';
+  color: var(--dim);
+}
+
+.choices button.sel::before {
+  content: '▶';
+  color: var(--accent);
+}
+
+/* ---------- 手帳 ---------- */
+
+.notebook {
+  position: fixed;
+  inset: 0;
+  z-index: 35;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: calc(16px + var(--safe-t)) 16px calc(16px + var(--safe-b));
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.notebook.on {
+  display: flex;
+}
+
+.notebook .book {
+  position: relative;
+  width: min(640px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 22px 24px 26px;
+  background: #e4dcc6;
+  color: #2a241c;
+  border-radius: 3px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+  background-image: repeating-linear-gradient(transparent 0 31px, rgba(60, 80, 140, 0.18) 31px 32px);
+  touch-action: pan-y;
+}
+
+.notebook h2 {
+  margin: 0 0 4px;
+  font-size: 20px;
+  letter-spacing: 0.2em;
+  font-weight: normal;
+}
+
+.notebook .count {
+  font-size: 12px;
+  color: #6a604e;
+  margin-bottom: 14px;
+}
+
+.notebook .entry {
+  margin: 0 0 16px;
+  padding-left: 12px;
+  border-left: 3px solid #8c2a20;
+}
+
+.notebook .entry h3 {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+
+.notebook .entry p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+}
+
+.notebook .entry.new h3::after {
+  content: ' 新';
+  font-size: 11px;
+  color: #8c2a20;
+}
+
+.notebook .empty {
+  color: #6a604e;
+  font-size: 14px;
+}
+
+.notebook .close {
+  position: absolute;
+  right: 10px;
+  top: 8px;
+  padding: 6px 10px;
+  background: none;
+  border: none;
+  color: #2a241c;
+  font-size: 22px;
+  cursor: pointer;
+}
+
+/* ---------- トースト ---------- */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  top: calc(56px + var(--safe-t));
+  transform: translate(-50%, -10px);
+  padding: 8px 18px;
+  background: var(--panel);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  z-index: 32;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s, transform 0.3s;
+  white-space: nowrap;
+}
+
+.toast.on {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+/* 横向き推奨の案内（縦長かつ狭いとき） */
+.rotate-hint {
+  position: fixed;
+  left: 50%;
+  top: calc(44px + var(--safe-t));
+  transform: translateX(-50%);
+  font-size: 12px;
+  color: var(--dim);
+  z-index: 12;
+  pointer-events: none;
+  display: none;
+}
+
+@media (pointer: coarse) and (orientation: portrait) {
+  .rotate-hint {
+    display: block;
+  }
+}
+
+.debug {
+  position: fixed;
+  left: 8px;
+  bottom: 8px;
+  font: 11px monospace;
+  color: #7f7;
+  z-index: 50;
+  pointer-events: none;
+  white-space: pre;
+}

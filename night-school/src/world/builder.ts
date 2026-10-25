@@ -1,0 +1,241 @@
+import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { CollisionWorld } from '../engine/collision';
+
+/**
+ * Box / Plane を並べてステージを組み立てるためのヘルパー。
+ * 動かない物は材質ごとに 1 つのジオメトリへ結合して描画負荷を下げる。
+ * 動く物・調べられる物は個別の Mesh として返す。
+ */
+
+export interface MaterialDef {
+  material: THREE.Material;
+  /** テクスチャ 1 枚が覆う大きさ（m）。world UV の計算に使う */
+  texW?: number;
+  texH?: number;
+}
+
+export interface Opening {
+  from: number;
+  to: number;
+  /** 下端（0 なら床まで＝通れる） */
+  bottom?: number;
+  /** 上端 */
+  top: number;
+}
+
+export type Vec3 = [number, number, number];
+
+/** 開閉する物（個室の扉など）。open アクションで回転させる */
+export interface Openable {
+  pivot: THREE.Object3D;
+  /** 開いたときの Y 回転 */
+  openRotY: number;
+  /** 開いたら無効にする当たり判定のタグ */
+  colliderTag?: string;
+  progress: number;
+  opening: boolean;
+}
+
+export class WorldBuilder {
+  readonly root = new THREE.Group();
+  /** 名前付きの物（調べられる物・扉など） */
+  readonly named = new Map<string, THREE.Object3D>();
+  /** 視線の遮蔽に使う静的メッシュ */
+  readonly occluders: THREE.Object3D[] = [];
+  /** 照準で調べられる物（userData.interactId を持つ） */
+  readonly pickables: THREE.Object3D[] = [];
+  readonly openables = new Map<string, Openable>();
+  private pending = new Map<string, THREE.BufferGeometry[]>();
+  private hitMat = new THREE.MeshBasicMaterial({ visible: false });
+
+  constructor(
+    readonly scene: THREE.Scene,
+    readonly collision: CollisionWorld,
+    readonly materials: Record<string, MaterialDef>,
+  ) {
+    scene.add(this.root);
+  }
+
+  mat(key: string): THREE.Material {
+    const m = this.materials[key];
+    if (!m) throw new Error(`unknown material: ${key}`);
+    return m.material;
+  }
+
+  /** 静的な直方体。collide=true で当たり判定も作る */
+  box(min: Vec3, max: Vec3, matKey: string, opts: { collide?: boolean } = {}): void {
+    const geo = boxGeometry(min, max);
+    this.applyWorldUV(geo, matKey);
+    this.queue(matKey, geo);
+    if (opts.collide) this.collision.add(min[0], min[2], max[0], max[2]);
+  }
+
+  /** 個別に動かせる直方体（原点 = pivot）。親グループに入れて返す */
+  dynamicBox(size: Vec3, offset: Vec3, matKey: string | THREE.Material): THREE.Mesh {
+    const geo = new THREE.BoxGeometry(size[0], size[1], size[2]);
+    geo.translate(offset[0], offset[1], offset[2]);
+    if (typeof matKey === 'string') {
+      const def = this.materials[matKey];
+      const w = def?.texW ?? size[0];
+      const h = def?.texH ?? size[1];
+      scaleBoxUV(geo, size, w, h);
+    }
+    const mesh = new THREE.Mesh(geo, typeof matKey === 'string' ? this.mat(matKey) : matKey);
+    return mesh;
+  }
+
+  /** 水平な面（床・天井）。up=false で下向き */
+  plane(x1: number, z1: number, x2: number, z2: number, y: number, matKey: string, up = true): void {
+    const geo = new THREE.PlaneGeometry(Math.abs(x2 - x1), Math.abs(z2 - z1));
+    geo.rotateX(up ? -Math.PI / 2 : Math.PI / 2);
+    geo.translate((x1 + x2) / 2, y, (z1 + z2) / 2);
+    this.applyWorldUV(geo, matKey);
+    this.queue(matKey, geo);
+  }
+
+  /**
+   * X 軸方向に伸びる壁（z 固定）。openings で扉・窓の穴をあける。
+   * 当たり判定は「床まで開いた穴」以外すべてに付く。
+   */
+  wallX(z: number, x1: number, x2: number, matKey: string, openings: Opening[] = [], h = 3, t = 0.2): void {
+    this.wall('x', z, x1, x2, matKey, openings, h, t);
+  }
+
+  /** Z 軸方向に伸びる壁（x 固定） */
+  wallZ(x: number, z1: number, z2: number, matKey: string, openings: Opening[] = [], h = 3, t = 0.2): void {
+    this.wall('z', x, z1, z2, matKey, openings, h, t);
+  }
+
+  private wall(axis: 'x' | 'z', fixed: number, a1: number, a2: number, matKey: string, openings: Opening[], h: number, t: number): void {
+    const lo = Math.min(a1, a2);
+    const hi = Math.max(a1, a2);
+    const ops = [...openings].sort((p, q) => p.from - q.from);
+    const seg = (s: number, e: number, y1: number, y2: number, collide: boolean) => {
+      if (e - s <= 1e-4 || y2 - y1 <= 1e-4) return;
+      if (axis === 'x') this.box([s, y1, fixed - t / 2], [e, y2, fixed + t / 2], matKey, { collide });
+      else this.box([fixed - t / 2, y1, s], [fixed + t / 2, y2, e], matKey, { collide });
+    };
+    let cursor = lo;
+    for (const o of ops) {
+      seg(cursor, o.from, 0, h, true);
+      const bottom = o.bottom ?? 0;
+      if (bottom > 0) seg(o.from, o.to, 0, bottom, true);
+      seg(o.from, o.to, o.top, h, false);
+      if (bottom > 0) {
+        // 窓は通れない
+        if (axis === 'x') this.collision.add(o.from, fixed - t / 2, o.to, fixed + t / 2);
+        else this.collision.add(fixed - t / 2, o.from, fixed + t / 2, o.to);
+      }
+      cursor = o.to;
+    }
+    seg(cursor, hi, 0, h, true);
+  }
+
+  /** 個別メッシュを登録（name があれば named に入れる） */
+  add(obj: THREE.Object3D, name?: string, occluder = false): THREE.Object3D {
+    this.root.add(obj);
+    if (name) this.named.set(name, obj);
+    if (occluder) this.occluders.push(obj);
+    return obj;
+  }
+
+  /** 調べられる物として登録する */
+  interactable(id: string, obj: THREE.Object3D): THREE.Object3D {
+    obj.userData.interactId = id;
+    this.add(obj, id);
+    this.pickables.push(obj);
+    return obj;
+  }
+
+  /** 見えない当たり箱で調べられる範囲を作る（静的な物を調べたいとき） */
+  hitbox(id: string, min: Vec3, max: Vec3): THREE.Mesh {
+    const geo = boxGeometry(min, max);
+    const mesh = new THREE.Mesh(geo, this.hitMat);
+    this.interactable(id, mesh);
+    return mesh;
+  }
+
+  openable(name: string, pivot: THREE.Object3D, openRotY: number, colliderTag?: string): void {
+    this.openables.set(name, { pivot, openRotY, colliderTag, progress: 0, opening: false });
+  }
+
+  /** 結合して scene に追加する */
+  finalize(): void {
+    for (const [key, geos] of this.pending) {
+      const merged = mergeGeometries(geos, false);
+      if (!merged) continue;
+      merged.computeBoundingSphere();
+      const mesh = new THREE.Mesh(merged, this.mat(key));
+      mesh.matrixAutoUpdate = false;
+      this.root.add(mesh);
+      this.occluders.push(mesh);
+      for (const g of geos) g.dispose();
+    }
+    this.pending.clear();
+  }
+
+  private queue(key: string, geo: THREE.BufferGeometry): void {
+    // mergeGeometries は属性が揃っている必要がある
+    if (geo.index) geo = geo.toNonIndexed();
+    let list = this.pending.get(key);
+    if (!list) {
+      list = [];
+      this.pending.set(key, list);
+    }
+    list.push(geo);
+  }
+
+  /** 頂点のワールド座標から UV を決める（面の向きで投影軸を選ぶ） */
+  private applyWorldUV(geo: THREE.BufferGeometry, matKey: string): void {
+    const def = this.materials[matKey];
+    const tw = def?.texW ?? 1;
+    const th = def?.texH ?? tw;
+    const pos = geo.getAttribute('position');
+    const nor = geo.getAttribute('normal');
+    const uv = geo.getAttribute('uv');
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i);
+      const y = pos.getY(i);
+      const z = pos.getZ(i);
+      const nx = Math.abs(nor.getX(i));
+      const ny = Math.abs(nor.getY(i));
+      if (ny > 0.5) uv.setXY(i, x / tw, -z / tw);
+      else if (nx > 0.5) uv.setXY(i, z / tw, y / th);
+      else uv.setXY(i, x / tw, y / th);
+    }
+    uv.needsUpdate = true;
+  }
+}
+
+function boxGeometry(a: Vec3, b: Vec3): THREE.BufferGeometry {
+  const min: Vec3 = [Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.min(a[2], b[2])];
+  const max: Vec3 = [Math.max(a[0], b[0]), Math.max(a[1], b[1]), Math.max(a[2], b[2])];
+  const sx = max[0] - min[0];
+  const sy = max[1] - min[1];
+  const sz = max[2] - min[2];
+  const geo = new THREE.BoxGeometry(sx, sy, sz);
+  geo.translate(min[0] + sx / 2, min[1] + sy / 2, min[2] + sz / 2);
+  return geo;
+}
+
+/** BoxGeometry の各面 UV を実寸 / テクスチャ寸法に合わせて拡大する */
+function scaleBoxUV(geo: THREE.BufferGeometry, size: Vec3, tw: number, th: number): void {
+  const uv = geo.getAttribute('uv');
+  // 面の並び: +x, -x, +y, -y, +z, -z（各 4 頂点）
+  const faces: [number, number][] = [
+    [size[2], size[1]],
+    [size[2], size[1]],
+    [size[0], size[2]],
+    [size[0], size[2]],
+    [size[0], size[1]],
+    [size[0], size[1]],
+  ];
+  for (let f = 0; f < 6; f++) {
+    for (let k = 0; k < 4; k++) {
+      const i = f * 4 + k;
+      uv.setXY(i, (uv.getX(i) * faces[f][0]) / tw, (uv.getY(i) * faces[f][1]) / th);
+    }
+  }
+  uv.needsUpdate = true;
+}
