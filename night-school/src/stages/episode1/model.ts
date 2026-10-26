@@ -11,12 +11,13 @@ const GRACE = 2.5;
 
 /**
  * 動く人体模型。
- * 決まり：見られている間は動けない。目を離すと、心臓を持つプレイヤーへ近づいてくる。
+ * 決まり：画面に映っている間（見られている間）は動けない。
+ *         背を向けたり、壁の向こうに隠れたりすると、近づいてくる。心臓を返すと止まる。
  *
  * 状態はフラグで決まる（データ側で切り替える）
- *   modelHunting かつ modelCalm でない → 追ってくる
+ *   modelHunting かつ modelCalm でない → 追ってくる（理科室に入った時点で立つ）
  * 命令
- *   reset … 理科室の定位置に戻す
+ *   reset … 理科室の定位置に戻す（少しの間は動かない）
  */
 export const modelActor: ActorDef = {
   id: 'model',
@@ -29,6 +30,8 @@ class AnatomyModelActor implements Actor {
   private homeRot: number;
   private body: Box2;
   private grace = GRACE;
+  private lastDist = Infinity;
+  private moving = false;
   private stepDist = 0;
   private beatTimer = 0;
   private tmp = new THREE.Vector3();
@@ -48,9 +51,18 @@ class AnatomyModelActor implements Actor {
     if (cmd === 'reset') {
       this.root.position.copy(this.home);
       this.root.rotation.set(0, this.homeRot, 0);
-      this.grace = GRACE;
+      this.grace = GRACE * 2;
       this.syncBody();
     }
+  }
+
+  /** 怪異メーター：近いほど振れる。見ていないあいだに動いているときは強め */
+  threat(): number {
+    const { state, playerPos: p } = this.ctx;
+    if (!state.hasFlag('modelHunting') || state.hasFlag('modelCalm')) return 0;
+    if (Math.abs(p.z - OZ) > 20) return 0;
+    const t = Math.max(0, 1 - this.lastDist / 14);
+    return Math.min(1, t * (this.moving ? 1.15 : 0.9));
   }
 
   update(dt: number): void {
@@ -61,6 +73,8 @@ class AnatomyModelActor implements Actor {
 
     const m = this.root.position;
     const dist = Math.hypot(p.x - m.x, p.z - m.z);
+    this.lastDist = dist;
+    this.moving = false;
     this.heartbeat(dt, dist);
 
     if (this.grace > 0) {
@@ -89,6 +103,7 @@ class AnatomyModelActor implements Actor {
     const moved = Math.hypot(pos.x - m.x, pos.z - m.z);
     m.x = pos.x;
     m.z = pos.z;
+    this.moving = moved > 1e-4;
     this.root.rotation.y = Math.atan2(dx, dz);
     // ぎこちなく揺れる
     this.root.rotation.z = Math.sin(performance.now() * 0.02) * 0.04;

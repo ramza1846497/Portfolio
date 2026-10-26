@@ -6,6 +6,7 @@ import {
   H,
   anatomyModel,
   blackboard,
+  firstAidKit,
   doorOpening,
   labTable,
   moonPatch,
@@ -154,6 +155,11 @@ function buildStaffRoom(b: WorldBuilder, lights: BuildContext['lights']): void {
   wallPlane(b, noticeTexture('keybox', '鍵', ['理科室　　○', '職員室　　○', '音楽室　　－', '女子便所　－', '昇降口　　－']), 0.55, 0.7, [28.19, 1.6, OZ - 4.2], Math.PI / 2);
   b.hitbox('keybox', [28.1, 1.2, OZ - 4.7], [28.4, 2.0, OZ - 3.7]);
 
+  const aid = firstAidKit(b);
+  aid.position.set(35.6, 0.73, OZ - 6.4);
+  aid.rotation.y = 0.3;
+  b.interactable('firstAidStaff', aid);
+
   // 保健の先生の机：引き出しに四桁のダイヤル錠
   officeDesk(b, 38.6, OZ - 4.9, false);
   wallPlane(b, noticeTexture('nursePlate', '保健', ['']), 0.24, 0.12, [38.6, 0.85, OZ - 4.9 + 0.38], 0).scale.y = 0.6;
@@ -205,6 +211,10 @@ function buildNurseRoom(b: WorldBuilder, lights: BuildContext['lights']): void {
 
   // 先生の机・薬品棚・体重計
   b.box([11.2, 0, z1 + 1.2], [12.0, 0.72, z1 + 2.6], 'wood', { collide: true });
+  const aid = firstAidKit(b);
+  aid.position.set(11.6, 0.72, z1 + 2.1);
+  aid.rotation.y = Math.PI / 2;
+  b.interactable('firstAidNurse', aid);
   b.box([11.1, 0, z1 + 4.0], [11.55, 1.9, z1 + 6.2], 'locker', { collide: true });
   b.box([11.56, 0.9, z1 + 4.1], [11.57, 1.8, z1 + 6.1], 'glassDark');
   b.hitbox('medicine', [11.1, 0.8, z1 + 4.0], [11.7, 1.9, z1 + 6.2]);

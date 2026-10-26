@@ -148,6 +148,7 @@ export const piano: StagePart = {
       { fx: 'strobe', duration: 1 },
       { fx: 'shake' },
       { say: [{ text: '……ちがう', style: 'ghost' }] },
+      { damage: 10 },
       { addVar: 'pianoFail', value: 1 },
       {
         if: { var: 'pianoFail', eq: 1 },
@@ -164,6 +165,7 @@ export const piano: StagePart = {
       when: { all: [{ flag: 'musicOpen' }, { notFlag: 'pianoSolved' }] },
       actions: [
         { flag: 'pianistShow' },
+        { meter: 0.85 },
         { look: 'piano' },
         { melody: FIRST_HALF, tempo: 132 },
         { say: ['……ピアノが、ひとりでに鳴っている。', 'ピアノの前に、誰かが立っている。……透けている。', '曲は途中で、ぷつりと止まった。'] },
@@ -176,6 +178,7 @@ export const piano: StagePart = {
       when: { all: [{ flag: 'pianoSolved' }, { notFlag: 'toiletOpen' }] },
       actions: [
         { flag: 'glimpse' },
+        { meter: 1 },
         { sfx: 'laugh' },
         { look: 'hanakoGlimpse' },
         { say: ['……！', '女子トイレの前に、赤いスカートの女の子が立っている。'] },
@@ -186,6 +189,7 @@ export const piano: StagePart = {
       ],
     },
   ],
+  presences: [{ id: 'pianist', x: 1.85, z: -6.5, radius: 8, strength: 0.6, when: { notFlag: 'pianoSolved' } }],
   visibility: [
     { id: 'pianist', when: { flag: 'pianistShow' } },
     { id: 'hanakoGlimpse', when: { flag: 'glimpse' } },

@@ -25,6 +25,10 @@ export interface RunnerHost {
   shake(): void;
   /** クリア画面へ */
   clear(title?: string, text?: string): void;
+  /** ダメージを受けた演出 */
+  hurt(amount: number): void;
+  /** 怪異メーターを一瞬振らせる */
+  meterSpike(level: number): void;
 }
 
 const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -62,11 +66,12 @@ export class ScriptRunner {
     this.onBusyChange?.(b);
   }
 
-  private async run(actions: Action[]): Promise<void> {
+  /** true を返したら、呼び出し元の手順もすべて打ち切る（クリア・気絶） */
+  private async run(actions: Action[]): Promise<boolean> {
     for (const a of actions) {
-      const stop = await this.exec(a);
-      if (stop) return;
+      if (await this.exec(a)) return true;
     }
+    return false;
   }
 
   /** true を返すと以降を打ち切る */
@@ -152,7 +157,7 @@ export class ScriptRunner {
       const got = await this.host.keypad.ask(q.prompt, q.keys, q.answer.length, q.sound ?? 'click');
       if (got) {
         const ok = got.every((k, i) => k === q.answer[i]);
-        await this.run(ok ? q.correct : q.wrong);
+        return this.run(ok ? q.correct : q.wrong);
       }
     } else if ('actor' in a) {
       this.host.actorCommand(a.actor, a.command);
@@ -162,16 +167,30 @@ export class ScriptRunner {
         options.map((o) => o.label),
         a.choice.prompt,
       );
-      await this.run(options[i].actions);
+      return this.run(options[i].actions);
     } else if ('if' in a) {
-      await this.run(state.test(a.if) ? a.then : (a.else ?? []));
+      return this.run(state.test(a.if) ? a.then : (a.else ?? []));
     } else if ('run' in a) {
       const script = stage.scripts[a.run];
       if (!script) throw new Error(`unknown script: ${a.run}`);
-      await this.run(script);
+      return this.run(script);
     } else if ('clear' in a) {
       this.host.clear(a.title, a.text);
       return true;
+    } else if ('damage' in a) {
+      const max = stage.maxHp ?? 100;
+      const hp = Math.max(0, state.getVar('hp') - a.damage);
+      state.setVar('hp', hp);
+      this.host.hurt(a.damage / max);
+      if (hp <= 0 && stage.faintScript) {
+        await this.run(stage.scripts[stage.faintScript] ?? []);
+        return true;
+      }
+    } else if ('heal' in a) {
+      const max = stage.maxHp ?? 100;
+      state.setVar('hp', Math.min(max, state.getVar('hp') + a.heal));
+    } else if ('meter' in a) {
+      this.host.meterSpike(a.meter);
     }
     return false;
   }

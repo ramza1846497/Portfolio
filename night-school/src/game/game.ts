@@ -47,6 +47,9 @@ export class Game {
   private target: InteractableDef | null = null;
   private timer = new THREE.Timer();
   private cleared = false;
+  /** 怪異メーター：表示中の値と、一時的な振り切れ */
+  private meter = 0;
+  private meterSpike = 0;
   private debugEl: HTMLDivElement | null = null;
   private frames = 0;
   private fpsTime = 0;
@@ -104,6 +107,13 @@ export class Game {
       },
       shake: () => this.shake(),
       clear: (title, text) => this.showClear(title, text),
+      hurt: (amount) => {
+        this.audio.play('hurt');
+        this.hud.hurtFlash(amount);
+        this.shake();
+        this.meterSpike = Math.max(this.meterSpike, 1);
+      },
+      meterSpike: (level) => (this.meterSpike = Math.max(this.meterSpike, level)),
     });
     this.runner.onBusyChange = () => this.syncControls();
     this.keypad.onPress = (key, style) => (style === 'piano' ? this.audio.note(key) : this.audio.play('click'));
@@ -121,10 +131,13 @@ export class Game {
     for (const a of stage.actors ?? []) this.actors.set(a.id, a.create(actorCtx));
     this.notebook.onClose = () => this.syncControls();
     this.state.subscribe(() => this.syncState());
+    if (stage.maxHp) this.state.setVar('hp', stage.maxHp);
+    this.hud.showVitals(stage.maxHp !== undefined);
     this.syncState();
 
     const s = this.builder.spawns.get('start') ?? stage.start;
     this.player.place(s.x, s.z, s.yaw);
+    this.updateFloor();
 
     window.addEventListener('resize', () => this.resize());
     this.input.onAction((a) => this.onAction(a));
@@ -194,6 +207,7 @@ export class Game {
     const obj = this.stage.objectives.find((o) => this.state.test(o.when));
     this.hud.setObjective(obj?.text ?? '');
     this.hud.setNoteCount(this.state.unreadNotes.size);
+    if (this.stage.maxHp) this.hud.setHp(this.state.getVar('hp') / this.stage.maxHp);
     // 名前が条件で変わる物のために照準をやり直す
     this.target = null;
     this.hud.setTarget(null);
@@ -206,10 +220,37 @@ export class Game {
     if (o.colliderTag) this.collision.setEnabled(o.colliderTag, false);
   }
 
+  /** いる階を変数 floor に入れる（スクリプトの条件で使う） */
+  private updateFloor(): void {
+    const f = this.stage.floorOf?.(this.player.pos.x, this.player.pos.z);
+    if (f !== undefined && f !== this.state.getVar('floor')) this.state.setVar('floor', f);
+  }
+
+  /** 怪異メーター：気配・追ってくる怪異・一時的な振り切れのうち最大のもの */
+  private updateMeter(dt: number): void {
+    const p = this.player.pos;
+    let target = 0;
+    for (const pr of this.stage.presences ?? []) {
+      const d = Math.hypot(pr.x - p.x, pr.z - p.z);
+      if (d >= pr.radius || !this.state.test(pr.when)) continue;
+      target = Math.max(target, pr.strength * (1 - d / pr.radius));
+    }
+    for (const a of this.actors.values()) target = Math.max(target, a.threat?.() ?? 0);
+    this.meterSpike = Math.max(0, this.meterSpike - dt * 0.6);
+    target = Math.max(target, this.meterSpike);
+    // 針は少し遅れて追いかけ、強いほど震える
+    this.meter += (target - this.meter) * Math.min(1, dt * 4);
+    const jitter = (Math.random() - 0.5) * this.meter * 0.12;
+    const shown = Math.max(0, Math.min(1, this.meter + jitter));
+    this.hud.drawMeter(shown);
+    this.audio.setStatic(shown);
+  }
+
   private teleport(name: string): void {
     const s = this.builder.spawns.get(name);
     if (!s) throw new Error(`unknown spawn: ${name}`);
     this.player.place(s.x, s.z, s.yaw);
+    this.updateFloor();
     // 移った先のトリガーがすぐ発火しないように、いる場所を「中にいる」扱いにする
     this.insideTriggers.clear();
     for (const t of this.stage.triggers ?? []) if (this.inArea(t.area)) this.insideTriggers.add(t.id);
@@ -298,6 +339,7 @@ export class Game {
       <dl>
         <dt>調査時間</dt><dd>${time}</dd>
         <dt>記録数</dt><dd>${this.state.notes.length} / ${this.stage.notes.length}</dd>
+        ${this.state.getVar('faints') > 0 ? `<dt>気絶</dt><dd>${this.state.getVar('faints')} 回</dd>` : ''}
       </dl>
       <div class="sub">${text}</div>
       <div class="tap">タップでもう一度</div>`;
@@ -320,6 +362,7 @@ export class Game {
     this.input.update();
     this.player.update(dt);
     this.lights.update(dt, this.player.pos.z);
+    if (!this.cleared) this.updateMeter(dt);
     this.updateOpenables(dt);
     if (this.input.enabled) {
       for (const a of this.actors.values()) a.update(dt);

@@ -358,3 +358,20 @@ export function officeDesk(b: WorldBuilder, x: number, z: number, papers: boolea
 /** 廊下の扉の穴 */
 export const doorOpening = (from: number, width = 1.2): Opening => ({ from, to: from + width, top: 2.1 });
 export const windowOpening = (from: number, to: number): Opening => ({ from, to, bottom: 0.9, top: 2.4 });
+
+/** 救急箱（白い箱に赤十字）。原点は箱の底の中心 */
+export function firstAidKit(b: WorldBuilder): THREE.Group {
+  const g = new THREE.Group();
+  const box = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.16, 0.22), b.mat('porcelain'));
+  box.position.y = 0.08;
+  g.add(box);
+  const red = b.mat('red');
+  const v = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.005, 0.14), red);
+  v.position.y = 0.163;
+  g.add(v);
+  const h = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.005, 0.05), red);
+  h.position.y = 0.163;
+  g.add(h);
+  g.add(b.hitShape([0.45, 0.3, 0.35], [0, 0.1, 0]));
+  return g;
+}

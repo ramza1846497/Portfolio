@@ -65,7 +65,12 @@ export type Action =
   | { if: Cond; then: Action[]; else?: Action[] }
   | { run: string }
   /** クリア画面へ。title / text でエンディングごとの文言を変えられる */
-  | { clear: true; title?: string; text?: string };
+  | { clear: true; title?: string; text?: string }
+  /** 体力を減らす。0 になると StageDef.faintScript を実行し、いまの手順は打ち切る */
+  | { damage: number }
+  | { heal: number }
+  /** 怪異メーターを一瞬振り切らせる（0..1） */
+  | { meter: number };
 
 export interface SequenceDef {
   prompt: string;
@@ -141,12 +146,15 @@ export interface Actor {
   /** 会話中・スクリプト実行中は呼ばれない */
   update(dt: number): void;
   command?(cmd: string): void;
+  /** 怪異メーターへの寄与（0..1） */
+  threat?(): number;
 }
 
 /**
  * ステージの一部（怪異 1 つ分など）。複数を mergeParts でまとめて StageDef にする。
  */
 export interface StagePart {
+  presences?: PresenceDef[];
   notes?: NoteDef[];
   items?: ItemDef[];
   interactables?: InteractableDef[];
@@ -156,8 +164,9 @@ export interface StagePart {
 }
 
 export function mergeParts(parts: StagePart[]): Required<StagePart> {
-  const out: Required<StagePart> = { notes: [], items: [], interactables: [], scripts: {}, triggers: [], visibility: [] };
+  const out: Required<StagePart> = { presences: [], notes: [], items: [], interactables: [], scripts: {}, triggers: [], visibility: [] };
   for (const p of parts) {
+    out.presences.push(...(p.presences ?? []));
     out.notes.push(...(p.notes ?? []));
     out.items.push(...(p.items ?? []));
     out.interactables.push(...(p.interactables ?? []));
@@ -196,4 +205,22 @@ export interface StageDef {
   visibility?: { id: string; when: Cond }[];
   triggers?: TriggerDef[];
   actors?: ActorDef[];
+  /** 怪異メーターを振らせる気配（近づくほど強い） */
+  presences?: PresenceDef[];
+  /** 体力の最大値（体力ゲージを使わないステージは省略） */
+  maxHp?: number;
+  /** 体力が 0 になったときに実行するスクリプト名 */
+  faintScript?: string;
+  /** いる階の番号（変数 floor に入る。スクリプトの条件で使う） */
+  floorOf?: (x: number, z: number) => number;
+}
+
+/** 怪異の気配。半径 radius の中に入ると、近いほど strength に近い値でメーターが振れる */
+export interface PresenceDef {
+  id: string;
+  x: number;
+  z: number;
+  radius: number;
+  strength: number;
+  when?: Cond;
 }

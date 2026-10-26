@@ -5,15 +5,17 @@ import { OZ } from '../floor1';
  * 怪異その二「動く人体模型」（1 階・理科室）。
  * 動きそのものは ../model.ts（actor）に書いてある。
  *
- * 決まり：人体模型は、なくした心臓を探して歩く。見られている間は動けない。
- *         心臓を持ったまま目を離すと、近づいてきて捕まる。心臓を返すと止まる。
+ * 決まり：人体模型は、なくした心臓を探して歩く。画面に映っている間は動けない。
+ *         背を向けると近づいてきて、捕まると体力が減る。心臓を返すと止まる。
  *
  * flag modelSeen     人体模型を調べた
  * flag heartTaken    落とし物箱から心臓を取った
- * flag modelHunting  人体模型が動き出した
+ * flag modelHunting  人体模型が動き出した（理科室に入った時点）
  * flag modelCalm     心臓を返した（もう動かない）
  */
 export const model: StagePart = {
+  // 動き出す前の、理科室の奥の気配（動き出してからは actor がメーターを振らせる）
+  presences: [{ id: 'modelIdle', x: 24.6, z: OZ - 8.4, radius: 8, strength: 0.4, when: { notFlag: 'modelHunting' } }],
   notes: [
     {
       id: 'n_model',
@@ -28,12 +30,12 @@ export const model: StagePart = {
     {
       id: 'n_heart',
       title: '作り物の心臓',
-      body: '職員室の落とし物箱に入っていた、人体模型の心臓。\n取り出した直後、理科室の方で何かが倒れる音がした。',
+      body: '職員室の落とし物箱に入っていた、人体模型の心臓。\nこれを返せば、あれは止まるはずだ。',
     },
     {
       id: 'n_modelRule',
       title: '人体模型の決まり',
-      body: '目を離すと、近づいてくる。見ている間は動かない。\n心臓を返せば、止まるはずだ。',
+      body: '背を向けると、近づいてくる。見ている間は動かない。\n捕まると、首を絞められる。心臓を返せば、止まるはずだ。',
     },
     {
       id: 'n_musicKey',
@@ -136,45 +138,53 @@ export const model: StagePart = {
             { give: 'heart' },
             { flag: 'heartTaken' },
             { note: 'n_heart' },
-            { wait: 700 },
-            { sfx: 'fall' },
-            { fx: 'shake' },
-            { say: ['……ガタン。', '理科室の方から、何かが倒れる音がした。'] },
-            { flag: 'modelHunting' },
-            { sfx: 'thud' },
-            { say: [{ text: '……コツ、コツ、コツ。', style: 'whisper' }, '足音が、近づいてくる。'] },
+            {
+              if: { all: [{ flag: 'modelHunting' }, { notFlag: 'modelCalm' }] },
+              then: [{ say: ['……これを返せば、あれは止まるはずだ。', '目を離さずに、近づかないと。'] }],
+              else: [{ say: ['人体模型の心臓……理科室の人体模型のものだろうか。'] }],
+            },
           ],
         },
       ],
     },
   ],
   scripts: {
-    /** 目を離したすきに捕まった */
+    /** 背を向けたすきに捕まった */
     modelCaught: [
       { sfx: 'stinger' },
-      { fx: 'shake' },
       { fx: 'strobe', duration: 1 },
       { look: 'model' },
       { say: ['……！', '冷たく硬い指が、首にかかった——'] },
-      { fx: 'fadeOut', duration: 1 },
+      { damage: 35 },
+      { fx: 'flashFlicker', duration: 0.6 },
       { actor: 'model', command: 'reset' },
-      { teleport: 'f1Stairs' },
-      { wait: 800 },
-      { fx: 'fadeIn', duration: 1.5 },
       { addVar: 'caughtCount', value: 1 },
       {
         if: { var: 'caughtCount', eq: 1 },
-        then: [{ say: ['……はっ。', '気がつくと、階段の下に倒れていた。', 'あれは、見ていないときに動く。目を離しちゃいけない。'] }, { note: 'n_modelRule' }],
+        then: [
+          { say: ['……なんとか振りほどいた。', '瞬きした隙に、人体模型は消えていた。……理科室へ戻ったのか。', 'あれは、見ていないときに動く。背を向けちゃいけない。'] },
+          { note: 'n_modelRule' },
+        ],
         else: [{ say: ['……また、捕まった。', '目を離さずに近づいて、心臓を返さないと。'] }],
       },
     ],
   },
   triggers: [
     {
+      // 理科室に入ると、人体模型が動き出す
       id: 'scienceEnter',
       area: { minX: 14.2, maxX: 25.8, minZ: OZ - 9.4, maxZ: OZ - 1.6 },
-      when: { notFlag: 'modelSeen' },
-      actions: [{ say: ['……薬品の匂い。', '奥の暗がりに、誰かが立っている——', '……人体模型か。'] }],
+      when: { all: [{ notFlag: 'modelHunting' }, { notFlag: 'modelCalm' }] },
+      actions: [
+        { say: ['……薬品の匂い。', '奥の暗がりに、誰かが立っている——'] },
+        { look: 'model' },
+        { meter: 0.9 },
+        { sfx: 'thud' },
+        { fx: 'flashFlicker', duration: 0.6 },
+        { say: ['……人体模型だ。', '今、首がこちらを向いた……？'] },
+        { flag: 'modelHunting' },
+        { say: [{ text: '怪異メーターが振れている。……目を離さないほうがいい。', style: 'system' }] },
+      ],
     },
   ],
   visibility: [

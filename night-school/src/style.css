@@ -692,3 +692,97 @@ button {
     height: 72px;
   }
 }
+
+/* ---------- 体力ゲージ・怪異メーター ---------- */
+
+.vitals {
+  position: absolute;
+  left: calc(14px + var(--safe-l));
+  top: calc(36px + var(--safe-t));
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+}
+
+.vitals .hp {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 6px;
+}
+
+.vitals .cap,
+.meter-cap {
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  color: var(--dim);
+}
+
+.hp-bar {
+  width: 112px;
+  height: 7px;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+.hp-fill {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, #8c8a78, #d8d4c0);
+  transition: width 0.4s;
+}
+
+.hp-bar.danger .hp-fill {
+  background: linear-gradient(90deg, #6a1410, #c0392b);
+  animation: blink 1s infinite;
+}
+
+.meter {
+  position: relative;
+  width: 90px;
+  height: 60px;
+}
+
+.meter-dial {
+  width: 90px;
+  height: 51px;
+  display: block;
+}
+
+.meter-cap {
+  text-align: center;
+  margin-top: -2px;
+}
+
+.meter-cap.alert {
+  color: #ff6a55;
+  animation: blink 0.4s infinite;
+}
+
+.hurt {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 19;
+  opacity: 0;
+  background: radial-gradient(ellipse at center, rgba(120, 0, 0, 0.15) 30%, rgba(160, 0, 0, 0.85) 100%);
+}
+
+.low-hp {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 6;
+  opacity: 0;
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 50%, rgba(110, 0, 0, 0.55) 100%);
+}
+
+.low-hp.on {
+  animation: pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 0.9; }
+}

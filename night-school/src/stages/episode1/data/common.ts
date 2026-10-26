@@ -193,6 +193,21 @@ export const common: StagePart = {
       ],
     },
     {
+      id: 'firstAidStaff',
+      name: '救急箱',
+      visibleWhen: { notFlag: 'firstAidStaffUsed' },
+      reactions: [
+        {
+          actions: [
+            { sfx: 'pickup' },
+            { flag: 'firstAidStaffUsed' },
+            { heal: 40 },
+            { say: ['職員室の救急箱だ。', '絆創膏と湿布で、少しだけ楽になった。'] },
+          ],
+        },
+      ],
+    },
+    {
       id: 'shoes',
       name: '下駄箱',
       reactions: [
@@ -205,6 +220,19 @@ export const common: StagePart = {
     },
   ],
   scripts: {
+    /** 体力が尽きたとき：その階の階段で目を覚ます（進み具合はそのまま） */
+    faint: [
+      { fx: 'fadeOut', duration: 1.5 },
+      { say: ['……目の前が、真っ暗になった。'] },
+      { actor: 'model', command: 'reset' },
+      { fx: 'lightsOn' },
+      { addVar: 'faints', value: 1 },
+      { setVar: 'hp', value: 50 },
+      { if: { var: 'floor', eq: 1 }, then: [{ teleport: 'f1Stairs' }], else: [{ teleport: 'f2Stairs' }] },
+      { wait: 1000 },
+      { fx: 'fadeIn', duration: 1.5 },
+      { say: ['……どれくらい倒れていたのだろう。', '体が重い。無理はできない。'] },
+    ],
     intro: [
       { fx: 'fadeIn', duration: 2.5 },
       {
@@ -216,6 +244,7 @@ export const common: StagePart = {
         ],
       },
       { say: [{ text: '目的：一階の昇降口から脱出する', style: 'system' }] },
+      { say: [{ text: '左上は体力と怪異メーター。怪異が近いほど、針が振れる。', style: 'system' }] },
     ],
   },
   triggers: [
@@ -242,7 +271,9 @@ export const objectives: StageDef['objectives'] = [
   { when: { flag: 'toiletKeyAppeared' }, text: 'ピアノの上の鍵を取る' },
   { when: { flag: 'musicOpen' }, text: '音楽室のピアノを調べる' },
   { when: { item: 'musicKey' }, text: '二階の音楽室を開ける' },
-  { when: { item: 'heart' }, text: '人体模型に心臓を返す（目を離すな）' },
+  { when: { all: [{ item: 'heart' }, { flag: 'modelHunting' }] }, text: '人体模型に心臓を返す（背を向けるな）' },
+  { when: { all: [{ flag: 'modelHunting' }, { notFlag: 'modelCalm' }] }, text: '人体模型から逃げて、心臓を探す' },
+  { when: { item: 'heart' }, text: '心臓を理科室の人体模型に返す' },
   { when: { flag: 'modelSeen' }, text: '人体模型の心臓を探す' },
   { when: { flag: 'stairsSolved' }, text: '一階を調べる' },
   { text: '一階へ降りる方法を探す' },

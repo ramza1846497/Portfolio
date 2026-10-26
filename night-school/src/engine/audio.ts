@@ -20,7 +20,8 @@ export type SfxName =
   | 'clap'
   | 'whisper'
   | 'fall'
-  | 'click';
+  | 'click'
+  | 'hurt';
 
 /** 音名 → 周波数（Hz） */
 export const NOTE_FREQ: Record<string, number> = {
@@ -48,6 +49,7 @@ export class AudioEngine {
   private reverbSend!: GainNode;
   private noiseBuf!: AudioBuffer;
   private humGain: GainNode | null = null;
+  private staticGain: GainNode | null = null;
   private stepToggle = false;
   private playGain = 1;
   private playPan = 0;
@@ -83,6 +85,16 @@ export class AudioEngine {
 
   get ready(): boolean {
     return this.ctx !== null;
+  }
+
+  /**
+   * 怪異メーターに合わせたノイズ（0..1）。毎フレーム呼ぶ。
+   * ラジオの空電のように、ぶつぶつと途切れさせる
+   */
+  setStatic(level: number): void {
+    if (!this.staticGain || !this.ctx) return;
+    const v = level < 0.2 ? 0 : (level - 0.2) * (Math.random() < 0.35 ? 0.09 : 0.02);
+    this.staticGain.gain.setTargetAtTime(v, this.ctx.currentTime, 0.015);
   }
 
   /** 蛍光灯のハム音の大きさ（0..1） */
@@ -162,6 +174,8 @@ export class AudioEngine {
         return this.fall(t);
       case 'click':
         return this.click(t);
+      case 'hurt':
+        return this.hurt(t);
     }
   }
 
@@ -274,6 +288,20 @@ export class AudioEngine {
     wf.connect(wg);
     wg.connect(this.master);
     wind.start();
+    // 怪異メーターの空電
+    const st = ctx.createBufferSource();
+    st.buffer = this.noiseBuf;
+    st.loop = true;
+    const sf = ctx.createBiquadFilter();
+    sf.type = 'bandpass';
+    sf.frequency.value = 2200;
+    sf.Q.value = 0.6;
+    this.staticGain = ctx.createGain();
+    this.staticGain.gain.value = 0;
+    st.connect(sf);
+    sf.connect(this.staticGain);
+    this.staticGain.connect(this.master);
+    st.start();
     // 蛍光灯のハム
     const hum = ctx.createOscillator();
     hum.type = 'sawtooth';
@@ -526,5 +554,13 @@ export class AudioEngine {
   private click(t: number): void {
     const out = this.out(0.1);
     this.noise(t, 0.025, out, 0.25, { type: 'bandpass', freq: 3500, q: 3 });
+  }
+
+  /** ダメージ：鈍い衝撃と耳鳴り */
+  private hurt(t: number): void {
+    const out = this.out(0.4);
+    this.tone(t, 0.3, 90, out, 0.7, 'sine', 40);
+    this.noise(t, 0.15, out, 0.4, { type: 'lowpass', freq: 700 });
+    this.tone(t + 0.05, 1.6, 3800, out, 0.03, 'sine');
   }
 }

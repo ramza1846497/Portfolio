@@ -5,7 +5,7 @@ import { model } from './data/model';
 import { nurse } from './data/nurse';
 import { piano } from './data/piano';
 import { stairs } from './data/stairs';
-import { buildFloor1 } from './floor1';
+import { OZ, buildFloor1 } from './floor1';
 import { buildFloor2 } from './floor2';
 import { modelActor } from './model';
 
@@ -25,4 +25,7 @@ export const episode1: StageDef = {
   ...parts,
   objectives,
   actors: [modelActor],
+  maxHp: 100,
+  faintScript: 'faint',
+  floorOf: (_x, z) => (z > OZ / 2 ? 1 : 2),
 };

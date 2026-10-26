@@ -17,6 +17,7 @@ import { OZ } from '../floor1';
 const CODE = ['0', '2', '1', '4'];
 
 export const nurse: StagePart = {
+  presences: [{ id: 'sleeper', x: 16.9, z: OZ + 6.1, radius: 6, strength: 0.5, when: { notFlag: 'truthSeen' } }],
   notes: [
     {
       id: 'n_nurseLocked',
@@ -130,6 +131,21 @@ export const nurse: StagePart = {
       ],
     },
     {
+      id: 'firstAidNurse',
+      name: '救急箱',
+      visibleWhen: { notFlag: 'firstAidNurseUsed' },
+      reactions: [
+        {
+          actions: [
+            { sfx: 'pickup' },
+            { flag: 'firstAidNurseUsed' },
+            { heal: 100 },
+            { say: ['保健室の救急箱だ。', '消毒をして、包帯を巻いた。体が軽くなった。'] },
+          ],
+        },
+      ],
+    },
+    {
       id: 'bedEmpty',
       name: 'ベッド',
       reactions: [{ actions: [{ say: ['空のベッド。シーツはきちんと整えられている。'] }] }],
@@ -199,9 +215,11 @@ export const nurse: StagePart = {
     /** 眠っている人を起こそうとした */
     wakeSleeper: [
       { sfx: 'stinger' },
+      { meter: 1 },
       { fx: 'blackout' },
       { wait: 900 },
       { say: [{ text: '……まだ、ねてなきゃ　だめ', style: 'ghost' }] },
+      { damage: 15 },
       { fx: 'fadeOut', duration: 0.6 },
       { fx: 'lightsOn' },
       { teleport: 'nurseOut' },

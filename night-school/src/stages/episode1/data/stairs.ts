@@ -10,6 +10,7 @@ import type { StagePart } from '../../../game/types';
  * var  stairsFail    十三段目を踏んだ回数
  */
 export const stairs: StagePart = {
+  presences: [{ id: 'thirteen', x: -1.6, z: 0, radius: 5, strength: 0.55, when: { notFlag: 'stairsSolved' } }],
   notes: [
     {
       id: 'n_graffiti',
@@ -71,6 +72,7 @@ export const stairs: StagePart = {
       { sfx: 'step' },
       { say: ['一段、二段、三段……', '……九段、十段、十一段。', '十二段。……踊り場のはずだ。'] },
       { sfx: 'whisper' },
+      { meter: 0.9 },
       { fx: 'flashFlicker', duration: 0.8 },
       { say: ['……足の下に、まだ段がある。', '十三段目が。'] },
       {
@@ -87,6 +89,7 @@ export const stairs: StagePart = {
       { sfx: 'stinger' },
       { fx: 'strobe', duration: 1.2 },
       { say: ['足を乗せた瞬間、段がぐにゃりと沈んだ——'] },
+      { damage: 10 },
       { fx: 'fadeOut', duration: 0.8 },
       { teleport: 'f2Stairs' },
       { wait: 600 },

@@ -19,6 +19,14 @@ export class Hud {
   private toastEl: HTMLDivElement;
   private toastTimer = 0;
   readonly fade: HTMLDivElement;
+  private vitals: HTMLDivElement;
+  private hpFill: HTMLDivElement;
+  private hpBar: HTMLDivElement;
+  private meterCanvas: HTMLCanvasElement;
+  private meterCtx: CanvasRenderingContext2D;
+  private meterLabel: HTMLDivElement;
+  private hurtEl: HTMLDivElement;
+  private lowEl: HTMLDivElement;
 
   constructor(input: Input) {
     this.root = el('div', 'hud', document.body);
@@ -48,6 +56,88 @@ export class Hud {
 
     this.toastEl = el('div', 'toast', document.body);
     this.fade = el('div', 'fade', document.body);
+
+    // 体力ゲージと怪異メーター
+    this.vitals = el('div', 'vitals', this.root);
+    const hp = el('div', 'hp', this.vitals, '<span class="cap">体力</span>');
+    this.hpBar = el('div', 'hp-bar', hp);
+    this.hpFill = el('div', 'hp-fill', this.hpBar);
+    const meter = el('div', 'meter', this.vitals);
+    this.meterCanvas = el('canvas', 'meter-dial', meter);
+    this.meterCanvas.width = 120;
+    this.meterCanvas.height = 68;
+    this.meterCtx = this.meterCanvas.getContext('2d')!;
+    this.meterLabel = el('div', 'meter-cap', meter, '怪異');
+    this.hurtEl = el('div', 'hurt', document.body);
+    this.lowEl = el('div', 'low-hp', document.body);
+    this.drawMeter(0);
+  }
+
+  /** 体力（0..1） */
+  setHp(ratio: number): void {
+    const r = Math.max(0, Math.min(1, ratio));
+    this.hpFill.style.width = `${r * 100}%`;
+    this.hpBar.classList.toggle('danger', r <= 0.3);
+    this.lowEl.classList.toggle('on', r <= 0.3);
+  }
+
+  showVitals(v: boolean): void {
+    this.vitals.style.display = v ? '' : 'none';
+  }
+
+  /** ダメージの赤い明滅。amount は最大体力に対する割合 */
+  hurtFlash(amount: number): void {
+    this.hurtEl.style.transition = 'none';
+    this.hurtEl.style.opacity = String(Math.min(0.85, 0.35 + amount));
+    void this.hurtEl.offsetWidth;
+    this.hurtEl.style.transition = 'opacity 1.2s';
+    this.hurtEl.style.opacity = '0';
+  }
+
+  /** 怪異メーターの針（0..1）。毎フレーム呼ぶ */
+  drawMeter(level: number): void {
+    const ctx = this.meterCtx;
+    const cx = 60;
+    const cy = 62;
+    const r = 52;
+    ctx.clearRect(0, 0, 120, 68);
+    // 目盛りの帯：静か → 気配 → 危険
+    const zones: [number, number, string][] = [
+      [0, 0.45, 'rgba(120,160,130,0.55)'],
+      [0.45, 0.75, 'rgba(200,170,80,0.65)'],
+      [0.75, 1, 'rgba(190,50,40,0.8)'],
+    ];
+    const ang = (t: number) => Math.PI + t * Math.PI;
+    ctx.lineWidth = 6;
+    for (const [a, b, col] of zones) {
+      ctx.strokeStyle = col;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, ang(a), ang(b));
+      ctx.stroke();
+    }
+    ctx.strokeStyle = 'rgba(232,228,216,0.5)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 10; i++) {
+      const a = ang(i / 10);
+      const r1 = i % 5 === 0 ? r - 12 : r - 8;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1);
+      ctx.lineTo(cx + Math.cos(a) * (r - 3), cy + Math.sin(a) * (r - 3));
+      ctx.stroke();
+    }
+    // 針
+    const a = ang(Math.max(0, Math.min(1, level)));
+    ctx.strokeStyle = level > 0.75 ? '#ff5a44' : '#e8e4d8';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(a) * (r - 6), cy + Math.sin(a) * (r - 6));
+    ctx.stroke();
+    ctx.fillStyle = '#e8e4d8';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+    ctx.fill();
+    this.meterLabel.classList.toggle('alert', level > 0.75);
   }
 
   setTarget(name: string | null): void {

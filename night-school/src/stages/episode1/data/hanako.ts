@@ -147,6 +147,7 @@ const scripts: StagePart['scripts'] = {
     { fx: 'shake' },
     { wait: 1200 },
     { say: [{ text: 'クスクスクス……', style: 'ghost' }] },
+    { damage: 10 },
     { setVar: 'knockStall', value: 0 },
     { setVar: 'knockCount', value: 0 },
     { addVar: 'failCount', value: 1 },
@@ -166,6 +167,7 @@ const scripts: StagePart['scripts'] = {
     { fx: 'blackout' },
     { wait: 1800 },
     { sfx: 'hai' },
+    { meter: 1 },
     { wait: 300 },
     { say: [{ speaker: '？？？', text: 'はあい', style: 'ghost' }] },
     { wait: 700 },
@@ -320,6 +322,7 @@ export const hanako: StagePart = {
   items,
   interactables,
   scripts,
+  presences: [{ id: 'hanako', x: 10.1, z: 7.6, radius: 7, strength: 0.7, when: { notFlag: 'hanakoAnswered' } }],
   visibility: [
     { id: 'hanakoFigure', when: { flag: 'hanakoShow' } },
     { id: 'toiletChain', when: { notFlag: 'toiletOpen' } },
