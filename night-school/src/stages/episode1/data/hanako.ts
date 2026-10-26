@@ -22,6 +22,11 @@ const CORRECT_KNOCKS = 3;
 
 const notes: StagePart['notes'] = [
   {
+    id: 'n_hanakoWelcome',
+    title: '暴れる扉',
+    body: '女子トイレに入った瞬間、四つの個室の扉がいっせいに開け閉めを繰り返し、\n明かりが激しく明滅した。……歓迎されているのだろうか。',
+  },
+  {
     id: 'n_toiletLocked',
     title: '清掃中の女子トイレ',
     body: '二階の女子トイレは、鎖と南京錠で閉ざされている。\n札には「清掃中・立入禁止」。',
@@ -88,7 +93,24 @@ function knock(n: number): Action[] {
     },
     { addVar: 'knockCount', value: 1 },
     { sfx: 'knock' },
+    // 正しい個室ほど、ノックを重ねるほど、メーターが大きく振れる
+    ...(n === CORRECT_STALL
+      ? [
+          { if: { var: 'knockCount', eq: 1 }, then: [{ meter: 0.55 }] },
+          { if: { var: 'knockCount', eq: 2 }, then: [{ meter: 0.75 }] },
+          { if: { var: 'knockCount', gte: 3 }, then: [{ meter: 0.95 }] },
+        ]
+      : [{ meter: 0.3 }]),
     { say: [{ text: 'コン……（{knockCount}回）', style: 'system' }] },
+    // 三回ノックすると、中から一度だけ叩き返される
+    ...(n === CORRECT_STALL
+      ? [
+          {
+            if: { var: 'knockCount', eq: CORRECT_KNOCKS },
+            then: [{ wait: 700 }, { sfx: 'knock' }, { fx: 'flashFlicker', duration: 0.4 }, { say: [{ text: '……コン。', style: 'whisper' }, '中から、一度だけ叩き返された。'] }],
+          } as Action,
+        ]
+      : []),
     { run: `menu${n}` },
   ];
 }
@@ -143,7 +165,9 @@ const scripts: StagePart['scripts'] = {
   hanakoWrong: [
     { wait: 500 },
     { sfx: 'laugh' },
-    { fx: 'strobe', duration: 1.8 },
+    { meter: 1 },
+    { rattle: ['stall1', 'stall2', 'stall3', 'stall4'], duration: 1.4 },
+    { fx: 'strobe', duration: 1.8, target: 'toilet' },
     { fx: 'shake' },
     { wait: 1200 },
     { say: [{ text: 'クスクスクス……', style: 'ghost' }] },
@@ -170,7 +194,9 @@ const scripts: StagePart['scripts'] = {
     { meter: 1 },
     { wait: 300 },
     { say: [{ speaker: '？？？', text: 'はあい', style: 'ghost' }] },
-    { wait: 700 },
+    { rattle: ['stall1', 'stall2', 'stall4'], duration: 1.6 },
+    { sfx: 'laugh' },
+    { wait: 1800 },
     { sfx: 'creak' },
     { open: 'stall3' },
     { wait: 1600 },
@@ -318,11 +344,38 @@ const interactables: InteractableDef[] = [
 ];
 
 export const hanako: StagePart = {
+  triggers: [
+    {
+      // 女子トイレに初めて入った瞬間：花子さんが「出迎える」
+      id: 'toiletEnter',
+      area: { minX: 8.2, maxX: 15.8, minZ: 1.8, maxZ: 6.6 },
+      when: { all: [{ flag: 'toiletOpen' }, { notFlag: 'hanakoAnswered' }] },
+      actions: [
+        { look: 'stall3' },
+        { meter: 1 },
+        { sfx: 'laugh' },
+        { rattle: ['stall1', 'stall2', 'stall3', 'stall4'], duration: 3.2 },
+        { fx: 'strobe', duration: 3.4, target: 'toilet' },
+        { fx: 'shake' },
+        { wait: 1500 },
+        { say: ['……！', '個室の扉が、いっせいに暴れ出した——'] },
+        { wait: 900 },
+        { sfx: 'whisper' },
+        { say: ['……静かになった。', '水の落ちる音だけが、響いている。', 'この中の、どこかに……いる。'] },
+        { note: 'n_hanakoWelcome' },
+      ],
+    },
+  ],
   notes,
   items,
   interactables,
   scripts,
-  presences: [{ id: 'hanako', x: 10.1, z: 7.6, radius: 7, strength: 0.7, when: { notFlag: 'hanakoAnswered' } }],
+  presences: [
+    // 三番目の個室：トイレの前の廊下でも、かすかに振れる
+    { id: 'hanako', x: 10.1, z: 7.6, radius: 10, strength: 0.85, when: { notFlag: 'hanakoAnswered' } },
+    // 扉が開いてからは、トイレの中全体がざわつく
+    { id: 'hanakoRoom', x: 12, z: 5, radius: 5, strength: 0.6, when: { all: [{ flag: 'toiletOpen' }, { notFlag: 'hanakoAnswered' }] } },
+  ],
   visibility: [
     { id: 'hanakoFigure', when: { flag: 'hanakoShow' } },
     { id: 'toiletChain', when: { notFlag: 'toiletOpen' } },

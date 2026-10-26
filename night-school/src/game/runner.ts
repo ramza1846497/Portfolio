@@ -16,6 +16,7 @@ export interface RunnerHost {
   keypad: Keypad;
   /** 開閉する物を開く */
   open(name: string): void;
+  rattle(names: string[], seconds: number): void;
   /** spawn 地点へプレイヤーを移す */
   teleport(spawn: string): void;
   /** カメラを物の方へ向ける（向き終わるまで待つ） */
@@ -120,7 +121,7 @@ export class ScriptRunner {
           audio.setHum(1);
           break;
         case 'strobe':
-          lights.strobe(ms / 1000);
+          lights.strobe(ms / 1000, a.target);
           break;
         case 'flashFlicker':
           lights.flickerFlashlight(ms / 1000);
@@ -141,6 +142,8 @@ export class ScriptRunner {
       }
     } else if ('open' in a) {
       this.host.open(a.open);
+    } else if ('rattle' in a) {
+      this.host.rattle(a.rattle, a.duration ?? 2);
     } else if ('teleport' in a) {
       this.host.teleport(a.teleport);
     } else if ('look' in a) {

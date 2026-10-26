@@ -38,6 +38,12 @@ export interface Openable {
   colliderTag?: string;
   progress: number;
   opening: boolean;
+  /** 勝手に開け閉めする演出の残り時間など */
+  rattleLeft: number;
+  rattleTimer: number;
+  /** 演出中の開き具合（0..1）と、その目標 */
+  rattleAmount: number;
+  rattleTarget: number;
 }
 
 export class WorldBuilder {
@@ -169,7 +175,7 @@ export class WorldBuilder {
   }
 
   openable(name: string, pivot: THREE.Object3D, openRotY: number, colliderTag?: string, slide: Vec3 = [0, 0, 0]): void {
-    this.openables.set(name, { pivot, openRotY, slide, basePos: pivot.position.clone(), colliderTag, progress: 0, opening: false });
+    this.openables.set(name, { pivot, openRotY, slide, basePos: pivot.position.clone(), colliderTag, progress: 0, opening: false, rattleLeft: 0, rattleTimer: 0, rattleAmount: 0, rattleTarget: 0 });
   }
 
   spawn(name: string, x: number, z: number, yaw: number): void {

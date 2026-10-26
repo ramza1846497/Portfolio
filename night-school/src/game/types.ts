@@ -49,8 +49,11 @@ export type Action =
   | { take: string }
   | { sfx: SfxName }
   | { wait: number }
-  | { fx: 'blackout' | 'lightsOn' | 'strobe' | 'flashFlicker' | 'shake' | 'fadeOut' | 'fadeIn'; duration?: number }
+  /** target を付けた strobe は、その名前の明かりだけを激しく明滅させる */
+  | { fx: 'blackout' | 'lightsOn' | 'strobe' | 'flashFlicker' | 'shake' | 'fadeOut' | 'fadeIn'; duration?: number; target?: string }
   | { open: string }
+  /** 扉をバタンバタンと勝手に開け閉めさせる（待たずに次へ進む）。終わると元の状態に戻る */
+  | { rattle: string[]; duration?: number }
   /** builder.spawn で決めた地点へプレイヤーを移す（階の移動など） */
   | { teleport: string }
   /** カメラを名前付きの物の方へ向ける */

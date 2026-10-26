@@ -283,5 +283,5 @@ function buildToilet(b: WorldBuilder, lights: BuildContext['lights']): void {
   b.box([8.649, 1.55, 2.3], [8.652, 1.62, 2.65], 'dark');
   b.hitbox('locker', [8.1, 0, 2.0], [8.7, 1.9, 2.95]);
 
-  lights.addFluorescent(12, H - 0.08, 4.2, 'flicker', 0, 3.2);
+  lights.addFluorescent(12, H - 0.08, 4.2, 'flicker', 0, 3.2, 'toilet');
 }

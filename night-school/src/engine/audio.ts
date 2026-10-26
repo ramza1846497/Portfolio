@@ -21,7 +21,8 @@ export type SfxName =
   | 'whisper'
   | 'fall'
   | 'click'
-  | 'hurt';
+  | 'hurt'
+  | 'bang';
 
 /** 音名 → 周波数（Hz） */
 export const NOTE_FREQ: Record<string, number> = {
@@ -176,6 +177,8 @@ export class AudioEngine {
         return this.click(t);
       case 'hurt':
         return this.hurt(t);
+      case 'bang':
+        return this.bang(t);
     }
   }
 
@@ -562,5 +565,13 @@ export class AudioEngine {
     this.tone(t, 0.3, 90, out, 0.7, 'sine', 40);
     this.noise(t, 0.15, out, 0.4, { type: 'lowpass', freq: 700 });
     this.tone(t + 0.05, 1.6, 3800, out, 0.03, 'sine');
+  }
+
+  /** 個室の扉が叩きつけられる音 */
+  private bang(t: number): void {
+    const out = this.out(0.7);
+    this.tone(t, 0.18, 110 + Math.random() * 30, out, 0.6, 'triangle', 55);
+    this.noise(t, 0.09, out, 0.45, { type: 'bandpass', freq: 900 + Math.random() * 500, q: 1.5 });
+    this.noise(t + 0.04, 0.2, out, 0.12, { type: 'bandpass', freq: 2400, q: 6 });
   }
 }

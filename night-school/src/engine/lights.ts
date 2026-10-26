@@ -10,9 +10,17 @@ interface Fixture {
   base: number;
   mode: FixtureMode;
   z: number;
+  /** strobe(…, tag) で、この明かりだけを明滅させるための名前 */
+  tag?: string;
   /** ちらつき用の内部状態 */
   timer: number;
   on: boolean;
+  /** 明滅の演出の残り時間など */
+  sLeft: number;
+  sTimer: number;
+  sOn: boolean;
+  /** 明滅の強さ（部屋だけの明滅は激しく） */
+  sPower: number;
 }
 
 /**
@@ -23,9 +31,8 @@ export class LightRig {
   readonly flashlight: THREE.SpotLight;
   private fixtures: Fixture[] = [];
   private blackout = false;
+  /** 全体の明滅中（懐中電灯も乱れる） */
   private strobeLeft = 0;
-  private strobeTimer = 0;
-  private strobeOn = true;
   private flashFlicker = 0;
   private ambient: THREE.HemisphereLight;
   private ambientBase: number;
@@ -48,7 +55,7 @@ export class LightRig {
   }
 
   /** 天井の蛍光灯を 1 つ追加する */
-  addFluorescent(x: number, y: number, z: number, mode: FixtureMode, rotY = 0, intensity = 4): void {
+  addFluorescent(x: number, y: number, z: number, mode: FixtureMode, rotY = 0, intensity = 4, tag?: string): void {
     const group = new THREE.Group();
     group.position.set(x, y, z);
     group.rotation.y = rotY;
@@ -69,17 +76,22 @@ export class LightRig {
       light.position.set(x, y - 0.25, z);
       this.scene.add(light);
     }
-    this.fixtures.push({ light, tubeMat, base, mode, z, timer: Math.random() * 2, on: mode !== 'dead' });
+    this.fixtures.push({ light, tubeMat, base, mode, z, tag, timer: Math.random() * 2, on: mode !== 'dead', sLeft: 0, sTimer: 0, sOn: true, sPower: 1.3 });
   }
 
   setBlackout(on: boolean): void {
     this.blackout = on;
   }
 
-  /** 照明が明滅する演出 */
-  strobe(seconds: number): void {
-    this.strobeLeft = seconds;
-    this.strobeTimer = 0;
+  /** 照明が明滅する演出。tag を付けると、その明かりだけが激しく明滅する */
+  strobe(seconds: number, tag?: string): void {
+    if (!tag) this.strobeLeft = seconds;
+    for (const f of this.fixtures) {
+      if (tag && f.tag !== tag) continue;
+      f.sLeft = seconds;
+      f.sTimer = 0;
+      f.sPower = tag ? 2.2 : 1.3;
+    }
   }
 
   /** 懐中電灯を一瞬弱める（怪異の気配） */
@@ -92,16 +104,8 @@ export class LightRig {
    * 階は z を大きくずらして配置している前提。
    */
   update(dt: number, playerZ = 0): void {
-    if (this.strobeLeft > 0) {
-      this.strobeLeft -= dt;
-      this.strobeTimer -= dt;
-      if (this.strobeTimer <= 0) {
-        this.strobeOn = !this.strobeOn;
-        this.strobeTimer = 0.03 + Math.random() * (this.strobeOn ? 0.12 : 0.08);
-      }
-    } else {
-      this.strobeOn = true;
-    }
+    if (this.strobeLeft > 0) this.strobeLeft -= dt;
+    let anyDark = false;
 
     for (const f of this.fixtures) {
       if (f.mode === 'flicker') {
@@ -113,13 +117,23 @@ export class LightRig {
         }
       }
       let k = f.on ? 1 : 0;
-      if (this.strobeLeft > 0) k = this.strobeOn ? 1.3 : 0;
+      if (f.sLeft > 0) {
+        f.sLeft -= dt;
+        f.sTimer -= dt;
+        if (f.sTimer <= 0) {
+          f.sOn = !f.sOn;
+          f.sTimer = 0.03 + Math.random() * (f.sOn ? 0.12 : 0.08);
+        }
+        // 消えた明かりも、この間だけは点く
+        k = f.sOn ? f.sPower * (0.6 + Math.random() * 0.4) : 0;
+        if (!f.sOn) anyDark = true;
+      }
       if (this.blackout) k = 0;
       if (f.light) {
         f.light.intensity = f.base * k;
         f.light.visible = Math.abs(f.z - playerZ) < 30;
       }
-      const lit = f.mode !== 'dead' && k > 0;
+      const lit = (f.mode !== 'dead' || f.sLeft > 0) && k > 0;
       f.tubeMat.color.setHex(lit ? (f.mode === 'dim' ? 0x9fb4b8 : 0xeaffff) : 0x2a2a2a);
     }
 
@@ -128,7 +142,7 @@ export class LightRig {
       this.flashFlicker -= dt;
       flash = Math.random() < 0.5 ? 0.15 : 0.8;
     }
-    if (this.strobeLeft > 0 && !this.strobeOn) flash = 0.1;
+    if ((this.strobeLeft > 0 && anyDark) || (anyDark && Math.random() < 0.3)) flash = 0.1;
     if (this.blackout) flash = 0;
     this.flashlight.intensity = FLASH_INTENSITY * flash;
     this.ambient.intensity = this.blackout ? 0.02 : this.ambientBase;

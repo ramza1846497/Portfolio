@@ -8,7 +8,7 @@ import { Dialogue } from '../ui/dialogue';
 import { Hud } from '../ui/hud';
 import { Keypad } from '../ui/keypad';
 import { Notebook } from '../ui/notebook';
-import { WorldBuilder } from '../world/builder';
+import { WorldBuilder, type Openable } from '../world/builder';
 import { createMaterials } from '../world/materials';
 import { ScriptRunner } from './runner';
 import { GameState } from './state';
@@ -41,6 +41,7 @@ export class Game {
   /** いま中にいるトリガー（入り直したときだけ再発火させる） */
   private insideTriggers = new Set<string>();
   private losRay = new THREE.Raycaster();
+  private tmpVec = new THREE.Vector3();
   private raycaster = new THREE.Raycaster();
   private center = new THREE.Vector2(0, 0);
   private defs = new Map<string, InteractableDef>();
@@ -98,6 +99,15 @@ export class Game {
       hud: this.hud,
       keypad: this.keypad,
       open: (name) => this.open(name),
+      rattle: (names, seconds) => {
+        for (const n of names) {
+          const o = this.builder.openables.get(n);
+          if (!o) throw new Error(`unknown openable: ${n}`);
+          o.rattleLeft = seconds;
+          o.rattleTimer = Math.random() * 0.15;
+          o.rattleAmount = o.progress;
+        }
+      },
       teleport: (name) => this.teleport(name),
       look: (name) => this.lookAt(name),
       actorCommand: (id, cmd) => {
@@ -236,7 +246,7 @@ export class Game {
       target = Math.max(target, pr.strength * (1 - d / pr.radius));
     }
     for (const a of this.actors.values()) target = Math.max(target, a.threat?.() ?? 0);
-    this.meterSpike = Math.max(0, this.meterSpike - dt * 0.6);
+    this.meterSpike = Math.max(0, this.meterSpike - dt * 0.35);
     target = Math.max(target, this.meterSpike);
     // 針は少し遅れて追いかけ、強いほど震える
     this.meter += (target - this.meter) * Math.min(1, dt * 4);
@@ -379,6 +389,10 @@ export class Game {
 
   private updateOpenables(dt: number): void {
     for (const o of this.builder.openables.values()) {
+      if (o.rattleLeft > 0) {
+        this.updateRattle(o, dt);
+        continue;
+      }
       if (!o.opening || o.progress >= 1) continue;
       o.progress = Math.min(1, o.progress + dt / OPEN_SECONDS);
       // ゆっくり動き出して、最後にすっと止まる
@@ -387,6 +401,42 @@ export class Game {
       o.pivot.rotation.y = o.openRotY * ease;
       o.pivot.position.set(o.basePos.x + o.slide[0] * ease, o.basePos.y + o.slide[1] * ease, o.basePos.z + o.slide[2] * ease);
     }
+  }
+
+  /** 扉が勝手にバタンバタンと開け閉めする */
+  private updateRattle(o: Openable, dt: number): void {
+    o.rattleLeft -= dt;
+    o.rattleTimer -= dt;
+    const done = o.rattleLeft <= 0;
+    const rest = o.opening ? 1 : 0;
+    if (done) {
+      o.rattleTarget = rest;
+    } else if (o.rattleTimer <= 0) {
+      // 開く → 叩きつけるように閉まる、を不規則に繰り返す
+      const closing = o.rattleTarget > 0.3;
+      o.rattleTarget = closing ? 0 : 0.35 + Math.random() * 0.55;
+      o.rattleTimer = closing ? 0.12 + Math.random() * 0.25 : 0.1 + Math.random() * 0.18;
+    }
+    const prev = o.rattleAmount;
+    o.rattleAmount += (o.rattleTarget - o.rattleAmount) * Math.min(1, dt * 22);
+    if (prev > 0.08 && o.rattleAmount <= 0.08 && o.rattleTarget === 0) {
+      const p = o.pivot.getWorldPosition(this.tmpVec);
+      const d = p.distanceTo(this.camera.position);
+      this.audio.play('bang', { gain: Math.max(0.15, 1 - d / 14), pan: this.panOf(p) });
+    }
+    const t = done ? rest : o.rattleAmount;
+    o.pivot.rotation.y = o.openRotY * t;
+    o.pivot.position.set(o.basePos.x + o.slide[0] * t, o.basePos.y + o.slide[1] * t, o.basePos.z + o.slide[2] * t);
+    if (done) o.rattleLeft = 0;
+  }
+
+  /** 音の左右（カメラから見て右が +） */
+  private panOf(p: THREE.Vector3): number {
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion);
+    const dx = p.x - this.camera.position.x;
+    const dz = p.z - this.camera.position.z;
+    const len = Math.hypot(dx, dz) || 1;
+    return (dx * right.x + dz * right.z) / len;
   }
 
   /** 画面中央から 2.5m 以内の、調べられる物を探す */
