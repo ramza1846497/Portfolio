@@ -75,12 +75,45 @@ function buildRoad(b: WorldBuilder, lights: BuildContext['lights']): void {
 
 function coin(b: WorldBuilder, id: string, x: number, z: number): void {
   const g = new THREE.Group();
-  const m = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.012, 14), new THREE.MeshLambertMaterial({ color: 0xa0602a, emissive: 0x301a08 }));
+  const mat = new THREE.MeshLambertMaterial({ color: 0xa0602a, emissive: 0x301a08 });
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.012, 14), mat);
   m.position.y = 0.008;
   g.add(m);
   g.add(b.hitShape([0.5, 0.25, 0.5], [0, 0.05, 0]));
+  // 目印：チカッ、チカッと二度光って、少し休む。霧の向こうからも、遠くても同じ大きさで見える
+  const glint = new THREE.Sprite(new THREE.SpriteMaterial({ map: glintTexture(), color: 0xffe2a0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, sizeAttenuation: false }));
+  glint.position.y = 0.06;
+  g.add(glint);
+  const offset = (x * 0.37) % 1.6;
+  b.animations.push((time) => {
+    const t = (time + offset) % 1.6;
+    const on = t < 0.09 || (t > 0.22 && t < 0.31);
+    glint.visible = on;
+    glint.scale.setScalar(on ? 0.1 + Math.random() * 0.03 : 0.001);
+    mat.emissive.setHex(on ? 0xc08040 : 0x301a08);
+  });
   g.position.set(x, 0, z);
   b.interactable(id, g);
+}
+
+/** 光の十字（目印用） */
+let glintTex: THREE.Texture | null = null;
+function glintTexture(): THREE.Texture {
+  if (glintTex) return glintTex;
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const ctx = c.getContext('2d')!;
+  const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 30);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.25, 'rgba(255,240,200,0.6)');
+  g.addColorStop(1, 'rgba(255,220,150,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 64, 64);
+  ctx.fillStyle = 'rgba(255,255,240,0.9)';
+  ctx.fillRect(30, 2, 4, 60);
+  ctx.fillRect(2, 30, 60, 4);
+  glintTex = new THREE.CanvasTexture(c);
+  return glintTex;
 }
 
 /**

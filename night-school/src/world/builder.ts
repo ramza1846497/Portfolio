@@ -59,6 +59,8 @@ export class WorldBuilder {
   readonly openables = new Map<string, Openable>();
   /** teleport で使う地点 */
   readonly spawns = new Map<string, { x: number; z: number; yaw: number }>();
+  /** 毎フレーム呼ばれる見た目の動き（光る目印など）。引数は経過秒 */
+  readonly animations: ((time: number) => void)[] = [];
   private pending = new Map<string, THREE.BufferGeometry[]>();
   private hitMat = new THREE.MeshBasicMaterial({ visible: false });
 

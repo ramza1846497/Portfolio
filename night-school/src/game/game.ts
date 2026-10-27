@@ -391,6 +391,7 @@ export class Game {
     this.lights.update(dt, this.player.pos.z);
     if (!this.cleared) this.updateMeter(dt);
     this.updateOpenables(dt);
+    for (const anim of this.builder.animations) anim(time / 1000);
     if (this.input.enabled) {
       for (const a of this.actors.values()) a.update(dt);
       this.updateTriggers();
