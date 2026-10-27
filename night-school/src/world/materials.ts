@@ -1,7 +1,10 @@
 import * as THREE from 'three';
 import type { MaterialDef } from './builder';
 import {
+  asphaltTexture,
   ceilingTexture,
+  grassTexture,
+  productTexture,
   cubbyTexture,
   floorTexture,
   nightWindowTexture,
@@ -49,6 +52,26 @@ export function createMaterials(): Record<string, MaterialDef> {
     cubby: { material: lambert({ map: cubbyTexture() }), texW: 1.2, texH: 1.8 },
     curtain: { material: lambert({ color: 0xcfd2c6, transparent: true, opacity: 0.93 }) },
     blanket: { material: lambert({ color: 0x7d8796 }) },
+    // 校舎の外
+    asphalt: { material: lambert({ map: asphaltTexture() }), texW: 4 },
+    grass: { material: lambert({ map: grassTexture() }), texW: 2 },
+    paint: { material: lambert({ color: 0xbdbdb4 }) },
+    rail: { material: lambert({ color: 0xc8c8c0 }) },
+    pole: { material: lambert({ color: 0x6a6660 }) },
+    concrete: { material: lambert({ map: paintedMetalTexture('#8a8a84') }), texW: 1 },
+    // コンビニ
+    storeFloor: { material: lambert({ map: tileTexture('#e6e6e0') }), texW: 0.8 },
+    storeCeil: { material: lambert({ color: 0xe8e8e4 }) },
+    storeWall: { material: lambert({ map: paintedMetalTexture('#dcdcd6') }), texW: 1 },
+    counter: { material: lambert({ map: paintedMetalTexture('#cfd0cc') }), texW: 1 },
+    shelf: { material: lambert({ color: 0xb8b8b2 }) },
+    goodsA: { material: lambert({ map: productTexture('a', ['#c03a3a', '#e8c040', '#3a7ac0', '#f0f0e8', '#40a060']) }), texW: 1.2, texH: 0.4 },
+    goodsB: { material: lambert({ map: productTexture('b', ['#e07a2a', '#8a4ac0', '#f0f0e8', '#2a2a2a', '#e05a8a']) }), texW: 1.2, texH: 0.4 },
+    screen: { material: new THREE.MeshBasicMaterial({ color: 0x6a9a7a }) },
+    storeGlass: {
+      material: new THREE.MeshBasicMaterial({ color: 0x4a5650, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }),
+    },
+    doorGlass: { material: new THREE.MeshLambertMaterial({ color: 0x9ab0b0, transparent: true, opacity: 0.25, depthWrite: false }) },
     metal: { material: lambert({ color: 0x8d918f }) },
     frame: { material: lambert({ color: 0x7c807d }) },
     porcelain: { material: lambert({ color: 0xd9d6cc }) },

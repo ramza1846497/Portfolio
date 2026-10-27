@@ -22,7 +22,8 @@ export type SfxName =
   | 'fall'
   | 'click'
   | 'hurt'
-  | 'bang';
+  | 'bang'
+  | 'chime';
 
 /** 音名 → 周波数（Hz） */
 export const NOTE_FREQ: Record<string, number> = {
@@ -179,6 +180,8 @@ export class AudioEngine {
         return this.hurt(t);
       case 'bang':
         return this.bang(t);
+      case 'chime':
+        return this.chime(t);
     }
   }
 
@@ -573,5 +576,20 @@ export class AudioEngine {
     this.tone(t, 0.18, 110 + Math.random() * 30, out, 0.6, 'triangle', 55);
     this.noise(t, 0.09, out, 0.45, { type: 'bandpass', freq: 900 + Math.random() * 500, q: 1.5 });
     this.noise(t + 0.04, 0.2, out, 0.12, { type: 'bandpass', freq: 2400, q: 6 });
+  }
+
+  /** 自動ドアの入店チャイム（ありふれた二音のベル。少しだけ音程が狂っている） */
+  private chime(t: number): void {
+    const out = this.out(0.5);
+    const notes: [number, number][] = [
+      [659.3, 0],
+      [523.3, 0.42],
+      [659.3, 0.84],
+      [519, 1.26],
+    ];
+    for (const [f, dt] of notes) {
+      this.tone(t + dt, 1.1, f, out, 0.16, 'sine');
+      this.tone(t + dt, 0.6, f * 2.01, out, 0.04, 'sine');
+    }
   }
 }

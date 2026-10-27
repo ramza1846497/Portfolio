@@ -553,3 +553,137 @@ export function muscleTexture(): THREE.Texture {
   });
 }
 
+
+/** アスファルト（1 枚 = 4m 四方） */
+export function asphaltTexture(): THREE.Texture {
+  return cached('asphalt', () => {
+    const [c, ctx] = makeCanvas(256, 256);
+    ctx.fillStyle = '#2b2b2c';
+    ctx.fillRect(0, 0, 256, 256);
+    speckle(ctx, 256, 256, 6000, 0.35);
+    grime(ctx, 256, 256, 40);
+    // ひび
+    ctx.strokeStyle = 'rgba(10,10,10,0.6)';
+    for (let i = 0; i < 4; i++) {
+      ctx.beginPath();
+      let x = rand() * 256;
+      let y = rand() * 256;
+      ctx.moveTo(x, y);
+      for (let k = 0; k < 8; k++) {
+        x += (rand() - 0.5) * 40;
+        y += (rand() - 0.5) * 40;
+        ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+    return toTexture(c);
+  });
+}
+
+/** 道の脇の草むら（1 枚 = 2m 四方） */
+export function grassTexture(): THREE.Texture {
+  return cached('grass', () => {
+    const [c, ctx] = makeCanvas(128, 128);
+    ctx.fillStyle = '#18200f';
+    ctx.fillRect(0, 0, 128, 128);
+    for (let i = 0; i < 900; i++) {
+      ctx.strokeStyle = `rgba(${40 + rand() * 40},${60 + rand() * 50},${20 + rand() * 20},0.7)`;
+      const x = rand() * 128;
+      const y = rand() * 128;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + (rand() - 0.5) * 4, y - 3 - rand() * 5);
+      ctx.stroke();
+    }
+    return toTexture(c);
+  });
+}
+
+/** コンビニの看板（光る帯） */
+export function storeSignTexture(name: string): THREE.Texture {
+  return cached('storeSign' + name, () => {
+    const [c, ctx] = makeCanvas(1024, 128);
+    ctx.fillStyle = '#efeee6';
+    ctx.fillRect(0, 0, 1024, 128);
+    ctx.fillStyle = '#7a1f2b';
+    ctx.fillRect(0, 96, 1024, 14);
+    ctx.fillStyle = '#4a4f6a';
+    ctx.fillRect(0, 110, 1024, 18);
+    ctx.fillStyle = '#7a1f2b';
+    ctx.font = 'bold 72px sans-serif';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(name, 60, 52);
+    ctx.fillStyle = '#4a4f6a';
+    ctx.font = 'bold 54px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText('24H', 980, 52);
+    return toTexture(c, false);
+  });
+}
+
+/** 商品棚の一段分（色とりどりの箱が並ぶ。1 枚 = 幅 1.2m × 高さ 0.4m） */
+export function productTexture(key: string, palette: string[]): THREE.Texture {
+  return cached('product' + key, () => {
+    const [c, ctx] = makeCanvas(256, 96);
+    ctx.fillStyle = '#d8d8d2';
+    ctx.fillRect(0, 0, 256, 96);
+    let x = 2;
+    while (x < 254) {
+      const w = 14 + rand() * 18;
+      const h = 40 + rand() * 46;
+      ctx.fillStyle = palette[Math.floor(rand() * palette.length)];
+      ctx.fillRect(x, 96 - h, w - 2, h);
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      ctx.fillRect(x + 2, 96 - h + 6, w - 6, 6);
+      x += w;
+    }
+    ctx.fillStyle = '#9a9a92';
+    ctx.fillRect(0, 88, 256, 8);
+    return toTexture(c);
+  });
+}
+
+/** 冷蔵ケースの扉越しの飲み物 */
+export function fridgeTexture(): THREE.Texture {
+  return cached('fridge', () => {
+    const [c, ctx] = makeCanvas(256, 256);
+    ctx.fillStyle = '#dfe8ec';
+    ctx.fillRect(0, 0, 256, 256);
+    const cols = ['#e8e8e0', '#3a7ac0', '#c03a3a', '#e0c040', '#40a060', '#f0f0f0'];
+    for (let row = 0; row < 5; row++) {
+      for (let i = 0; i < 12; i++) {
+        ctx.fillStyle = cols[Math.floor(rand() * cols.length)];
+        ctx.fillRect(6 + i * 20, 12 + row * 50, 14, 36);
+      }
+      ctx.fillStyle = '#a8b0b4';
+      ctx.fillRect(0, 48 + row * 50, 256, 4);
+    }
+    ctx.strokeStyle = '#8a9296';
+    ctx.lineWidth = 6;
+    ctx.strokeRect(0, 0, 256, 256);
+    return toTexture(c, false);
+  });
+}
+
+/** 新聞の一面 */
+export function newspaperTexture(): THREE.Texture {
+  return cached('newspaper', () => {
+    const [c, ctx] = makeCanvas(256, 320);
+    ctx.fillStyle = '#ddd6c0';
+    ctx.fillRect(0, 0, 256, 320);
+    ctx.fillStyle = '#222';
+    ctx.font = 'bold 22px serif';
+    ctx.fillText('夕刊', 12, 30);
+    ctx.font = '11px serif';
+    ctx.fillText('二月十五日', 190, 28);
+    ctx.font = 'bold 26px serif';
+    ctx.fillText('女子児童', 20, 80);
+    ctx.fillText('校内で行方不明', 20, 112);
+    ctx.fillStyle = 'rgba(30,30,30,0.5)';
+    for (let i = 0; i < 14; i++) ctx.fillRect(16, 140 + i * 12, 100 + rand() * 120, 5);
+    ctx.fillStyle = '#555';
+    ctx.fillRect(150, 140, 90, 70);
+    grime(ctx, 256, 320, 20);
+    return toTexture(c, false);
+  });
+}

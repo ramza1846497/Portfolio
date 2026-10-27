@@ -52,6 +52,8 @@ export type Action =
   /** target を付けた strobe は、その名前の明かりだけを激しく明滅させる */
   | { fx: 'blackout' | 'lightsOn' | 'strobe' | 'flashFlicker' | 'shake' | 'fadeOut' | 'fadeIn'; duration?: number; target?: string }
   | { open: string }
+  /** 開いた扉を閉める（当たり判定も戻る） */
+  | { close: string }
   /** 扉をバタンバタンと勝手に開け閉めさせる（待たずに次へ進む）。終わると元の状態に戻る */
   | { rattle: string[]; duration?: number }
   /** builder.spawn で決めた地点へプレイヤーを移す（階の移動など） */

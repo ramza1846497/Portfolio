@@ -49,31 +49,8 @@ export const common: StagePart = {
       id: 'exit',
       name: '昇降口の扉',
       reactions: [
-        {
-          when: { all: [{ item: 'exitKey' }, { flag: 'truthSeen' }] },
-          actions: [
-            { sfx: 'unlock' },
-            { say: ['鍵を差し込むと、重たい音を立てて回った。', '扉を開けると、まぶしい光が差し込んできた——'] },
-            { fx: 'fadeOut', duration: 2 },
-            { say: ['……', '気がつくと、白い天井が見えた。', '保健室のベッドの上だった。窓の外は、もう朝だ。', '枕元に、古い鍵が一本、転がっていた。'] },
-            { clear: true, title: '目覚め', text: '保健室で眠っていたのは、あなた自身だった。<br>七不思議の残り二つは、まだ読めない。' },
-          ],
-        },
-        {
-          when: { item: 'exitKey' },
-          actions: [
-            { sfx: 'unlock' },
-            { say: ['鍵を差し込むと、重たい音を立てて回った。', '鎖が床に落ちる。'] },
-            { sfx: 'creak' },
-            { say: [{ text: '……またね', style: 'whisper' }] },
-            { fx: 'fadeOut', duration: 2 },
-            {
-              clear: true,
-              title: '脱出成功',
-              text: '花子さんは、今夜も三番目の個室で待っている。<br>……保健室の寝息は、誰のものだったのだろう。',
-            },
-          ],
-        },
+        // 外に出たあとの話は outside.ts
+        { when: { item: 'exitKey' }, actions: [{ run: 'leaveSchool' }] },
         { when: { note: 'n_exit' }, actions: [{ sfx: 'locked' }, { say: ['やはり開かない。鍵を探さないと。'] }] },
         {
           actions: [
@@ -228,7 +205,17 @@ export const common: StagePart = {
       { fx: 'lightsOn' },
       { addVar: 'faints', value: 1 },
       { setVar: 'hp', value: 50 },
-      { if: { var: 'floor', eq: 1 }, then: [{ teleport: 'f1Stairs' }], else: [{ teleport: 'f2Stairs' }] },
+      {
+        if: { var: 'floor', eq: 1 },
+        then: [{ teleport: 'f1Stairs' }],
+        else: [
+          {
+            if: { var: 'floor', eq: 2 },
+            then: [{ teleport: 'f2Stairs' }],
+            else: [{ if: { flag: 'inStore' }, then: [{ teleport: 'storeIn' }], else: [{ teleport: 'outsideStart' }] }],
+          },
+        ],
+      },
       { wait: 1000 },
       { fx: 'fadeIn', duration: 1.5 },
       { say: ['……どれくらい倒れていたのだろう。', '体が重い。無理はできない。'] },
@@ -264,6 +251,10 @@ export const common: StagePart = {
 
 /** 画面左上の目的。上から順に、最初に当てはまるものを出す */
 export const objectives: StageDef['objectives'] = [
+  { when: { flag: 'storePaid' }, text: '店を出る' },
+  { when: { flag: 'inStore' }, text: '店員の顔を見ずに、お会計を済ませる' },
+  { when: { flag: 'storeLit' }, text: '明かりの方へ向かう' },
+  { when: { flag: 'outside' }, text: '夜道を進む' },
   { when: { item: 'exitKey' }, text: '一階の昇降口から脱出する' },
   { when: { flag: 'keyAppeared' }, text: '三番目の個室を調べる' },
   { when: { flag: 'toiletOpen' }, text: '女子トイレで花子さんを呼び出す' },

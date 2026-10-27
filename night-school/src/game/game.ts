@@ -99,6 +99,12 @@ export class Game {
       hud: this.hud,
       keypad: this.keypad,
       open: (name) => this.open(name),
+      close: (name) => {
+        const o = this.builder.openables.get(name);
+        if (!o) throw new Error(`unknown openable: ${name}`);
+        o.opening = false;
+        if (o.colliderTag) this.collision.setEnabled(o.colliderTag, true);
+      },
       rattle: (names, seconds) => {
         for (const n of names) {
           const o = this.builder.openables.get(n);
@@ -393,8 +399,10 @@ export class Game {
         this.updateRattle(o, dt);
         continue;
       }
-      if (!o.opening || o.progress >= 1) continue;
-      o.progress = Math.min(1, o.progress + dt / OPEN_SECONDS);
+      const goal = o.opening ? 1 : 0;
+      if (o.progress === goal) continue;
+      const step = dt / (o.seconds ?? OPEN_SECONDS);
+      o.progress = o.opening ? Math.min(1, o.progress + step) : Math.max(0, o.progress - step);
       // ゆっくり動き出して、最後にすっと止まる
       const t = o.progress;
       const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;

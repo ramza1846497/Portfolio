@@ -16,6 +16,7 @@ export interface RunnerHost {
   keypad: Keypad;
   /** 開閉する物を開く */
   open(name: string): void;
+  close(name: string): void;
   rattle(names: string[], seconds: number): void;
   /** spawn 地点へプレイヤーを移す */
   teleport(spawn: string): void;
@@ -142,6 +143,8 @@ export class ScriptRunner {
       }
     } else if ('open' in a) {
       this.host.open(a.open);
+    } else if ('close' in a) {
+      this.host.close(a.close);
     } else if ('rattle' in a) {
       this.host.rattle(a.rattle, a.duration ?? 2);
     } else if ('teleport' in a) {

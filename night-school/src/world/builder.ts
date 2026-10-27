@@ -38,6 +38,8 @@ export interface Openable {
   colliderTag?: string;
   progress: number;
   opening: boolean;
+  /** 開け閉めにかかる秒数（省略時 1.4 秒） */
+  seconds?: number;
   /** 勝手に開け閉めする演出の残り時間など */
   rattleLeft: number;
   rattleTimer: number;

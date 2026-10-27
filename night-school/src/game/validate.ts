@@ -43,6 +43,7 @@ export function validateStage(stage: StageDef, map: MapNames): string[] {
       if ('take' in a && !items.has(a.take)) errors.push(`${where}: unknown item "${a.take}"`);
       if ('run' in a && !stage.scripts[a.run]) errors.push(`${where}: unknown script "${a.run}"`);
       if ('open' in a && !map.openables.has(a.open)) errors.push(`${where}: unknown openable "${a.open}"`);
+      if ('close' in a && !map.openables.has(a.close)) errors.push(`${where}: unknown openable "${a.close}"`);
       if ('rattle' in a) for (const r of a.rattle) if (!map.openables.has(r)) errors.push(`${where}: unknown openable "${r}"`);
       if ('teleport' in a && !map.spawns.has(a.teleport)) errors.push(`${where}: unknown spawn "${a.teleport}"`);
       if ('look' in a && !map.objects.has(a.look)) errors.push(`${where}: unknown object "${a.look}"`);
