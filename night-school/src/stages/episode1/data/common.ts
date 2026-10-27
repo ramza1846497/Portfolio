@@ -253,6 +253,8 @@ export const common: StagePart = {
 export const objectives: StageDef['objectives'] = [
   { when: { flag: 'storePaid' }, text: '店を出る' },
   { when: { flag: 'inStore' }, text: '店員の顔を見ずに、お会計を済ませる' },
+  { when: { all: [{ flag: 'storeVisited' }, { var: 'coins', lt: 3 }] }, text: '道に落ちている十円玉を探して、店に戻る' },
+  { when: { flag: 'storeVisited' }, text: '店に戻って、お会計を済ませる' },
   { when: { flag: 'storeLit' }, text: '明かりの方へ向かう' },
   { when: { flag: 'outside' }, text: '夜道を進む' },
   { when: { item: 'exitKey' }, text: '一階の昇降口から脱出する' },

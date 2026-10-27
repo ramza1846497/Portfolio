@@ -1,17 +1,17 @@
 import * as THREE from 'three';
 import type { Actor, ActorContext, ActorDef } from '../../game/types';
 
-/** 顔を見つめていられる秒数 */
-const GAZE_LIMIT = 1.4;
-/** 顔を見られたあと、次に判定するまでの猶予 */
-const COOLDOWN = 3;
+/** この距離より近くで顔が画面に映ると、体力が減り始める（m） */
+const RANGE = 4.5;
+/** 体力の減り方（1 秒あたり、いちばん近いとき） */
+const DRAIN_PER_SEC = 9;
 
 /**
  * コンビニの店員（のっぺらぼう）。
- * 決まり：店員の顔を見てはいけない。顔が画面の中央付近に映り続けると「目が合って」体力が減る。
- *         下を向いたままレジに近づけば、顔を見ずに会計できる。
+ * 決まり：店員の顔を見てはいけない。近くで顔が画面に映っている間、体力がじわじわ減る
+ *         （近いほど速い）。会話や演出は挟まない。初めて減ったときだけ知らせを出す。
  *
- * inStore かつ storePaid でないときだけ働く。目が合うと clerkFace スクリプトを実行する。
+ * inStore かつ storePaid でないときだけ働く。
  */
 export const clerkActor: ActorDef = {
   id: 'clerk',
@@ -20,8 +20,10 @@ export const clerkActor: ActorDef = {
 
 class ClerkActor implements Actor {
   private root: THREE.Object3D;
-  private gaze = 0;
-  private cooldown = 0;
+  /** 0..1：いま顔がどれだけ「効いている」か（近さ） */
+  private exposure = 0;
+  private pending = 0;
+  private beat = 0;
   private head = new THREE.Vector3();
   private ndc = new THREE.Vector3();
 
@@ -37,38 +39,47 @@ class ClerkActor implements Actor {
   }
 
   update(dt: number): void {
-    if (!this.active) {
-      this.gaze = 0;
-      return;
+    const target = this.active ? this.faceExposure() : 0;
+    // 見るのをやめると、赤みはすぐに引いていく
+    this.exposure += (target - this.exposure) * Math.min(1, dt * (target > this.exposure ? 6 : 3));
+    this.ctx.setDrain(this.exposure);
+    if (target <= 0) return;
+
+    if (!this.ctx.state.hasNote('n_noppera')) {
+      this.ctx.state.addNote('n_noppera');
+      this.ctx.toast('……顔が、ない。見ちゃいけない');
+      this.ctx.audio.play('stinger', { gain: 0.6 });
     }
-    if (this.cooldown > 0) {
-      this.cooldown -= dt;
-      this.gaze = 0;
-      return;
+    // 1 ずつまとめて減らす
+    this.pending += DRAIN_PER_SEC * target * dt;
+    if (this.pending >= 1) {
+      const n = Math.floor(this.pending);
+      this.pending -= n;
+      this.ctx.damage(n);
     }
-    if (this.isLookingAtFace()) this.gaze += dt;
-    else this.gaze = Math.max(0, this.gaze - dt * 1.5);
-    if (this.gaze >= GAZE_LIMIT) {
-      this.gaze = 0;
-      this.cooldown = COOLDOWN;
-      this.ctx.run([{ run: 'clerkFace' }]);
+    this.beat -= dt;
+    if (this.beat <= 0) {
+      this.beat = 0.7 - target * 0.35;
+      this.ctx.audio.play('heartbeat', { gain: 0.4 + target * 0.6 });
     }
   }
 
-  /** 店の中にいるだけで少し振れ、顔を見つめるほど振り切れていく */
+  /** 店の中にいるだけで少し振れ、顔が近くに映るほど振り切れていく */
   threat(): number {
     if (!this.active) return 0;
-    return Math.min(1, 0.3 + (this.gaze / GAZE_LIMIT) * 0.7);
+    return Math.min(1, 0.3 + this.exposure * 0.7);
   }
 
-  /** 顔が画面の中央付近にあり、遮る物がない */
-  private isLookingAtFace(): boolean {
+  /** 顔が RANGE 以内で画面に映っていて、遮る物がなければ、近さに応じて 0..1 */
+  private faceExposure(): number {
     const cam = this.ctx.camera;
     const top = new THREE.Box3().setFromObject(this.root).max.y;
     this.head.copy(this.root.position).setY(top - 0.12);
-    if (this.head.distanceTo(cam.position) > 7) return false;
+    const d = this.head.distanceTo(cam.position);
+    if (d > RANGE) return 0;
     this.ndc.copy(this.head).project(cam);
-    if (this.ndc.z >= 1 || Math.abs(this.ndc.x) > 0.32 || Math.abs(this.ndc.y) > 0.42) return false;
-    return this.ctx.lineOfSight(cam.position, this.head);
+    if (this.ndc.z >= 1 || Math.abs(this.ndc.x) > 1 || Math.abs(this.ndc.y) > 1) return 0;
+    if (!this.ctx.lineOfSight(cam.position, this.head)) return 0;
+    return 0.35 + 0.65 * (1 - d / RANGE);
   }
 }

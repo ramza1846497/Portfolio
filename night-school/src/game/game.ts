@@ -143,6 +143,17 @@ export class Game {
       playerPos: this.player.pos,
       lineOfSight: (from, to) => this.lineOfSight(from, to),
       run: (actions) => void this.runner.start(actions),
+      damage: (amount) => {
+        if (!stage.maxHp || this.runner.busy) return;
+        const hp = Math.max(0, this.state.getVar('hp') - amount);
+        this.state.setVar('hp', hp);
+        if (hp <= 0 && stage.faintScript) {
+          this.hud.setDrain(0);
+          void this.runner.start(stage.scripts[stage.faintScript] ?? []);
+        }
+      },
+      setDrain: (level) => this.hud.setDrain(level),
+      toast: (text) => this.hud.toast(text),
     };
     for (const a of stage.actors ?? []) this.actors.set(a.id, a.create(actorCtx));
     this.notebook.onClose = () => this.syncControls();
@@ -383,6 +394,8 @@ export class Game {
     if (this.input.enabled) {
       for (const a of this.actors.values()) a.update(dt);
       this.updateTriggers();
+    } else {
+      this.hud.setDrain(0);
     }
     if (this.input.enabled) this.updateTarget();
     else if (this.target) {

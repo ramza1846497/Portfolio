@@ -144,6 +144,12 @@ export interface ActorContext {
   lineOfSight(from: THREE.Vector3, to: THREE.Vector3): boolean;
   /** スクリプトを実行する（実行中なら何もしない） */
   run(actions: Action[]): void;
+  /** 体力を直接減らす（会話を挟まない持続ダメージ用）。0 になると気絶する */
+  damage(amount: number): void;
+  /** 持続ダメージ中の画面の赤み（0..1） */
+  setDrain(level: number): void;
+  /** 画面上部に短い知らせを出す */
+  toast(text: string): void;
 }
 
 /** データでは書きにくい動き（追いかけてくる怪異など）をコードで書く */

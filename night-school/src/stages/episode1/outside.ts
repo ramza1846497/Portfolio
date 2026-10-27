@@ -157,17 +157,18 @@ function buildStore(b: WorldBuilder, lights: BuildContext['lights']): void {
   // 店のきまり（入口のガラスに内側から貼ってある）
   b.interactable('storeRule', wallPlane(b, noticeTexture('storeRule', '深夜のお客様へ', ['一、お会計がお済みで', '　ないお客様は', '　お帰りになれません', '二、店員の顔は', '　見ないでください']), 0.5, 0.66, [x1 + 0.03, 1.5, ZO - 2.1], Math.PI / 2));
 
-  // レジカウンターと店員
+  // レジカウンターと店員。レジは東の端、店員は西の端に立っている
+  // （レジの前で正面を向けば、店員の顔は視界の外になる）
   b.box([72, 0, z1 + 1.0], [78, 1.0, z1 + 1.8], 'counter', { collide: true });
   b.box([71.95, 1.0, z1 + 0.95], [78.05, 1.04, z1 + 1.85], 'shelf');
-  b.box([74.0, 1.04, z1 + 1.1], [74.5, 1.28, z1 + 1.6], 'dark');
-  b.box([74.05, 1.2, z1 + 1.58], [74.45, 1.27, z1 + 1.6], 'screen');
-  b.hitbox('register', [73.6, 0.85, z1 + 1.0], [74.9, 1.32, z1 + 2.0]);
+  b.box([77.05, 1.04, z1 + 1.1], [77.55, 1.28, z1 + 1.6], 'dark');
+  b.box([77.1, 1.2, z1 + 1.58], [77.5, 1.27, z1 + 1.6], 'screen');
+  b.hitbox('register', [76.7, 0.85, z1 + 1.0], [77.9, 1.32, z1 + 2.0]);
   b.collision.add(71, z1, 72, z1 + 1.8);
   // 後ろの棚（たばこ）
   b.box([72, 1.2, z1 + 0.1], [78, 2.4, z1 + 0.4], 'goodsA');
   const clerk = ghostFigure({ hair: 0x161616, top: 0x5a5a7a, bottom: 0x22222a, opacity: 1, height: 1.75 });
-  clerk.position.set(75.4, 0, z1 + 0.55);
+  clerk.position.set(72.8, 0, z1 + 0.55);
   b.add(clerk, 'clerk');
 
   // 商品棚（二列）
@@ -190,7 +191,7 @@ function buildStore(b: WorldBuilder, lights: BuildContext['lights']): void {
   paper.add(b.hitShape([0.5, 0.6, 0.2], [0, 0, 0]));
 
   // 売り物（調べてカゴに入れる）
-  item(b, 'kiku', 71.0, 0, ZO - 4.2, 'bucket');
+  item(b, 'kiku', 71.3, 0, ZO + 2.1, 'bucket');
   item(b, 'manju', 73.6, 1.0, ZO - 1.55, 0xd8c8a8);
   item(b, 'senko', 76.4, 0.62, ZO - 1.55, 0x5a7a4a);
   item(b, 'onigiri', 73.6, 1.0, ZO + 1.55, 0xf0f0f0);

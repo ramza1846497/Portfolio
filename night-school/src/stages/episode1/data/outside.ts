@@ -8,7 +8,9 @@ import { STORE, ZO } from '../outside';
  *
  * 怪異その六「真夜中のコンビニ」
  * 決まり：お会計が済むまで帰れない。店員（のっぺらぼう）の顔を見てはいけない。
- *         顔を見つめ続けると体力が減る（../clerk.ts）。下を向いたままレジへ。
+ *         近くで顔が画面に映っている間、体力がじわじわ減る（../clerk.ts）。
+ *         レジは店員から離れた東の端にあるので、レジの前で正面を向けば顔は視界の外。
+ * お代が足りないまま入ってしまったら、店員がドアを開けて取りに行かせてくれる（詰まないように）。
  * 買う物：駐車場に落ちている「おつかいメモ」の三つ（菊の花・線香・まんじゅう）。それ以外を入れると叱られる。
  * お代  ：道に落ちている十円玉を三枚。
  *
@@ -109,7 +111,7 @@ export const outside: StagePart = {
     {
       id: 'n_noppera',
       title: '店員の顔',
-      body: '店員の顔を見てしまった。目も鼻も口もない、のっぺりとした肌。\n見つめていると、体の力が抜けていく。下を向いていよう。',
+      body: '店員の顔には、目も鼻も口もない。\n近くで顔が目に入っている間、体の力が抜けていく。視界に入れないようにしよう。',
     },
     {
       id: 'n_newspaper',
@@ -149,6 +151,22 @@ export const outside: StagePart = {
       name: '自動ドア',
       reactions: [
         { when: { flag: 'storePaid' }, actions: [{ say: ['自動ドアは開いている。'] }] },
+        {
+          when: { all: [{ flag: 'inStore' }, { var: 'coins', lt: 3 }] },
+          actions: [
+            { sfx: 'locked' },
+            { say: ['自動ドアが開かない。'] },
+            { say: [{ speaker: '店員', text: '……お代を、取りに行かれますか', style: 'ghost' }] },
+            {
+              choice: {
+                options: [
+                  { label: '取りに行く', actions: [{ run: 'storeLetOut' }] },
+                  { label: 'やめる', actions: [] },
+                ],
+              },
+            },
+          ],
+        },
         {
           when: { flag: 'inStore' },
           actions: [{ sfx: 'locked' }, { say: ['自動ドアが開かない。', 'ガラスを叩いても、外の霧が揺れるだけだ。'] }],
@@ -204,7 +222,11 @@ export const outside: StagePart = {
                     {
                       if: { var: 'coins', gte: 3 },
                       then: [{ run: 'storePay' }],
-                      else: [{ say: [{ speaker: '店員', text: '……お代が、足りませんね', style: 'ghost' }, '持っている十円玉は {coins} 枚。……道に、落ちていなかったか。'] }],
+                      else: [
+                        { say: [{ speaker: '店員', text: '……お代が、足りませんね', style: 'ghost' }, '持っている十円玉は {coins} 枚。……道に、落ちていなかったか。'] },
+                        { say: [{ speaker: '店員', text: '……お持ちになるまで、お待ちしております', style: 'ghost' }] },
+                        { run: 'storeLetOut' },
+                      ],
                     },
                   ],
                   else: [{ run: 'storeWrong' }],
@@ -241,10 +263,17 @@ export const outside: StagePart = {
       ...emptyBasket,
       { say: ['……カゴの中身が、いつの間にか空になっていた。'] },
     ],
+    /** お代が足りないとき：一度だけ外へ出してくれる */
+    storeLetOut: [
+      { sfx: 'chime' },
+      { open: 'storeDoorL' },
+      { open: 'storeDoorR' },
+      { say: ['……背後で、自動ドアが開いた。', '十円玉を探してこい、ということらしい。'] },
+    ],
     storePay: [
       { sfx: 'click' },
       { setVar: 'coins', value: 0 },
-      { say: ['十円玉を三枚、カウンターに置いた。', '顔を上げないように、店員の手元だけを見る。……白い、細い手だ。'] },
+      { say: ['十円玉を三枚、カウンターに置いた。', 'いつの間にか、レジの向こうに誰かが立っている気配がする。', '顔を上げないように、手元だけを見る。……白い、細い手が伸びてきた。'] },
       { say: [{ speaker: '店員', text: '……おそなえもの、ですね', style: 'ghost' }] },
       { sfx: 'click' },
       { wait: 300 },
@@ -260,20 +289,6 @@ export const outside: StagePart = {
       { open: 'storeDoorL' },
       { open: 'storeDoorR' },
       { say: ['……背後で、自動ドアが開いた。'] },
-    ],
-    /** 店員の顔を見つめてしまった */
-    clerkFace: [
-      { look: 'clerk' },
-      { sfx: 'stinger' },
-      { meter: 1 },
-      { fx: 'flashFlicker', duration: 0.6 },
-      { say: ['……！', '顔が、ない——', '目も鼻も口もない、のっぺりとした肌が、こちらを向いている。'] },
-      { damage: 20 },
-      {
-        if: { note: 'n_noppera' },
-        then: [{ say: ['……また、見てしまった。'] }],
-        else: [{ say: ['体の力が、すっと抜けていく。……顔を見ちゃいけない。下を向いていよう。'] }, { note: 'n_noppera' }],
-      },
     ],
     /** 店を出ると、夜が終わる */
     ending: [
@@ -327,16 +342,32 @@ export const outside: StagePart = {
     {
       id: 'storeEnter',
       area: { minX: 71.0, maxX: STORE.maxX, minZ: STORE.minZ, maxZ: STORE.maxZ },
-      when: { notFlag: 'inStore' },
+      when: { all: [{ notFlag: 'inStore' }, { notFlag: 'storePaid' }] },
+      once: false,
       actions: [
         { close: 'storeDoorL' },
         { close: 'storeDoorR' },
         { flag: 'inStore' },
-        { look: 'clerk' },
-        { meter: 0.7 },
-        { say: [{ speaker: '店員', text: '……いらっしゃいませ', style: 'ghost' }] },
-        { say: ['レジの奥に、店員がひとり立っている。うつむいていて、顔は見えない。', '……背後で、自動ドアが閉まった。'] },
+        {
+          if: { flag: 'storeVisited' },
+          then: [{ say: [{ speaker: '店員', text: '……おかえりなさいませ', style: 'ghost' }, '……背後で、自動ドアが閉まった。'] }],
+          else: [
+            { flag: 'storeVisited' },
+            { look: 'clerk' },
+            { meter: 0.7 },
+            { say: [{ speaker: '店員', text: '……いらっしゃいませ', style: 'ghost' }] },
+            { say: ['カウンターの奥に、店員がひとり立っている。うつむいていて、顔は見えない。', '……背後で、自動ドアが閉まった。'] },
+          ],
+        },
       ],
+    },
+    {
+      // お代を取りに外へ出た：また入るとドアが閉まる
+      id: 'storeLeave',
+      area: { minX: 60, maxX: 69.6, minZ: ZO - 7, maxZ: ZO + 7 },
+      when: { all: [{ flag: 'inStore' }, { notFlag: 'storePaid' }] },
+      once: false,
+      actions: [{ flag: 'inStore', value: false }, { close: 'storeDoorL' }, { close: 'storeDoorR' }],
     },
     {
       id: 'storeExit',

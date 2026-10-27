@@ -27,6 +27,7 @@ export class Hud {
   private meterLabel: HTMLDivElement;
   private hurtEl: HTMLDivElement;
   private lowEl: HTMLDivElement;
+  private drainEl: HTMLDivElement;
 
   constructor(input: Input) {
     this.root = el('div', 'hud', document.body);
@@ -70,6 +71,7 @@ export class Hud {
     this.meterLabel = el('div', 'meter-cap', meter, '怪異');
     this.hurtEl = el('div', 'hurt', document.body);
     this.lowEl = el('div', 'low-hp', document.body);
+    this.drainEl = el('div', 'drain', document.body);
     this.drawMeter(0);
   }
 
@@ -79,6 +81,11 @@ export class Hud {
     this.hpFill.style.width = `${r * 100}%`;
     this.hpBar.classList.toggle('danger', r <= 0.3);
     this.lowEl.classList.toggle('on', r <= 0.3);
+  }
+
+  /** 持続ダメージ中の赤み（0..1） */
+  setDrain(level: number): void {
+    this.drainEl.style.opacity = String(Math.max(0, Math.min(1, level)) * 0.75);
   }
 
   showVitals(v: boolean): void {

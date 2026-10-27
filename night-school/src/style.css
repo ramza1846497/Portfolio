@@ -786,3 +786,13 @@ button {
   0%, 100% { opacity: 0.25; }
   50% { opacity: 0.9; }
 }
+
+.drain {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 18;
+  opacity: 0;
+  transition: opacity 0.25s;
+  background: radial-gradient(ellipse at center, rgba(90, 0, 0, 0) 40%, rgba(140, 0, 10, 0.8) 100%);
+}
