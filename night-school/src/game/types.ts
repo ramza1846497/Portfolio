@@ -75,7 +75,15 @@ export type Action =
   | { damage: number }
   | { heal: number }
   /** 怪異メーターを一瞬振り切らせる（0..1） */
-  | { meter: number };
+  | { meter: number }
+  /** 操作説明のパネルを出して、閉じるまで待つ（StageDef.tutorials の名前） */
+  | { tutorial: string }
+  /** 画面下に短いヒントを出す（待たずに次へ進む） */
+  | { hint: string; duration?: number }
+  /** 敵をすべて初期位置・満タンの体力に戻す（気絶したときなど） */
+  | { enemies: 'reset' }
+  /** 名前（tag）付きの当たり判定を外す（道をふさぐ物が消えたときなど） */
+  | { unblock: string };
 
 export interface SequenceDef {
   prompt: string;
@@ -165,6 +173,7 @@ export interface Actor {
  * ステージの一部（怪異 1 つ分など）。複数を mergeParts でまとめて StageDef にする。
  */
 export interface StagePart {
+  enemies?: EnemyDef[];
   presences?: PresenceDef[];
   notes?: NoteDef[];
   items?: ItemDef[];
@@ -175,8 +184,9 @@ export interface StagePart {
 }
 
 export function mergeParts(parts: StagePart[]): Required<StagePart> {
-  const out: Required<StagePart> = { presences: [], notes: [], items: [], interactables: [], scripts: {}, triggers: [], visibility: [] };
+  const out: Required<StagePart> = { enemies: [], presences: [], notes: [], items: [], interactables: [], scripts: {}, triggers: [], visibility: [] };
   for (const p of parts) {
+    out.enemies.push(...(p.enemies ?? []));
     out.presences.push(...(p.presences ?? []));
     out.notes.push(...(p.notes ?? []));
     out.items.push(...(p.items ?? []));
@@ -224,6 +234,45 @@ export interface StageDef {
   faintScript?: string;
   /** いる階の番号（変数 floor に入る。スクリプトの条件で使う） */
   floorOf?: (x: number, z: number) => number;
+  /** 戦う敵（見た目は builder.named の物を使う） */
+  enemies?: EnemyDef[];
+  /** この持ち物を持っていると攻撃・回避ができる */
+  weaponItem?: string;
+  /** 操作説明のパネル */
+  tutorials?: Record<string, TutorialDef>;
+  /** 戦闘中に一度だけ出すヒント（初めて敵が身構えた・初めて攻撃を受けた など） */
+  combatHints?: Partial<Record<CombatHintKey, string>>;
+}
+
+export type CombatHintKey = 'windup' | 'hurt' | 'hit' | 'stun' | 'charge';
+
+/**
+ * 戦う敵。動きは kind ごとにコード（game/combat.ts）で決まり、数値と出来事はデータで決める。
+ *   shadow   … ザコ。近づいて、赤く光ってから飛びかかる
+ *   ninomiya … 中ボス。突進して壁にぶつかると気絶する。近くでは踏みつけ
+ */
+export interface EnemyDef {
+  /** builder.named にある見た目の名前 */
+  id: string;
+  kind: 'shadow' | 'ninomiya';
+  hp: number;
+  /** この条件のときだけ動く・戦う（姿の表示は visibility で決める） */
+  activeWhen?: Cond;
+  /** ボスなら体力バーに出す名前 */
+  bossName?: string;
+  /** 体力が半分を切ったとき（一度だけ） */
+  onHalf?: Action[];
+  onDefeat: Action[];
+}
+
+export interface TutorialDef {
+  title: string;
+  /** スマホでの説明 */
+  touch: string[];
+  /** PC での説明 */
+  pc: string[];
+  /** どちらでも共通の説明 */
+  common?: string[];
 }
 
 /** 怪異の気配。半径 radius の中に入ると、近いほど strength に近い値でメーターが振れる */

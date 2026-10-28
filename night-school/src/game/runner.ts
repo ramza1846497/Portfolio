@@ -31,6 +31,10 @@ export interface RunnerHost {
   hurt(amount: number): void;
   /** 怪異メーターを一瞬振らせる */
   meterSpike(level: number): void;
+  tutorial(name: string): Promise<void>;
+  hint(text: string, seconds?: number): void;
+  resetEnemies(): void;
+  unblock(tag: string): void;
 }
 
 const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -197,6 +201,14 @@ export class ScriptRunner {
       state.setVar('hp', Math.min(max, state.getVar('hp') + a.heal));
     } else if ('meter' in a) {
       this.host.meterSpike(a.meter);
+    } else if ('tutorial' in a) {
+      await this.host.tutorial(a.tutorial);
+    } else if ('hint' in a) {
+      this.host.hint(a.hint, a.duration);
+    } else if ('enemies' in a) {
+      this.host.resetEnemies();
+    } else if ('unblock' in a) {
+      this.host.unblock(a.unblock);
     }
     return false;
   }

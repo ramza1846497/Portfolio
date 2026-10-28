@@ -26,6 +26,14 @@ export class Player {
     camera.rotation.order = 'YXZ';
   }
 
+  /** 当たり判定つきで押し動かす（回避の踏み込み・ノックバック） */
+  push(dx: number, dz: number): void {
+    const p = { x: this.pos.x, z: this.pos.z };
+    this.collision.move(p, dx, dz, RADIUS);
+    this.pos.x = p.x;
+    this.pos.z = p.z;
+  }
+
   place(x: number, z: number, yaw: number): void {
     this.pos.set(x, 0, z);
     this.yaw = yaw;

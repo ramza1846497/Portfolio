@@ -375,3 +375,29 @@ export function firstAidKit(b: WorldBuilder): THREE.Group {
   g.add(b.hitShape([0.45, 0.3, 0.35], [0, 0.1, 0]));
   return g;
 }
+
+/** ザコ敵「影の子ども」：黒く半透明な子どもの形に、赤い目が二つ */
+export function shadowChild(): THREE.Group {
+  const g = ghostFigure({ hair: 0x050505, top: 0x0a0a0c, bottom: 0x0a0a0c, opacity: 0.82, height: 1.2 });
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff3020 });
+  for (const x of [-0.045, 0.045]) {
+    const eye = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.02, 0.01), eyeMat);
+    eye.position.set(x, 1.04, 0.1);
+    g.add(eye);
+  }
+  return g;
+}
+
+/** 立てかけた竹刀（拾える物） */
+export function shinaiProp(b: WorldBuilder): THREE.Group {
+  const g = new THREE.Group();
+  const blade = new THREE.Mesh(new THREE.BoxGeometry(0.035, 1.1, 0.035), new THREE.MeshLambertMaterial({ color: 0xc8b078 }));
+  blade.position.y = 0.6;
+  g.add(blade);
+  const grip = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.25, 0.045), new THREE.MeshLambertMaterial({ color: 0x5a3020 }));
+  grip.position.y = 0.12;
+  g.add(grip);
+  g.rotation.z = 0.18;
+  g.add(b.hitShape([0.4, 1.3, 0.4], [0, 0.6, 0]));
+  return g;
+}

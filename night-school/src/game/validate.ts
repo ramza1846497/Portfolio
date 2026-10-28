@@ -48,6 +48,7 @@ export function validateStage(stage: StageDef, map: MapNames): string[] {
       if ('teleport' in a && !map.spawns.has(a.teleport)) errors.push(`${where}: unknown spawn "${a.teleport}"`);
       if ('look' in a && !map.objects.has(a.look)) errors.push(`${where}: unknown object "${a.look}"`);
       if ('actor' in a && !actors.has(a.actor)) errors.push(`${where}: unknown actor "${a.actor}"`);
+      if ('tutorial' in a && !stage.tutorials?.[a.tutorial]) errors.push(`${where}: unknown tutorial "${a.tutorial}"`);
       if ('choice' in a) a.choice.options.forEach((o) => (cond(o.when, where), actions(o.actions, where)));
       if ('sequence' in a) {
         actions(a.sequence.correct, where);
@@ -75,6 +76,12 @@ export function validateStage(stage: StageDef, map: MapNames): string[] {
   for (const v of stage.visibility ?? []) {
     if (!map.objects.has(v.id)) errors.push(`visibility: unknown object "${v.id}"`);
     cond(v.when, `visibility ${v.id}`);
+  }
+  for (const e of stage.enemies ?? []) {
+    if (!map.objects.has(e.id)) errors.push(`enemy "${e.id}" has no object in the map`);
+    cond(e.activeWhen, `enemy ${e.id}`);
+    actions(e.onDefeat, `enemy ${e.id}`);
+    actions(e.onHalf ?? [], `enemy ${e.id}`);
   }
   actions(stage.intro, 'intro');
   stage.objectives.forEach((o) => cond(o.when, 'objectives'));

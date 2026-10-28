@@ -22,6 +22,8 @@ import {
   wallPlane,
   windowOpening,
   windowPane,
+  shadowChild,
+  shinaiProp,
 } from './parts';
 
 /**
@@ -114,6 +116,20 @@ export function buildFloor2({ builder: b, lights }: BuildContext): void {
   glimpse.position.set(14.4, 0, 0.85);
   glimpse.rotation.y = Math.PI;
   b.add(glimpse, 'hanakoGlimpse');
+
+  // 2-B の後ろの扉の脇に、剣道部の竹刀と防具袋
+  const shinai = shinaiProp(b);
+  shinai.position.set(24.4, 0, -1.3);
+  b.interactable('shinai', shinai);
+  b.box([24.6, 0, -1.4], [25.3, 0.45, -1.1], 'blanket');
+
+  // 西階段の前にうずくまる影（最初の敵）。倒すまで階段へは行けない
+  const shadow = shadowChild();
+  shadow.position.set(1.9, 0, 0.1);
+  shadow.rotation.y = -Math.PI / 2;
+  b.add(shadow, 'shadow1');
+  b.interactable('shadow1Look', b.hitShape([0.8, 1.3, 0.8], [1.9, 0.6, 0.1]));
+  b.collision.add(2.4, -1.5, 2.6, 1.5, 'shadowBlock');
 
   b.spawn('start', 40, 0, Math.PI / 2);
   b.spawn('f2Stairs', 1.0, 0, -Math.PI / 2);

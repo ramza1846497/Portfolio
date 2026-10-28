@@ -2,9 +2,10 @@
  * 入力のまとめ役。
  * - スマホ：画面左半分のドラッグ＝仮想ジョイスティック、右半分のドラッグ＝視点
  * - PC：WASD / 矢印キーで移動、マウスドラッグで視点、E で調べる、N で手帳
+ *        戦闘：F またはクリック（ドラッグせずに離す）で攻撃、Shift で回避
  * ゲーム側は move / consumeLook() / onAction を見るだけでよい。
  */
-export type InputAction = 'interact' | 'notebook' | 'advance' | 'cancel' | 'up' | 'down' | 'confirm';
+export type InputAction = 'interact' | 'notebook' | 'advance' | 'cancel' | 'up' | 'down' | 'confirm' | 'attack' | 'dodge';
 
 const JOY_RADIUS = 56;
 
@@ -22,6 +23,8 @@ export class Input {
   private joyVec = { x: 0, y: 0 };
   private lookId: number | null = null;
   private lookLast = { x: 0, y: 0 };
+  /** マウスの「クリック」判定用（押した位置と時刻） */
+  private clickStart = { x: 0, y: 0, t: 0 };
   private joyBase: HTMLDivElement;
   private joyKnob: HTMLDivElement;
   readonly isTouch: boolean;
@@ -108,6 +111,7 @@ export class Input {
     } else if (this.lookId === null) {
       this.lookId = e.pointerId;
       this.lookLast = { x: e.clientX, y: e.clientY };
+      this.clickStart = { x: e.clientX, y: e.clientY, t: performance.now() };
     }
     e.preventDefault();
   };
@@ -144,7 +148,12 @@ export class Input {
       this.joyVec = { x: 0, y: 0 };
       this.joyBase.classList.remove('active');
     }
-    if (e.pointerId === this.lookId) this.lookId = null;
+    if (e.pointerId === this.lookId) {
+      this.lookId = null;
+      // マウスでドラッグせずに素早く離したら「攻撃」
+      const moved = Math.hypot(e.clientX - this.clickStart.x, e.clientY - this.clickStart.y);
+      if (e.pointerType === 'mouse' && moved < 6 && performance.now() - this.clickStart.t < 300) this.emit('attack');
+    }
   };
 
   private onKeyDown = (e: KeyboardEvent): void => {
@@ -156,6 +165,15 @@ export class Input {
     switch (e.code) {
       case 'KeyE':
         this.emit('interact');
+        break;
+      case 'KeyF':
+      case 'KeyJ':
+        this.emit('attack');
+        break;
+      case 'ShiftLeft':
+      case 'ShiftRight':
+      case 'KeyK':
+        this.emit('dodge');
         break;
       case 'KeyN':
       case 'Tab':

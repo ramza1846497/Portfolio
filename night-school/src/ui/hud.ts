@@ -28,6 +28,14 @@ export class Hud {
   private hurtEl: HTMLDivElement;
   private lowEl: HTMLDivElement;
   private drainEl: HTMLDivElement;
+  private pcHelp: HTMLDivElement;
+  private attackBtn: HTMLButtonElement;
+  private dodgeBtn: HTMLButtonElement;
+  private bossEl: HTMLDivElement;
+  private bossName: HTMLDivElement;
+  private bossFill: HTMLDivElement;
+  private hintEl: HTMLDivElement;
+  private hintTimer = 0;
 
   constructor(input: Input) {
     this.root = el('div', 'hud', document.body);
@@ -37,7 +45,7 @@ export class Hud {
     this.objective = el('div', 'objective', this.root);
     el('div', 'joy-hint', this.root, '移動');
     el('div', 'rotate-hint', this.root, '横向きがおすすめです');
-    el('div', 'pc-help', this.root, 'WASD 移動 ／ ドラッグ 視点<br>E 調べる ／ N 手帳');
+    this.pcHelp = el('div', 'pc-help', this.root, 'WASD 移動 ／ ドラッグ 視点<br>E 調べる ／ N 手帳');
 
     this.interactBtn = el('button', 'hud-btn btn-interact', this.root, '調べる');
     const nb = el('button', 'hud-btn btn-notebook', this.root, '手帳');
@@ -45,7 +53,7 @@ export class Hud {
     this.badge.style.display = 'none';
 
     // タッチの反応を速くするため pointerdown で発火
-    const press = (btn: HTMLElement, action: 'interact' | 'notebook') => {
+    const press = (btn: HTMLElement, action: 'interact' | 'notebook' | 'attack' | 'dodge') => {
       btn.addEventListener('pointerdown', (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -54,6 +62,21 @@ export class Hud {
     };
     press(this.interactBtn, 'interact');
     press(nb, 'notebook');
+
+    // 戦闘ボタン（武器を持つまで隠す）
+    this.attackBtn = el('button', 'hud-btn btn-attack', this.root, '攻撃');
+    this.dodgeBtn = el('button', 'hud-btn btn-dodge', this.root, '回避');
+    press(this.attackBtn, 'attack');
+    press(this.dodgeBtn, 'dodge');
+    this.setCombat(false);
+
+    // ボスの体力
+    this.bossEl = el('div', 'boss', this.root);
+    this.bossName = el('div', 'boss-name', this.bossEl);
+    const bar = el('div', 'boss-bar', this.bossEl);
+    this.bossFill = el('div', 'boss-fill', bar);
+    this.bossEl.style.display = 'none';
+    this.hintEl = el('div', 'hint', document.body);
 
     this.toastEl = el('div', 'toast', document.body);
     this.fade = el('div', 'fade', document.body);
@@ -81,6 +104,29 @@ export class Hud {
     this.hpFill.style.width = `${r * 100}%`;
     this.hpBar.classList.toggle('danger', r <= 0.3);
     this.lowEl.classList.toggle('on', r <= 0.3);
+  }
+
+  /** 武器を持っているときだけ、攻撃・回避ボタンと説明を出す */
+  setCombat(armed: boolean): void {
+    this.attackBtn.style.display = armed ? '' : 'none';
+    this.dodgeBtn.style.display = armed ? '' : 'none';
+    this.pcHelp.innerHTML = 'WASD 移動 ／ ドラッグ 視点<br>E 調べる ／ N 手帳' + (armed ? '<br>F・クリック 攻撃 ／ Shift 回避' : '');
+  }
+
+  /** ボスの体力バー。name が null なら隠す */
+  setBoss(name: string | null, ratio: number): void {
+    this.bossEl.style.display = name ? '' : 'none';
+    if (!name) return;
+    this.bossName.textContent = name;
+    this.bossFill.style.width = `${Math.max(0, Math.min(1, ratio)) * 100}%`;
+  }
+
+  /** 画面下の短いヒント（seconds 秒で消える） */
+  hint(text: string, seconds = 3): void {
+    this.hintEl.textContent = text;
+    this.hintEl.classList.add('on');
+    clearTimeout(this.hintTimer);
+    this.hintTimer = window.setTimeout(() => this.hintEl.classList.remove('on'), seconds * 1000);
   }
 
   /** 持続ダメージ中の赤み（0..1） */

@@ -7,6 +7,8 @@ import { Player } from '../engine/player';
 import { Dialogue } from '../ui/dialogue';
 import { Hud } from '../ui/hud';
 import { Keypad } from '../ui/keypad';
+import { Tutorial } from '../ui/tutorial';
+import { Combat } from './combat';
 import { Notebook } from '../ui/notebook';
 import { WorldBuilder, type Openable } from '../world/builder';
 import { createMaterials } from '../world/materials';
@@ -35,6 +37,8 @@ export class Game {
   readonly notebook: Notebook;
   readonly runner: ScriptRunner;
   readonly keypad = new Keypad();
+  readonly tutorial: Tutorial;
+  readonly combat: Combat;
   private actors = new Map<string, Actor>();
   /** 発火済みのトリガー */
   private firedTriggers = new Set<string>();
@@ -130,6 +134,14 @@ export class Game {
         this.meterSpike = Math.max(this.meterSpike, 1);
       },
       meterSpike: (level) => (this.meterSpike = Math.max(this.meterSpike, level)),
+      tutorial: async (name) => {
+        const def = stage.tutorials?.[name];
+        if (!def) throw new Error(`unknown tutorial: ${name}`);
+        await this.tutorial.show(def);
+      },
+      hint: (text, seconds) => this.hud.hint(text, seconds),
+      resetEnemies: () => this.combat.reset(),
+      unblock: (tag) => this.collision.setEnabled(tag, false),
     });
     this.runner.onBusyChange = () => this.syncControls();
     this.keypad.onPress = (key, style) => (style === 'piano' ? this.audio.note(key) : this.audio.play('click'));
@@ -156,6 +168,22 @@ export class Game {
       toast: (text) => this.hud.toast(text),
     };
     for (const a of stage.actors ?? []) this.actors.set(a.id, a.create(actorCtx));
+
+    this.tutorial = new Tutorial(this.input.isTouch);
+    this.combat = new Combat({
+      state: this.state,
+      stage,
+      player: this.player,
+      camera: this.camera,
+      collision: this.collision,
+      builder: this.builder,
+      audio: this.audio,
+      hud: this.hud,
+      damage: (amount) => this.damageWithFx(amount),
+      run: (actions) => void this.runner.start(actions),
+      shake: () => this.shake(),
+    });
+    this.combat.moveInput = () => this.input.move;
     this.notebook.onClose = () => this.syncControls();
     this.state.subscribe(() => this.syncState());
     if (stage.maxHp) this.state.setVar('hp', stage.maxHp);
@@ -195,12 +223,24 @@ export class Game {
       return;
     }
     if (this.keypad.active) return;
+    if (this.tutorial.active) {
+      if (a === 'confirm' || a === 'interact') this.tutorial.confirm();
+      return;
+    }
     if (this.dialogue.active) {
       if (a === 'interact') this.dialogue.key('advance');
       else if (a === 'advance' || a === 'up' || a === 'down' || a === 'confirm') this.dialogue.key(a);
       return;
     }
     if (this.runner.busy) return;
+    if (a === 'attack' && this.input.enabled) {
+      this.combat.attack();
+      return;
+    }
+    if (a === 'dodge' && this.input.enabled) {
+      this.combat.dodge();
+      return;
+    }
     if (a === 'interact' && this.target) {
       void this.runner.interact(this.target);
     } else if (a === 'notebook') {
@@ -234,6 +274,8 @@ export class Game {
     const obj = this.stage.objectives.find((o) => this.state.test(o.when));
     this.hud.setObjective(obj?.text ?? '');
     this.hud.setNoteCount(this.state.unreadNotes.size);
+    // （コンストラクタの途中で呼ばれたときは combat がまだない）
+    if (this.combat) this.hud.setCombat(this.combat.armed);
     if (this.stage.maxHp) this.hud.setHp(this.state.getVar('hp') / this.stage.maxHp);
     // 名前が条件で変わる物のために照準をやり直す
     this.target = null;
@@ -263,6 +305,7 @@ export class Game {
       target = Math.max(target, pr.strength * (1 - d / pr.radius));
     }
     for (const a of this.actors.values()) target = Math.max(target, a.threat?.() ?? 0);
+    target = Math.max(target, this.combat.threat());
     this.meterSpike = Math.max(0, this.meterSpike - dt * 0.35);
     target = Math.max(target, this.meterSpike);
     // 針は少し遅れて追いかけ、強いほど震える
@@ -271,6 +314,18 @@ export class Game {
     const shown = Math.max(0, Math.min(1, this.meter + jitter));
     this.hud.drawMeter(shown);
     this.audio.setStatic(shown);
+  }
+
+  /** 戦闘で体力が減る：赤い明滅・揺れ・0 なら気絶 */
+  private damageWithFx(amount: number): void {
+    if (!this.stage.maxHp || this.runner.busy) return;
+    const hp = Math.max(0, this.state.getVar('hp') - amount);
+    this.state.setVar('hp', hp);
+    this.audio.play('hurt');
+    this.hud.hurtFlash(amount / this.stage.maxHp);
+    this.shake();
+    this.meterSpike = Math.max(this.meterSpike, 0.8);
+    if (hp <= 0 && this.stage.faintScript) void this.runner.start(this.stage.scripts[this.stage.faintScript] ?? []);
   }
 
   private teleport(name: string): void {
@@ -398,6 +453,7 @@ export class Game {
     if (!this.cleared) this.updateMeter(dt);
     this.updateOpenables(dt);
     for (const anim of this.builder.animations) anim(time / 1000);
+    this.combat.update(dt, !this.input.enabled);
     if (this.input.enabled) {
       for (const a of this.actors.values()) a.update(dt);
       this.updateTriggers();

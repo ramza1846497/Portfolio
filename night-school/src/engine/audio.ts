@@ -24,7 +24,14 @@ export type SfxName =
   | 'hurt'
   | 'bang'
   | 'chime'
-  | 'ring';
+  | 'ring'
+  | 'swing'
+  | 'hit'
+  | 'dodge'
+  | 'growl'
+  | 'stomp'
+  | 'vanish'
+  | 'clank';
 
 /** 音名 → 周波数（Hz） */
 export const NOTE_FREQ: Record<string, number> = {
@@ -185,6 +192,20 @@ export class AudioEngine {
         return this.chime(t);
       case 'ring':
         return this.ring(t);
+      case 'swing':
+        return this.noise(t, 0.16, this.out(0.2), 0.25, { type: 'bandpass', freq: 1400, q: 0.8 });
+      case 'hit':
+        return this.hitSfx(t);
+      case 'dodge':
+        return this.noise(t, 0.2, this.out(0.2), 0.18, { type: 'lowpass', freq: 900 });
+      case 'growl':
+        return this.growl(t);
+      case 'stomp':
+        return this.stomp(t);
+      case 'vanish':
+        return this.vanish(t);
+      case 'clank':
+        return this.clank(t);
     }
   }
 
@@ -607,5 +628,57 @@ export class AudioEngine {
         this.tone(tt, 0.06, 2600, out, 0.04, 'sine');
       }
     }
+  }
+
+  /** 竹刀が当たる：乾いた打撃音 */
+  private hitSfx(t: number): void {
+    const out = this.out(0.4);
+    this.noise(t, 0.06, out, 0.5, { type: 'bandpass', freq: 2200, q: 2 });
+    this.tone(t, 0.08, 300, out, 0.3, 'triangle', 150);
+  }
+
+  /** 敵が身構える：低いうなり */
+  private growl(t: number): void {
+    const ctx = this.ctx!;
+    const out = this.out(0.6);
+    const o = ctx.createOscillator();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(70, t);
+    o.frequency.linearRampToValueAtTime(110, t + 0.5);
+    const f = ctx.createBiquadFilter();
+    f.type = 'lowpass';
+    f.frequency.value = 500;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.35, t + 0.1);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
+    o.connect(f);
+    f.connect(g);
+    g.connect(out);
+    o.start(t);
+    o.stop(t + 0.65);
+  }
+
+  /** 石像の足音（ずしん） */
+  private stomp(t: number): void {
+    const out = this.out(0.7);
+    for (let i = 0; i < 3; i++) {
+      this.tone(t + i * 0.3, 0.3, 60, out, 0.6, 'sine', 30);
+      this.noise(t + i * 0.3, 0.1, out, 0.2, { type: 'lowpass', freq: 300 });
+    }
+  }
+
+  /** 敵が消える：吸い込まれるような音 */
+  private vanish(t: number): void {
+    const out = this.out(0.9);
+    this.tone(t, 0.7, 900, out, 0.12, 'sine', 120);
+    this.noise(t, 0.5, out, 0.12, { type: 'highpass', freq: 2500 });
+  }
+
+  /** 硬い物に弾かれる */
+  private clank(t: number): void {
+    const out = this.out(0.5);
+    this.tone(t, 0.25, 1200, out, 0.2, 'square', 900);
+    this.noise(t, 0.05, out, 0.3, { type: 'bandpass', freq: 3000, q: 3 });
   }
 }

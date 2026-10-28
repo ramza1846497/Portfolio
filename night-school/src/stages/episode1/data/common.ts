@@ -202,6 +202,7 @@ export const common: StagePart = {
       { fx: 'fadeOut', duration: 1.5 },
       { say: ['……目の前が、真っ暗になった。'] },
       { actor: 'model', command: 'reset' },
+      { enemies: 'reset' },
       { fx: 'lightsOn' },
       { addVar: 'faints', value: 1 },
       { setVar: 'hp', value: 50 },
@@ -288,5 +289,7 @@ export const objectives: StageDef['objectives'] = [
   { when: { item: 'heart' }, text: '心臓を理科室の人体模型に返す' },
   { when: { flag: 'modelSeen' }, text: '人体模型の心臓を探す' },
   { when: { flag: 'stairsSolved' }, text: '一階を調べる' },
+  { when: { all: [{ item: 'shinai' }, { flag: 'shadow1Awake' }, { notFlag: 'shadow1Dead' }] }, text: '影を竹刀で祓う' },
+  { when: { all: [{ note: 'n_shadowSeen' }, { noItem: 'shinai' }] }, text: '身を守れる物を探す' },
   { text: '一階へ降りる方法を探す' },
 ];

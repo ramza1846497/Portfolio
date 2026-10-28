@@ -1,4 +1,5 @@
 import { mergeParts, type StageDef } from '../../game/types';
+import { combat, combatHints, tutorials } from './data/combat';
 import { common, objectives } from './data/common';
 import { hanako } from './data/hanako';
 import { model } from './data/model';
@@ -14,7 +15,7 @@ import { buildHouses, ZH, ZM } from './houses';
 import { modelActor } from './model';
 import { buildOutside, ZO } from './outside';
 
-const parts = mergeParts([common, stairs, model, piano, hanako, nurse, outside, houses]);
+const parts = mergeParts([common, combat, stairs, model, piano, hanako, nurse, outside, houses]);
 
 /** 第一話「トイレの花子さん」：七不思議のうち五つが現れる一夜 */
 export const episode1: StageDef = {
@@ -33,6 +34,9 @@ export const episode1: StageDef = {
   objectives,
   actors: [modelActor, clerkActor],
   maxHp: 100,
+  weaponItem: 'shinai',
+  tutorials,
+  combatHints,
   faintScript: 'faint',
   // 2 = 2 階、1 = 1 階、0 = 校舎の外、3 = 花子さんの家のあたり、4 = 自分の家のあたり
   floorOf: (_x, z) => (z > (ZH + ZM) / 2 ? 4 : z > (ZO + ZH) / 2 ? 3 : z > (OZ + ZO) / 2 ? 0 : z > OZ / 2 ? 1 : 2),

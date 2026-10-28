@@ -45,6 +45,7 @@ export const stairs: StagePart = {
       id: 'stairs2f',
       name: '西階段（下り）',
       reactions: [
+        { when: { notFlag: 'shadow1Dead' }, actions: [{ say: ['影が、階段の前に立ちふさがっている。'] }] },
         { when: { flag: 'stairsSolved' }, actions: [{ run: 'goDown' }] },
         {
           actions: [
