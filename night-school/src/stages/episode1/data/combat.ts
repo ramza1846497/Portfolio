@@ -63,13 +63,10 @@ export const combat: StagePart = {
     },
   ],
   scripts: {
-    /** 最初の敵との遭遇：動きはムービーで見せ、言葉は心情だけ。そのあと操作説明 */
+    /** 最初の敵との遭遇：敵の動きはプレイ画面のまま見せ（登場演出）、言葉は心情だけ。そのあと操作説明 */
     firstEncounter: [
-      { look: 'shadow1' },
       { meter: 0.95 },
-      { sfx: 'growl' },
       { fx: 'flashFlicker', duration: 0.6 },
-      { say: ['……うずくまっていた影が、ゆっくりと立ち上がった。'] },
       { movie: 'shadow' },
       { say: ['……階段は、あいつの後ろだ。', '竹刀を握る手に、汗がにじむ。やるしかない。'] },
       { tutorial: 'combat' },

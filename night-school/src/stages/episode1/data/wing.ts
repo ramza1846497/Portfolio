@@ -80,10 +80,7 @@ export const wing: StagePart = {
   ],
   scripts: {
     bossIntro: [
-      { look: 'ninomiya' },
-      { sfx: 'stomp' },
       { meter: 1 },
-      { say: ['舞台の前に、二宮金次郎の像が立っている。', '……ぎぎ、と石の首がこちらを向いた。'] },
       { movie: 'ninomiya' },
       { say: ['……大きい。でも、まっすぐにしか走れないなら——'] },
       { flag: 'bossAwake' },

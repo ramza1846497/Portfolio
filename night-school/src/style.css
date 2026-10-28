@@ -1006,184 +1006,22 @@ button {
   text-align: center;
 }
 
-/* ---------- ショートムービー（敵紹介） ---------- */
+/* ---------- 敵の登場演出 ---------- */
 
-.movie {
+.movie-skip {
   position: fixed;
-  inset: 0;
+  right: calc(16px + var(--safe-r));
+  bottom: calc(12px + var(--safe-b));
   z-index: 40;
   display: none;
-  pointer-events: auto;
-  touch-action: none;
+  padding: 6px 10px;
+  font-size: 12px;
+  letter-spacing: 0.15em;
+  color: var(--dim);
+  opacity: 0.7;
   cursor: pointer;
 }
 
-.movie.on {
+.movie-skip.on {
   display: block;
-}
-
-/* 映像は少し色を抜いて「予感」の見た目に */
-body.movie-on canvas {
-  filter: saturate(0.45) contrast(1.12) brightness(1.08);
-}
-
-body.movie-on .hud,
-body.movie-on .vignette,
-body.movie-on .hint {
-  visibility: hidden;
-}
-
-.movie .bar {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 11vh;
-  background: #000;
-  transition: transform 0.45s ease;
-}
-
-.movie .bar.top {
-  top: 0;
-  transform: translateY(-100%);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--safe-t) calc(18px + var(--safe-r)) 0 calc(18px + var(--safe-l));
-  font-size: 12px;
-  color: var(--dim);
-  letter-spacing: 0.2em;
-}
-
-.movie .bar.bottom {
-  bottom: 0;
-  transform: translateY(100%);
-}
-
-.movie.on .bar {
-  transform: none;
-}
-
-.movie .tag {
-  color: #8aa8d8;
-}
-
-.movie .tag::before {
-  content: '● ';
-  color: #c03a2a;
-  animation: rec 1s steps(2) infinite;
-}
-
-@keyframes rec {
-  50% {
-    opacity: 0;
-  }
-}
-
-/* 名前のカード：左下に大きく、細い赤線とひとこと */
-.mv-title {
-  position: absolute;
-  left: calc(7vw + var(--safe-l));
-  bottom: calc(18vh + var(--safe-b));
-  opacity: 0;
-  transform: translateX(-24px);
-  transition: opacity 0.5s, transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
-  pointer-events: none;
-}
-
-.mv-title.on {
-  opacity: 1;
-  transform: none;
-}
-
-.mv-title .name {
-  font-size: clamp(30px, 6.5vw, 54px);
-  letter-spacing: 0.18em;
-  color: #f2ece0;
-  text-shadow: 0 0 18px rgba(0, 0, 0, 0.9);
-  padding-bottom: 6px;
-  border-bottom: 2px solid #b8322a;
-}
-
-.mv-title .sub {
-  margin-top: 8px;
-  font-size: 14px;
-  letter-spacing: 0.15em;
-  color: #c8c2b4;
-  text-shadow: 0 0 10px #000;
-}
-
-/* キャプション：下の黒帯の中に一行だけ */
-.mv-caption {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: calc(var(--safe-b));
-  height: 11vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  font-size: clamp(14px, 2.6vw, 19px);
-  letter-spacing: 0.12em;
-  color: #f2ece0;
-  opacity: 0;
-  transition: opacity 0.2s;
-  pointer-events: none;
-}
-
-.mv-caption.on {
-  opacity: 1;
-}
-
-.movie .chip {
-  display: inline-block;
-  margin: 0 4px;
-  padding: 2px 10px;
-  border-radius: 999px;
-  font-size: 0.85em;
-  letter-spacing: 0.1em;
-  border: 1px solid;
-}
-
-.movie .chip.attack {
-  color: #ffd2c8;
-  border-color: #b8322a;
-  background: rgba(184, 50, 42, 0.45);
-}
-
-.movie .chip.dodge {
-  color: #d8e6ff;
-  border-color: #6a8ac8;
-  background: rgba(70, 100, 170, 0.45);
-}
-
-/* まとめ：「予兆 ▶ 回避 ▶ 攻撃」 */
-.mv-recap {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%) scale(0.92);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 14px 22px;
-  background: rgba(0, 0, 0, 0.72);
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-  white-space: nowrap;
-  font-size: clamp(14px, 2.8vw, 20px);
-  letter-spacing: 0.12em;
-  opacity: 0;
-  transition: opacity 0.3s, transform 0.3s;
-  pointer-events: none;
-}
-
-.mv-recap.on {
-  opacity: 1;
-  transform: translate(-50%, -50%);
-}
-
-.mv-recap .arrow {
-  color: #b8322a;
-  font-size: 0.8em;
 }

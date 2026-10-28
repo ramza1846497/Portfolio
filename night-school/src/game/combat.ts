@@ -82,6 +82,8 @@ export class Combat {
     for (const def of host.stage.enemies ?? []) {
       const root = host.builder.named.get(def.id);
       if (!root) throw new Error(`enemy object not found: ${def.id}`);
+      // 向き（y）のあとに前後の傾き（x）・ふらつき（z）をかける
+      root.rotation.order = 'YXZ';
       const mats: THREE.MeshLambertMaterial[] = [];
       root.traverse((o) => {
         if (o instanceof THREE.Mesh && o.material instanceof THREE.MeshLambertMaterial) {

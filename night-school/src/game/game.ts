@@ -193,11 +193,10 @@ export class Game {
     this.combat.moveInput = () => this.input.move;
     this.movie = new Movie({
       camera: this.camera,
-      scene: this.scene,
+      player: this.player,
       combat: this.combat,
       audio: this.audio,
       isTouch: this.input.isTouch,
-      player: this.player.pos,
     });
     this.notebook.onClose = () => this.syncControls();
     this.notebook.onUse = (id) => {
@@ -484,7 +483,7 @@ export class Game {
     this.updateOpenables(dt);
     for (const anim of this.builder.animations) anim(time / 1000);
     this.combat.update(dt, !this.input.enabled);
-    // ムービー中はカメラをムービーが動かす（プレイヤーの視点を上書き）
+    // 登場演出の間は、視線を演出が動かす
     if (this.movie.active) this.movie.update(dt);
     if (this.input.enabled) {
       for (const a of this.actors.values()) a.update(dt);
