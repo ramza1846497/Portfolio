@@ -106,7 +106,7 @@ export class Combat {
         root,
         home: root.position.clone(),
         homeRot: root.rotation.y,
-        body: host.collision.add(0, 0, 0, 0, `enemy:${def.id}`),
+        body: Object.assign(host.collision.add(0, 0, 0, 0, `enemy:${def.id}`), { dynamic: true }),
         hp: def.hp,
         state: 'idle',
         timer: 0,

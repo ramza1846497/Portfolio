@@ -119,7 +119,8 @@ export const wing: StagePart = {
     {
       id: 'gymEnter',
       area: { minX: 9, maxX: 35, minZ: OZ + 21.6, maxZ: OZ + 36 },
-      when: { all: [{ notFlag: 'bossAwake' }, { notFlag: 'bossDead' }] },
+      // 扉を開けて入ったときだけ（何かの拍子に壁の向こうへ出ても始まらないように）
+      when: { all: [{ flag: 'gymOpen' }, { notFlag: 'bossAwake' }, { notFlag: 'bossDead' }] },
       actions: [{ run: 'bossIntro' }],
     },
   ],

@@ -10,6 +10,8 @@ export interface Box2 {
   /** 一時的に無効化できる（開いた扉など） */
   enabled?: boolean;
   tag?: string;
+  /** 動く物（敵の体）。向こうから重なってくることがあるので、静的な壁より先に押し出す */
+  dynamic?: boolean;
 }
 
 export class CollisionWorld {
@@ -70,25 +72,49 @@ export class CollisionWorld {
     const sx = dx / steps;
     const sz = dz / steps;
     for (let i = 0; i < steps; i++) {
+      const px = pos.x;
       pos.x += sx;
-      this.resolveAxis(pos, r, 'x', sx);
+      this.resolveAxis(pos, r, 'x', px);
+      const pz = pos.z;
       pos.z += sz;
-      this.resolveAxis(pos, r, 'z', sz);
+      this.resolveAxis(pos, r, 'z', pz);
     }
   }
 
-  private resolveAxis(pos: { x: number; z: number }, r: number, axis: 'x' | 'z', delta: number): void {
-    for (const b of this.boxes) {
-      if (b.enabled === false) continue;
-      if (pos.x + r <= b.minX || pos.x - r >= b.maxX || pos.z + r <= b.minZ || pos.z - r >= b.maxZ) continue;
-      if (axis === 'x') {
-        if (delta > 0) pos.x = b.minX - r;
-        else if (delta < 0) pos.x = b.maxX + r;
-        else pos.x = pos.x < (b.minX + b.maxX) / 2 ? b.minX - r : b.maxX + r;
-      } else {
-        if (delta > 0) pos.z = b.minZ - r;
-        else if (delta < 0) pos.z = b.maxZ + r;
-        else pos.z = pos.z < (b.minZ + b.maxZ) / 2 ? b.minZ - r : b.maxZ + r;
+  /**
+   * 動いた軸で重なった箱から押し戻す。
+   * 押し戻す向きは「動く前にどちら側にいたか」で決める（移動の向きでは決めない）。
+   * 動く前から重なっていた箱（敵が向こうから重なってきた、など）は、いちばん浅い向きへ押し出す。
+   * 移動の向きで決めると、壁に少し食い込んだだけで壁の端まで一気に押し出され、
+   * 壁の向こうへ抜けてしまうことがあった。
+   */
+  private resolveAxis(pos: { x: number; z: number }, r: number, axis: 'x' | 'z', prev: number): void {
+    // 敵の体を先に、壁をあとに（敵に押された先が壁の中でも、壁の手前に戻す）
+    for (const pass of [true, false]) {
+      for (const b of this.boxes) {
+        if (b.enabled === false || !!b.dynamic !== pass) continue;
+        if (pos.x + r <= b.minX || pos.x - r >= b.maxX || pos.z + r <= b.minZ || pos.z - r >= b.maxZ) continue;
+        const lo = axis === 'x' ? b.minX : b.minZ;
+        const hi = axis === 'x' ? b.maxX : b.maxZ;
+        if (prev + r <= lo + 1e-6) {
+          if (axis === 'x') pos.x = lo - r;
+          else pos.z = lo - r;
+        } else if (prev - r >= hi - 1e-6) {
+          if (axis === 'x') pos.x = hi + r;
+          else pos.z = hi + r;
+        } else if (axis === 'z') {
+          // 動く前から重なっていた：いちばん浅い向きへ
+          const pushes: [number, number][] = [
+            [b.minX - r - pos.x, 0],
+            [b.maxX + r - pos.x, 0],
+            [0, b.minZ - r - pos.z],
+            [0, b.maxZ + r - pos.z],
+          ];
+          pushes.sort((p, q) => Math.abs(p[0] + p[1]) - Math.abs(q[0] + q[1]));
+          pos.x += pushes[0][0];
+          pos.z += pushes[0][1];
+        }
+        // x の段で動く前から重なっていた箱は、続く z の段でまとめて解決する
       }
     }
   }
