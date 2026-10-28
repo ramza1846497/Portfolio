@@ -35,7 +35,8 @@ export function buildWing(ctx: BuildContext): void {
 function buildWalkway({ builder: b, lights }: BuildContext): void {
   b.plane(WX1, ZW1, WX2, ZG1, 0.004, 'concrete');
   b.plane(WX1 - 0.2, ZW1, WX2 + 0.2, ZG1, 2.7, 'storeCeil', false);
-  b.box([WX1 - 0.3, 2.7, ZW1], [WX2 + 0.3, 2.85, ZG1], 'roof');
+  // 天井板と屋根の下面が重なるとちらつくので、屋根は少し上に
+  b.box([WX1 - 0.3, 2.72, ZW1], [WX2 + 0.3, 2.87, ZG1], 'roof');
   // 東側は壁
   b.box([WX2, 0, ZW1], [WX2 + 0.2, 2.7, ZG1], 'wall', { collide: true });
   // 西側：柱と手すり。中庭への出入り口だけ開いている
@@ -71,6 +72,15 @@ function buildCourtyard({ builder: b, lights }: BuildContext): void {
   b.box([x1 - 0.3, 0, z1], [x1, 6, z2], 'wall', { collide: true });
   // 南：体育館の壁が始まる x=8 までのすき間をふさぐ
   b.box([x1 - 0.3, 0, z2 - 0.1], [GX1, 6, z2 + 0.2], 'wall', { collide: true });
+  // 中庭に面した側は、窓の並ぶ校舎の外壁（二階建て）
+  b.box([x1, 0, z1], [x2, 6, z1 + 0.03], 'facade');
+  b.box([x1, 0, z1 + 0.03], [x1 + 0.03, 6, z2 - 0.1], 'facade');
+  b.box([x1 + 0.03, 0, z2 - 0.13], [GX1, 6, z2 - 0.1], 'facade');
+  // 屋上のふち
+  b.box([x1 - 0.3, 6, z1 - 0.3], [x2, 6.25, z1 + 0.15], 'concrete');
+  b.box([x1 - 0.3, 6, z1], [x1 + 0.15, 6.25, z2], 'concrete');
+  // 夜空
+  b.plane(x1 - 30, z1 - 30, x2 + 30, z2 + 30, 14, 'sky', false);
   // 台座
   b.box([11.2, 0, OZ + 14.6], [12.8, 1.0, OZ + 16.2], 'concrete', { collide: true });
   b.box([11.1, 1.0, OZ + 14.5], [12.9, 1.08, OZ + 16.3], 'concrete');
@@ -88,9 +98,16 @@ function buildCourtyard({ builder: b, lights }: BuildContext): void {
     [4.5, OZ + 18.6],
   ]) {
     b.box([x - 0.15, 0, z - 0.15], [x + 0.15, 2.4, z + 0.15], 'wood', { collide: true });
-    const leaves = new THREE.Mesh(new THREE.SphereGeometry(1.3, 8, 6), new THREE.MeshLambertMaterial({ color: 0x1a2a18 }));
-    leaves.position.set(x, 3.2, z);
-    b.add(leaves);
+    b.add(tree(b, x, z));
+  }
+  // 校舎ぞいの植え込み
+  for (let x = x1 + 1; x < x2 - 2; x += 1.6) {
+    if (x > 9 && x < 15) continue;
+    const bush = new THREE.Mesh(new THREE.IcosahedronGeometry(0.55, 0), b.mat(x % 3.2 < 1.6 ? 'leaves' : 'leavesDark'));
+    bush.position.set(x, 0.35, z1 + 0.6);
+    bush.scale.set(1.3, 0.7, 0.9);
+    bush.rotation.y = x;
+    b.add(bush);
   }
   moonPatch(b, 8, 16, OZ + 11, OZ + 19);
   lights.addFluorescent(3.0, 3.2, OZ + 15, 'dim', Math.PI / 2, 2.4);
@@ -107,6 +124,35 @@ function buildCourtyard({ builder: b, lights }: BuildContext): void {
     s.rotation.y = Math.PI;
     b.add(s, id);
   }
+}
+
+/** 中庭の木：幹の上に、ごつごつした葉の塊をいくつか重ねる */
+function tree(b: BuildContext['builder'], x: number, z: number): THREE.Group {
+  const g = new THREE.Group();
+  const blobs: [number, number, number, number][] = [
+    [0, 3.0, 0, 1.2],
+    [0.7, 2.7, 0.3, 0.85],
+    [-0.6, 2.8, -0.4, 0.9],
+    [0.2, 3.7, -0.2, 0.8],
+    [-0.3, 2.5, 0.6, 0.7],
+  ];
+  blobs.forEach(([dx, y, dz, r], i) => {
+    const m = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), b.mat(i % 2 ? 'leavesDark' : 'leaves'));
+    m.position.set(x + dx, y, z + dz);
+    m.rotation.set(i, i * 2, 0);
+    g.add(m);
+  });
+  // 枝
+  for (const [dx, dz] of [
+    [0.5, 0.2],
+    [-0.4, -0.3],
+  ]) {
+    const br = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.07, 1.0, 5), b.mat('wood'));
+    br.position.set(x + dx * 0.6, 2.4, z + dz * 0.6);
+    br.rotation.set(dz * 1.2, 0, -dx * 1.2);
+    g.add(br);
+  }
+  return g;
 }
 
 /** 体育館：広い板張り。南に舞台、その前に二宮金次郎像 */

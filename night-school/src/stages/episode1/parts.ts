@@ -27,6 +27,11 @@ export function windowPane(b: WorldBuilder, axis: 'x' | 'z', fixed: number, from
 }
 
 /** 床に落ちる月明かり（加算合成の板） */
+/** 壁に貼る紙・札の材質：壁とちらつかないよう、深度を手前に寄せる */
+function decal(params: THREE.MeshLambertMaterialParameters): THREE.MeshLambertMaterial {
+  return new THREE.MeshLambertMaterial({ ...params, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });
+}
+
 export function moonPatch(b: WorldBuilder, x1: number, x2: number, z1: number, z2: number): void {
   const geo = new THREE.PlaneGeometry(x2 - x1, z2 - z1);
   geo.rotateX(-Math.PI / 2);
@@ -37,7 +42,7 @@ export function moonPatch(b: WorldBuilder, x1: number, x2: number, z1: number, z
 }
 
 export function sign(b: WorldBuilder, text: string, x: number, y: number, z: number, rotY: number, width: number): void {
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(width, width * 0.375), new THREE.MeshLambertMaterial({ map: signTexture(text) }));
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(width, width * 0.375), decal({ map: signTexture(text) }));
   m.position.set(x, y, z);
   m.rotation.y = rotY;
   b.add(m);
@@ -45,7 +50,7 @@ export function sign(b: WorldBuilder, text: string, x: number, y: number, z: num
 
 /** 壁に貼る板（貼り紙・落書き・肖像画など）。rotY で向きを決める */
 export function wallPlane(b: WorldBuilder, tex: THREE.Texture, w: number, h: number, pos: [number, number, number], rotY: number, transparent = false): THREE.Mesh {
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshLambertMaterial({ map: tex, transparent }));
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), decal({ map: tex, transparent }));
   m.position.set(pos[0], pos[1], pos[2]);
   m.rotation.y = rotY;
   b.add(m);

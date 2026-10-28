@@ -50,7 +50,21 @@ export const nurse: StagePart = {
       body: '奥のベッドで眠っていたのは、自分だった。\n今ここを歩いている自分は、いったい……。\n起こさずに、そっとしておいた。',
     },
   ],
-  items: [{ id: 'nurseKey', name: '保健室の鍵' }],
+  items: [
+    { id: 'nurseKey', name: '保健室の鍵' },
+    {
+      id: 'kitNurse',
+      name: '保健室の救急箱',
+      desc: '消毒液と包帯がそろっている。体力がすっかり回復する。',
+      use: [
+      {
+        if: { var: 'hp', gte: 100 },
+        then: [{ say: ['今は、まだ使わなくても大丈夫だ。'] }],
+        else: [{ take: 'kitNurse' }, { sfx: 'pickup' }, { heal: 100 }, { say: ['消毒をして、包帯を巻いた。', '体が軽くなった。'] }],
+      },
+    ],
+    },
+  ],
   interactables: [
     {
       id: 'nurseDrawer',
@@ -139,8 +153,8 @@ export const nurse: StagePart = {
           actions: [
             { sfx: 'pickup' },
             { flag: 'firstAidNurseUsed' },
-            { heal: 100 },
-            { say: ['保健室の救急箱だ。', '消毒をして、包帯を巻いた。体が軽くなった。'] },
+            { give: 'kitNurse' },
+            { say: ['保健室の救急箱だ。中身がちゃんとそろっている。', '持っていこう。「持ち物」から使える。'] },
           ],
         },
       ],

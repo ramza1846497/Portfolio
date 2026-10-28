@@ -70,7 +70,7 @@ export class Game {
     container.appendChild(this.renderer.domElement);
 
     this.scene.fog = new THREE.FogExp2(0x020203, 0.07);
-    this.camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.05, 60);
+    this.camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 60);
     this.scene.add(this.camera);
 
     this.input = new Input(this.renderer.domElement);
@@ -185,6 +185,12 @@ export class Game {
     });
     this.combat.moveInput = () => this.input.move;
     this.notebook.onClose = () => this.syncControls();
+    this.notebook.onUse = (id) => {
+      const use = this.stage.items.find((x) => x.id === id)?.use;
+      if (!use || this.runner.busy) return;
+      this.notebook.close();
+      void this.runner.start(use);
+    };
     this.state.subscribe(() => this.syncState());
     if (stage.maxHp) this.state.setVar('hp', stage.maxHp);
     this.hud.showVitals(stage.maxHp !== undefined);
@@ -219,7 +225,9 @@ export class Game {
   private onAction(a: string): void {
     if (this.cleared) return;
     if (this.notebook.isOpen) {
-      if (a === 'notebook' || a === 'cancel') this.notebook.close();
+      const same = (a === 'notebook' && this.notebook.currentTab === 'notes') || (a === 'items' && this.notebook.currentTab === 'items');
+      if (a === 'cancel' || same) this.notebook.close();
+      else if (a === 'notebook' || a === 'items') this.notebook.open(a === 'items' ? 'items' : 'notes');
       return;
     }
     if (this.keypad.active) return;
@@ -243,8 +251,8 @@ export class Game {
     }
     if (a === 'interact' && this.target) {
       void this.runner.interact(this.target);
-    } else if (a === 'notebook') {
-      this.notebook.open();
+    } else if (a === 'notebook' || a === 'items') {
+      this.notebook.open(a === 'items' ? 'items' : 'notes');
       this.syncControls();
     }
   }
@@ -274,6 +282,7 @@ export class Game {
     const obj = this.stage.objectives.find((o) => this.state.test(o.when));
     this.hud.setObjective(obj?.text ?? '');
     this.hud.setNoteCount(this.state.unreadNotes.size);
+    this.hud.setUsableCount(this.notebook.usableCount);
     // （コンストラクタの途中で呼ばれたときは combat がまだない）
     if (this.combat) this.hud.setCombat(this.combat.armed);
     if (this.stage.maxHp) this.hud.setHp(this.state.getVar('hp') / this.stage.maxHp);

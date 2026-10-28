@@ -15,8 +15,7 @@ import {
   tileTexture,
   wallTexture,
   woodFloorTexture,
-  woodTexture,
-} from '../engine/textures';
+  woodTexture, facadeTexture, skyTexture } from '../engine/textures';
 
 /** 床の月明かりの形（窓の桟の影つき） */
 function moonTexture(): THREE.Texture {
@@ -58,6 +57,10 @@ export function createMaterials(): Record<string, MaterialDef> {
     // 校舎の外
     asphalt: { material: lambert({ map: asphaltTexture() }), texW: 4 },
     grass: { material: lambert({ map: grassTexture() }), texW: 2 },
+    facade: { material: lambert({ map: facadeTexture() }), texW: 3, texH: 3 },
+    leaves: { material: lambert({ color: 0x1c2c1a }) },
+    leavesDark: { material: lambert({ color: 0x121e12 }) },
+    sky: { material: new THREE.MeshBasicMaterial({ map: skyTexture(), fog: false }), texW: 24 },
     paint: { material: lambert({ color: 0xbdbdb4 }) },
     rail: { material: lambert({ color: 0xc8c8c0 }) },
     pole: { material: lambert({ color: 0x6a6660 }) },
@@ -101,6 +104,10 @@ export function createMaterials(): Record<string, MaterialDef> {
         transparent: true,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
+        // 床に貼りつく光なので、遠くでも床とちらつかないよう手前に寄せる
+        polygonOffset: true,
+        polygonOffsetFactor: -2,
+        polygonOffsetUnits: -2,
       }),
     },
   };

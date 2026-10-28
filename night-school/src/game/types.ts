@@ -123,6 +123,10 @@ export interface NoteDef {
 export interface ItemDef {
   id: string;
   name: string;
+  /** 持ち物の欄に出す説明 */
+  desc?: string;
+  /** 持ち物の欄から「使う」と実行される（ない物は使えない） */
+  use?: Action[];
 }
 
 export interface BuildContext {

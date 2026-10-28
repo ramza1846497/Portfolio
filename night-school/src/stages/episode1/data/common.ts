@@ -13,6 +13,20 @@ import { OZ } from '../floor1';
  * 寄り道：職員室の引き出し（0214）→ 保健室で眠る子（nurse.ts）を起こさずに離れると、真のエンディング「目覚め」
  */
 export const common: StagePart = {
+  items: [
+    {
+      id: 'kitStaff',
+      name: '職員室の救急箱',
+      desc: '絆創膏と湿布が入っている。体力が少し回復する（+40）。',
+      use: [
+      {
+        if: { var: 'hp', gte: 100 },
+        then: [{ say: ['今は、まだ使わなくても大丈夫だ。'] }],
+        else: [{ take: 'kitStaff' }, { sfx: 'pickup' }, { heal: 40 }, { say: ['絆創膏を貼って、湿布をした。', '少しだけ楽になった。'] }],
+      },
+    ],
+    },
+  ],
   notes: [
     {
       id: 'n_seven',
@@ -179,8 +193,9 @@ export const common: StagePart = {
           actions: [
             { sfx: 'pickup' },
             { flag: 'firstAidStaffUsed' },
-            { heal: 40 },
-            { say: ['職員室の救急箱だ。', '絆創膏と湿布で、少しだけ楽になった。'] },
+            { give: 'kitStaff' },
+            { say: ['職員室の救急箱だ。持っていこう。', '……いざというときは、「持ち物」から使える。'] },
+            { hint: '右上の「持ち物」から、救急箱を使うと体力が回復する', duration: 5 },
           ],
         },
       ],

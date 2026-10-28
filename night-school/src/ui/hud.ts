@@ -16,6 +16,7 @@ export class Hud {
   private objective: HTMLDivElement;
   private interactBtn: HTMLButtonElement;
   private badge: HTMLSpanElement;
+  private itemBadge: HTMLSpanElement;
   private toastEl: HTMLDivElement;
   private toastTimer = 0;
   readonly fade: HTMLDivElement;
@@ -45,15 +46,18 @@ export class Hud {
     this.objective = el('div', 'objective', this.root);
     el('div', 'joy-hint', this.root, '移動');
     el('div', 'rotate-hint', this.root, '横向きがおすすめです');
-    this.pcHelp = el('div', 'pc-help', this.root, 'WASD 移動 ／ ドラッグ 視点<br>E 調べる ／ N 手帳');
+    this.pcHelp = el('div', 'pc-help', this.root, 'WASD 移動 ／ ドラッグ 視点<br>E 調べる ／ N 手帳 ／ I 持ち物');
 
     this.interactBtn = el('button', 'hud-btn btn-interact', this.root, '調べる');
     const nb = el('button', 'hud-btn btn-notebook', this.root, '手帳');
     this.badge = el('span', 'badge', nb, '0');
     this.badge.style.display = 'none';
+    const items = el('button', 'hud-btn btn-items', this.root, '持ち物');
+    this.itemBadge = el('span', 'badge', items, '0');
+    this.itemBadge.style.display = 'none';
 
     // タッチの反応を速くするため pointerdown で発火
-    const press = (btn: HTMLElement, action: 'interact' | 'notebook' | 'attack' | 'dodge') => {
+    const press = (btn: HTMLElement, action: 'interact' | 'notebook' | 'items' | 'attack' | 'dodge') => {
       btn.addEventListener('pointerdown', (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -62,6 +66,7 @@ export class Hud {
     };
     press(this.interactBtn, 'interact');
     press(nb, 'notebook');
+    press(items, 'items');
 
     // 戦闘ボタン（武器を持つまで隠す）
     this.attackBtn = el('button', 'hud-btn btn-attack', this.root, '攻撃');
@@ -110,7 +115,7 @@ export class Hud {
   setCombat(armed: boolean): void {
     this.attackBtn.style.display = armed ? '' : 'none';
     this.dodgeBtn.style.display = armed ? '' : 'none';
-    this.pcHelp.innerHTML = 'WASD 移動 ／ ドラッグ 視点<br>E 調べる ／ N 手帳' + (armed ? '<br>F・クリック 攻撃 ／ Shift 回避' : '');
+    this.pcHelp.innerHTML = 'WASD 移動 ／ ドラッグ 視点<br>E 調べる ／ N 手帳 ／ I 持ち物' + (armed ? '<br>F・クリック 攻撃 ／ Shift 回避' : '');
   }
 
   /** ボスの体力バー。name が null なら隠す */
@@ -208,6 +213,12 @@ export class Hud {
   setNoteCount(n: number): void {
     this.badge.textContent = String(n);
     this.badge.style.display = n > 0 ? 'inline-block' : 'none';
+  }
+
+  /** 持ち物ボタンの印：使える物の数 */
+  setUsableCount(n: number): void {
+    this.itemBadge.textContent = String(n);
+    this.itemBadge.style.display = n > 0 ? 'inline-block' : 'none';
   }
 
   setVisible(v: boolean): void {

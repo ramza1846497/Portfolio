@@ -5,7 +5,7 @@
  *        戦闘：F またはクリック（ドラッグせずに離す）で攻撃、Shift で回避
  * ゲーム側は move / consumeLook() / onAction を見るだけでよい。
  */
-export type InputAction = 'interact' | 'notebook' | 'advance' | 'cancel' | 'up' | 'down' | 'confirm' | 'attack' | 'dodge';
+export type InputAction = 'interact' | 'notebook' | 'items' | 'advance' | 'cancel' | 'up' | 'down' | 'confirm' | 'attack' | 'dodge';
 
 const JOY_RADIUS = 56;
 
@@ -179,6 +179,9 @@ export class Input {
       case 'Tab':
         this.emit('notebook');
         e.preventDefault();
+        break;
+      case 'KeyI':
+        this.emit('items');
         break;
       case 'Space':
       case 'Enter':

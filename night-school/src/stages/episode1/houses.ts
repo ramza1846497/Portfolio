@@ -77,7 +77,8 @@ function buildHanakoHouse({ builder: b, lights }: BuildContext): void {
   b.plane(x1, ZH + 0.9, 32, zS, 0.01, 'woodfloor');
   b.plane(32, ZH + 0.9, x2, zS, 0.01, 'tatami');
   b.plane(x1, zN, x2, zS, HH, 'plaster', false);
-  b.box([x1 - 0.3, HH, zN - 0.3], [x2 + 0.3, HH + 0.6, zS + 0.3], 'roof');
+  // 天井と屋根の下面が同じ高さだとちらつくので、屋根は少し浮かせる
+  b.box([x1 - 0.3, HH + 0.02, zN - 0.3], [x2 + 0.3, HH + 0.6, zS + 0.3], 'roof');
 
   // 外壁（入口は西の中央）と、襖の間仕切り
   b.wallZ(x1, zN, zS, 'plaster', [{ from: ZH - 0.7, to: ZH + 0.7, top: 2.0 }], HH);
@@ -187,7 +188,8 @@ function buildHome({ builder: b, lights }: BuildContext): void {
   b.plane(11, ZM - 1.8, x1, ZM + 1.8, 0, 'asphalt');
   b.plane(x1, zN, x2, zS, 0.01, 'woodfloor');
   b.plane(x1, zN, x2, zS, HH, 'storeCeil', false);
-  b.box([x1 - 0.3, HH, zN - 0.3], [x2 + 0.3, HH + 0.6, zS + 0.3], 'roof');
+  // 天井と屋根の下面が同じ高さだとちらつくので、屋根は少し浮かせる
+  b.box([x1 - 0.3, HH + 0.02, zN - 0.3], [x2 + 0.3, HH + 0.6, zS + 0.3], 'roof');
   b.wallZ(x1, zN, zS, 'homeWall', [{ from: ZM - 0.6, to: ZM + 0.6, top: 2.0 }], HH);
   b.wallZ(x2, zN, zS, 'homeWall', [], HH);
   b.wallX(zN, x1, x2, 'homeWall', [], HH);

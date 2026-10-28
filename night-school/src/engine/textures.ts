@@ -264,6 +264,101 @@ export function nightWindowTexture(): THREE.Texture {
   });
 }
 
+/**
+ * 校舎の外壁（中庭側）：1 枚 = 幅 3m・高さ 3m（ワンフロア分）。
+ * 下に床の帯、真ん中に暗い窓。雨だれの筋で古びた感じに。
+ */
+export function facadeTexture(): THREE.Texture {
+  return cached('facade', () => {
+    const [c, ctx] = makeCanvas(256, 256);
+    const px = 256 / 3; // 1m あたりのピクセル
+    ctx.fillStyle = '#8c887c';
+    ctx.fillRect(0, 0, 256, 256);
+    speckle(ctx, 256, 256, 1200, 0.1);
+    grime(ctx, 256, 256, 30);
+    // 床スラブの帯（下 0.3m）
+    ctx.fillStyle = '#9a968a';
+    ctx.fillRect(0, 256 - 0.3 * px, 256, 0.3 * px);
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.fillRect(0, 256 - 0.3 * px - 2, 256, 2);
+    // 窓（床から 0.9〜2.5m、左右 0.3m あけて）
+    const x0 = 0.3 * px;
+    const x1 = 2.7 * px;
+    const y0 = 256 - 2.5 * px;
+    const y1 = 256 - 0.9 * px;
+    const glass = ctx.createLinearGradient(0, y0, 0, y1);
+    glass.addColorStop(0, '#141c2c');
+    glass.addColorStop(1, '#070a10');
+    ctx.fillStyle = glass;
+    ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+    // 月の映り込み（斜めの淡い帯）
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x0, y0, x1 - x0, y1 - y0);
+    ctx.clip();
+    ctx.fillStyle = 'rgba(150,170,210,0.12)';
+    ctx.beginPath();
+    ctx.moveTo(x0 + 30, y0);
+    ctx.lineTo(x0 + 70, y0);
+    ctx.lineTo(x0 + 20, y1);
+    ctx.lineTo(x0 - 20, y1);
+    ctx.fill();
+    // 窓の内側のカーテン（右端だけ寄せてある）
+    ctx.fillStyle = 'rgba(120,120,105,0.35)';
+    ctx.fillRect(x1 - 26, y0, 26, y1 - y0);
+    ctx.restore();
+    // サッシ
+    ctx.strokeStyle = '#a8aaa4';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo((x0 + x1) / 2, y0);
+    ctx.lineTo((x0 + x1) / 2, y1);
+    ctx.moveTo(x0, y0 + (y1 - y0) * 0.3);
+    ctx.lineTo(x1, y0 + (y1 - y0) * 0.3);
+    ctx.stroke();
+    // 窓台と、その下の雨だれ
+    ctx.fillStyle = '#b0aca0';
+    ctx.fillRect(x0 - 6, y1, x1 - x0 + 12, 5);
+    for (let i = 0; i < 14; i++) {
+      const x = x0 + rand() * (x1 - x0);
+      const g = ctx.createLinearGradient(0, y1, 0, y1 + 30 + rand() * 50);
+      g.addColorStop(0, 'rgba(30,25,20,0.25)');
+      g.addColorStop(1, 'rgba(30,25,20,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(x, y1 + 5, 2 + rand() * 4, 80);
+    }
+    return toTexture(c);
+  });
+}
+
+/** 夜空：星と薄い雲 */
+export function skyTexture(): THREE.Texture {
+  return cached('sky', () => {
+    const [c, ctx] = makeCanvas(512, 512);
+    ctx.fillStyle = '#05070e';
+    ctx.fillRect(0, 0, 512, 512);
+    for (let i = 0; i < 18; i++) {
+      const x = rand() * 512;
+      const y = rand() * 512;
+      const r = 40 + rand() * 120;
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+      g.addColorStop(0, 'rgba(40,50,80,0.25)');
+      g.addColorStop(1, 'rgba(40,50,80,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(x - r, y - r, r * 2, r * 2);
+    }
+    for (let i = 0; i < 260; i++) {
+      const a = 0.2 + rand() * 0.8;
+      ctx.fillStyle = `rgba(220,228,255,${a})`;
+      const s = rand() < 0.08 ? 2 : 1;
+      ctx.fillRect(rand() * 512, rand() * 512, s, s);
+    }
+    return toTexture(c);
+  });
+}
+
 /** 黒板。lines を手書き風のチョークで書く */
 export function blackboardTexture(key: string, lines: string[], options: { small?: string[] } = {}): THREE.Texture {
   return cached('bb' + key, () => {

@@ -935,3 +935,73 @@ button {
   font-size: 15px;
   cursor: pointer;
 }
+
+/* ---------- 手帳：持ち物 ---------- */
+
+.notebook .tabs {
+  display: flex;
+  gap: 4px;
+  margin: 6px 0 14px;
+  border-bottom: 1px solid rgba(42, 36, 28, 0.35);
+}
+
+.notebook .tabs button {
+  padding: 6px 16px;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 3px 3px 0 0;
+  background: none;
+  color: #6a604e;
+  font: inherit;
+  font-size: 14px;
+  letter-spacing: 0.15em;
+  cursor: pointer;
+}
+
+.notebook .tabs button.sel {
+  border-color: rgba(42, 36, 28, 0.35);
+  background: #ece5d2;
+  color: #2a241c;
+  margin-bottom: -1px;
+}
+
+.notebook .entry.item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-left-color: #4a5a3a;
+}
+
+.notebook .use {
+  flex: none;
+  padding: 8px 18px;
+  border: 1px solid #8c2a20;
+  border-radius: 3px;
+  background: #8c2a20;
+  color: #f4ecd8;
+  font: inherit;
+  font-size: 14px;
+  letter-spacing: 0.15em;
+  cursor: pointer;
+}
+
+.btn-items {
+  right: calc(14px + var(--safe-r));
+  top: calc(56px + var(--safe-t));
+  padding: 8px 14px;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.btn-items .badge {
+  display: inline-block;
+  min-width: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #b04030;
+  color: #fff;
+  font-size: 12px;
+  text-align: center;
+}

@@ -69,6 +69,7 @@ export function validateStage(stage: StageDef, map: MapNames): string[] {
     d.reactions.forEach((r) => (cond(r.when, d.id), actions(r.actions, d.id)));
   }
   for (const [name, list] of Object.entries(stage.scripts)) actions(list, `script ${name}`);
+  for (const it of stage.items) actions(it.use ?? [], `item ${it.id}`);
   for (const t of stage.triggers ?? []) {
     cond(t.when, `trigger ${t.id}`);
     actions(t.actions, `trigger ${t.id}`);

@@ -45,6 +45,11 @@ export class GameState {
     this.changed();
   }
 
+  /** 持っている物（手に入れた順） */
+  get itemList(): string[] {
+    return [...this.items];
+  }
+
   hasItem(id: string): boolean {
     return this.items.has(id);
   }
