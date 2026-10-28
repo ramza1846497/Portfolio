@@ -687,3 +687,171 @@ export function newspaperTexture(): THREE.Texture {
     return toTexture(c, false);
   });
 }
+
+/** 畳（1 枚 = 0.9m × 1.8m） */
+export function tatamiTexture(): THREE.Texture {
+  return cached('tatami', () => {
+    const [c, ctx] = makeCanvas(128, 256);
+    ctx.fillStyle = '#8a8a5a';
+    ctx.fillRect(0, 0, 128, 256);
+    for (let y = 0; y < 256; y += 2) {
+      ctx.fillStyle = `rgba(${60 + rand() * 30},${60 + rand() * 30},30,0.35)`;
+      ctx.fillRect(0, y, 128, 1);
+    }
+    // 畳の縁
+    ctx.fillStyle = '#2a2a24';
+    ctx.fillRect(0, 0, 8, 256);
+    ctx.fillRect(120, 0, 8, 256);
+    grime(ctx, 128, 256, 25);
+    return toTexture(c);
+  });
+}
+
+/** 襖（1 枚 = 幅 0.9m × 高さ 1.8m）。古びて、ところどころ破れている */
+export function fusumaTexture(): THREE.Texture {
+  return cached('fusuma', () => {
+    const [c, ctx] = makeCanvas(128, 256);
+    ctx.fillStyle = '#d6cfb8';
+    ctx.fillRect(0, 0, 128, 256);
+    // 山の絵
+    ctx.strokeStyle = 'rgba(90,100,90,0.35)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(0, 200);
+    ctx.quadraticCurveTo(40, 140, 70, 180);
+    ctx.quadraticCurveTo(100, 150, 128, 190);
+    ctx.stroke();
+    grime(ctx, 128, 256, 40);
+    ctx.fillStyle = '#1a140e';
+    ctx.beginPath();
+    ctx.ellipse(40 + rand() * 40, 90 + rand() * 60, 8, 12, 0.3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#3a2a1a';
+    ctx.lineWidth = 6;
+    ctx.strokeRect(0, 0, 128, 256);
+    ctx.fillStyle = '#2a2a2a';
+    ctx.fillRect(100, 120, 10, 20);
+    return toTexture(c);
+  });
+}
+
+/** 板塀（1 枚 = 幅 1.2m × 高さ 1.8m） */
+export function fenceTexture(): THREE.Texture {
+  return cached('fence', () => {
+    const [c, ctx] = makeCanvas(128, 192);
+    for (let i = 0; i < 8; i++) {
+      ctx.fillStyle = `hsl(25, 22%, ${18 + rand() * 10}%)`;
+      ctx.fillRect(i * 16, 0, 15, 192);
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.fillRect(i * 16 + 15, 0, 1, 192);
+    }
+    ctx.fillStyle = '#1a120a';
+    ctx.fillRect(0, 20, 128, 6);
+    ctx.fillRect(0, 160, 128, 6);
+    grime(ctx, 128, 192, 30);
+    return toTexture(c);
+  });
+}
+
+/** テレビの砂嵐。frame を変えると別の模様になる。message は砂嵐の奥にうっすら浮かぶ文字 */
+export function staticTexture(frame: number, message = ''): THREE.Texture {
+  return cached('static' + frame + message, () => {
+    const [c, ctx] = makeCanvas(160, 120);
+    const img = ctx.createImageData(160, 120);
+    for (let i = 0; i < img.data.length; i += 4) {
+      const v = rand() * 255;
+      img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+      img.data[i + 3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+    if (message) {
+      ctx.fillStyle = 'rgba(0,0,0,0.55)';
+      ctx.font = 'bold 18px serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(message, 80, 66);
+    }
+    return toTexture(c, false);
+  });
+}
+
+/** 家族写真。blankIndex の人だけ顔がぼやけて見えない */
+export function familyPhotoTexture(key: string, people: number, blankIndex: number): THREE.Texture {
+  return cached('photo' + key, () => {
+    const [c, ctx] = makeCanvas(192, 144);
+    ctx.fillStyle = '#5a4a32';
+    ctx.fillRect(0, 0, 192, 144);
+    ctx.fillStyle = '#c8bca0';
+    ctx.fillRect(10, 10, 172, 124);
+    const g = ctx.createLinearGradient(0, 10, 0, 134);
+    g.addColorStop(0, '#9aa8a0');
+    g.addColorStop(1, '#6a6a58');
+    ctx.fillStyle = g;
+    ctx.fillRect(14, 14, 164, 116);
+    for (let i = 0; i < people; i++) {
+      const x = 40 + i * (112 / Math.max(1, people - 1));
+      const h = i === people - 1 ? 22 : 34;
+      ctx.fillStyle = '#2a2622';
+      ctx.fillRect(x - 12, 130 - h - 40, 24, h + 40);
+      ctx.fillStyle = '#c8a888';
+      ctx.beginPath();
+      ctx.arc(x, 130 - h - 50, 10, 0, Math.PI * 2);
+      ctx.fill();
+      if (i === blankIndex) {
+        ctx.fillStyle = 'rgba(230,230,225,0.95)';
+        ctx.beginPath();
+        ctx.arc(x, 130 - h - 50, 12, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.filter = 'blur(3px)';
+      } else {
+        ctx.fillStyle = '#222';
+        ctx.fillRect(x - 5, 130 - h - 52, 3, 2);
+        ctx.fillRect(x + 2, 130 - h - 52, 3, 2);
+      }
+      ctx.filter = 'none';
+    }
+    grime(ctx, 192, 144, 20);
+    return toTexture(c, false);
+  });
+}
+
+/** カレンダー（二月）。markDay の日に赤い丸と書き込み */
+export function calendarTexture(key: string, markDay: number, note: string): THREE.Texture {
+  return cached('cal' + key, () => {
+    const [c, ctx] = makeCanvas(160, 200);
+    ctx.fillStyle = '#e8e4d6';
+    ctx.fillRect(0, 0, 160, 200);
+    ctx.fillStyle = '#7a1a1a';
+    ctx.font = 'bold 30px serif';
+    ctx.fillText('2', 10, 34);
+    ctx.font = '14px serif';
+    ctx.fillText('月', 32, 34);
+    ctx.fillStyle = '#333';
+    ctx.font = '11px sans-serif';
+    for (let d = 1; d <= 28; d++) {
+      const col = (d + 2) % 7;
+      const row = Math.floor((d + 2) / 7);
+      const x = 8 + col * 21;
+      const y = 62 + row * 26;
+      ctx.fillStyle = col === 0 ? '#a02020' : '#333';
+      ctx.fillText(String(d), x + 4, y);
+      if (d === markDay) {
+        ctx.strokeStyle = '#c02020';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(x + 9, y - 4, 10, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = '#c02020';
+        ctx.font = '9px sans-serif';
+        ctx.fillText(note, x - 4, y + 12);
+        ctx.font = '11px sans-serif';
+      }
+      // 14 日より後は、何も書かれていない（めくられていない）
+      if (d > markDay) {
+        ctx.fillStyle = 'rgba(200,195,180,0.6)';
+        ctx.fillRect(x, y - 10, 20, 14);
+      }
+    }
+    grime(ctx, 160, 200, 15);
+    return toTexture(c, false);
+  });
+}

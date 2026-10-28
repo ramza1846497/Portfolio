@@ -280,7 +280,8 @@ export class Game {
     this.updateFloor();
     // 移った先のトリガーがすぐ発火しないように、いる場所を「中にいる」扱いにする
     this.insideTriggers.clear();
-    for (const t of this.stage.triggers ?? []) if (this.inArea(t.area)) this.insideTriggers.add(t.id);
+    // （条件をまだ満たしていないトリガーは、満たした時点で発火できるよう印を付けない）
+    for (const t of this.stage.triggers ?? []) if (this.inArea(t.area) && this.state.test(t.when)) this.insideTriggers.add(t.id);
   }
 
   private lookAt(name: string): Promise<void> {
@@ -323,7 +324,12 @@ export class Game {
       const entered = inside && !this.insideTriggers.has(t.id);
       if (inside) this.insideTriggers.add(t.id);
       else this.insideTriggers.delete(t.id);
-      if (!entered || this.runner.busy) continue;
+      if (!entered) continue;
+      if (this.runner.busy) {
+        // 会話が終わってから、もう一度確かめる
+        this.insideTriggers.delete(t.id);
+        continue;
+      }
       if (t.once !== false && this.firedTriggers.has(t.id)) continue;
       if (!this.state.test(t.when)) {
         // 条件を満たしたら、範囲の中にいても次のフレームで発火できるように

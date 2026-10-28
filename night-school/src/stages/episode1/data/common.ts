@@ -212,7 +212,19 @@ export const common: StagePart = {
           {
             if: { var: 'floor', eq: 2 },
             then: [{ teleport: 'f2Stairs' }],
-            else: [{ if: { flag: 'inStore' }, then: [{ teleport: 'storeIn' }], else: [{ teleport: 'outsideStart' }] }],
+            else: [
+              {
+                if: { var: 'floor', eq: 3 },
+                then: [{ if: { flag: 'inHanakoHouse' }, then: [{ teleport: 'hanakoHouseIn' }], else: [{ teleport: 'alleyStart' }] }],
+                else: [
+                  {
+                    if: { var: 'floor', eq: 4 },
+                    then: [{ if: { flag: 'homeEntered' }, then: [{ teleport: 'homeIn' }], else: [{ teleport: 'homeStreet' }] }],
+                    else: [{ if: { flag: 'inStore' }, then: [{ teleport: 'storeIn' }], else: [{ teleport: 'outsideStart' }] }],
+                  },
+                ],
+              },
+            ],
           },
         ],
       },
@@ -251,12 +263,19 @@ export const common: StagePart = {
 
 /** 画面左上の目的。上から順に、最初に当てはまるものを出す */
 export const objectives: StageDef['objectives'] = [
+  { when: { flag: 'homePhoneRinging' }, text: '電話に出る' },
+  { when: { flag: 'homeEntered' }, text: '家の中を調べる（おうちのきまりを守る）' },
+  { when: { flag: 'atHome' }, text: '家に入る' },
+  { when: { flag: 'phone2Done' }, text: '自分の家へ帰る' },
+  { when: { flag: 'phone2Ringing' }, text: '居間の黒電話に出る' },
+  { when: { flag: 'inHanakoHouse' }, text: '仏壇にお供えをする' },
+  { when: { flag: 'inAlley' }, text: '女の子についていく' },
   { when: { flag: 'storePaid' }, text: '店を出る' },
   { when: { flag: 'inStore' }, text: '店員の顔を見ずに、お会計を済ませる' },
   { when: { all: [{ flag: 'storeVisited' }, { var: 'coins', lt: 3 }] }, text: '道に落ちている十円玉を探して、店に戻る' },
   { when: { flag: 'storeVisited' }, text: '店に戻って、お会計を済ませる' },
   { when: { flag: 'storeLit' }, text: '明かりの方へ向かう' },
-  { when: { flag: 'outside' }, text: '夜道を進む' },
+  { when: { flag: 'outside' }, text: '家を目指す（夜道を進む）' },
   { when: { item: 'exitKey' }, text: '一階の昇降口から脱出する' },
   { when: { flag: 'keyAppeared' }, text: '三番目の個室を調べる' },
   { when: { flag: 'toiletOpen' }, text: '女子トイレで花子さんを呼び出す' },

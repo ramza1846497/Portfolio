@@ -23,7 +23,8 @@ export type SfxName =
   | 'click'
   | 'hurt'
   | 'bang'
-  | 'chime';
+  | 'chime'
+  | 'ring';
 
 /** 音名 → 周波数（Hz） */
 export const NOTE_FREQ: Record<string, number> = {
@@ -182,6 +183,8 @@ export class AudioEngine {
         return this.bang(t);
       case 'chime':
         return this.chime(t);
+      case 'ring':
+        return this.ring(t);
     }
   }
 
@@ -590,6 +593,19 @@ export class AudioEngine {
     for (const [f, dt] of notes) {
       this.tone(t + dt, 1.1, f, out, 0.16, 'sine');
       this.tone(t + dt, 0.6, f * 2.01, out, 0.04, 'sine');
+    }
+  }
+
+  /** 黒電話のベル：金属の鐘を細かく叩く「ジリリリ」を二回 */
+  private ring(t: number): void {
+    const out = this.out(0.5);
+    for (let burst = 0; burst < 2; burst++) {
+      const st = t + burst * 1.4;
+      for (let i = 0; i < 22; i++) {
+        const tt = st + i * 0.045;
+        this.tone(tt, 0.08, 1750, out, 0.07, 'square', 1700);
+        this.tone(tt, 0.06, 2600, out, 0.04, 'sine');
+      }
     }
   }
 }

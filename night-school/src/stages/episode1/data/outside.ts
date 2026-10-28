@@ -87,6 +87,11 @@ const anyInBasket = { any: [...OFFERINGS, ...OTHERS].map((id) => ({ flag: `buy_$
 const emptyBasket: Action[] = [...OFFERINGS, ...OTHERS].map((id) => ({ flag: `buy_${id}`, value: false }));
 
 export const outside: StagePart = {
+  items: [
+    { id: 'kiku', name: '菊の花' },
+    { id: 'senko', name: '線香' },
+    { id: 'manju', name: 'まんじゅう' },
+  ],
   notes: [
     {
       id: 'n_outside',
@@ -251,7 +256,7 @@ export const outside: StagePart = {
       { teleport: 'outsideStart' },
       { wait: 800 },
       { fx: 'fadeIn', duration: 2.5 },
-      { say: ['……外だ。', '校門を出れば、細い道があって、家が並んでいるはずだった。', '……何もない。', '霧の中に、一本の道だけが続いている。'] },
+      { say: ['……外だ。', '校門を出れば、細い道があって、家が並んでいるはずだった。', '……何もない。', '霧の中に、一本の道だけが続いている。', '……とにかく、家に帰らなきゃ。'] },
       { note: 'n_outside' },
     ],
     storeWrong: [
@@ -282,6 +287,9 @@ export const outside: StagePart = {
       { fx: 'strobe', duration: 1.2, target: 'store' },
       { meter: 0.8 },
       { flag: 'storePaid' },
+      { give: 'kiku' },
+      { give: 'senko' },
+      { give: 'manju' },
       { wait: 900 },
       { say: ['……顔を上げると、レジには誰もいなかった。', 'カウンターに、レシートが一枚残っている。'] },
       { note: 'n_receipt' },
@@ -289,21 +297,6 @@ export const outside: StagePart = {
       { open: 'storeDoorL' },
       { open: 'storeDoorR' },
       { say: ['……背後で、自動ドアが開いた。'] },
-    ],
-    /** 店を出ると、夜が終わる */
-    ending: [
-      { fx: 'fadeOut', duration: 2 },
-      {
-        if: { flag: 'truthSeen' },
-        then: [
-          { say: ['店を出ると、まぶしい光が差し込んできた——', '……', '気がつくと、白い天井が見えた。', '保健室のベッドの上だった。窓の外は、もう朝だ。', '枕元に、菊の花と線香と、おまんじゅうが置かれていた。'] },
-          { clear: true, title: '目覚め', text: '保健室で眠っていたのは、あなた自身だった。<br>七不思議の最後の一つは、まだ読めない。' },
-        ],
-        else: [
-          { say: ['店を出ると、夜道は消えていた。', '目の前に、見慣れた家の玄関がある。', '……ただいま。', '手には、コンビニの袋が残っていた。中身は、菊の花と線香とおまんじゅう。'] },
-          { clear: true, title: '帰宅', text: '花子さんへのおそなえものは、まだ手の中にある。<br>……保健室の寝息は、誰のものだったのだろう。' },
-        ],
-      },
     ],
   },
   triggers: [
@@ -373,7 +366,8 @@ export const outside: StagePart = {
       id: 'storeExit',
       area: { minX: 60, maxX: 69.6, minZ: ZO - 7, maxZ: ZO + 7 },
       when: { flag: 'storePaid' },
-      actions: [{ run: 'ending' }],
+      // 先の話は houses.ts
+      actions: [{ run: 'toAlley' }],
     },
   ],
   visibility: [
