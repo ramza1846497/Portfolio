@@ -10,6 +10,7 @@ import { Keypad } from '../ui/keypad';
 import { Tutorial } from '../ui/tutorial';
 import { Combat } from './combat';
 import { Notebook } from '../ui/notebook';
+import { Movie } from './movie';
 import { WorldBuilder, type Openable } from '../world/builder';
 import { createMaterials } from '../world/materials';
 import { ScriptRunner } from './runner';
@@ -39,6 +40,7 @@ export class Game {
   readonly keypad = new Keypad();
   readonly tutorial: Tutorial;
   readonly combat: Combat;
+  readonly movie: Movie;
   private actors = new Map<string, Actor>();
   /** 発火済みのトリガー */
   private firedTriggers = new Set<string>();
@@ -141,6 +143,11 @@ export class Game {
       },
       hint: (text, seconds) => this.hud.hint(text, seconds),
       resetEnemies: () => this.combat.reset(),
+      movie: async (name) => {
+        const script = stage.movies?.[name];
+        if (!script) throw new Error(`unknown movie: ${name}`);
+        await this.movie.play(script);
+      },
       unblock: (tag) => this.collision.setEnabled(tag, false),
     });
     this.runner.onBusyChange = () => this.syncControls();
@@ -184,6 +191,14 @@ export class Game {
       shake: () => this.shake(),
     });
     this.combat.moveInput = () => this.input.move;
+    this.movie = new Movie({
+      camera: this.camera,
+      scene: this.scene,
+      combat: this.combat,
+      audio: this.audio,
+      isTouch: this.input.isTouch,
+      player: this.player.pos,
+    });
     this.notebook.onClose = () => this.syncControls();
     this.notebook.onUse = (id) => {
       const use = this.stage.items.find((x) => x.id === id)?.use;
@@ -224,6 +239,10 @@ export class Game {
 
   private onAction(a: string): void {
     if (this.cleared) return;
+    if (this.movie.active) {
+      if (a === 'interact' || a === 'confirm' || a === 'advance' || a === 'cancel' || a === 'attack') this.movie.skip();
+      return;
+    }
     if (this.notebook.isOpen) {
       const same = (a === 'notebook' && this.notebook.currentTab === 'notes') || (a === 'items' && this.notebook.currentTab === 'items');
       if (a === 'cancel' || same) this.notebook.close();
@@ -465,6 +484,8 @@ export class Game {
     this.updateOpenables(dt);
     for (const anim of this.builder.animations) anim(time / 1000);
     this.combat.update(dt, !this.input.enabled);
+    // ムービー中はカメラをムービーが動かす（プレイヤーの視点を上書き）
+    if (this.movie.active) this.movie.update(dt);
     if (this.input.enabled) {
       for (const a of this.actors.values()) a.update(dt);
       this.updateTriggers();

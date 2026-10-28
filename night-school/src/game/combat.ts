@@ -37,7 +37,12 @@ interface Enemy {
   mats: THREE.MeshLambertMaterial[];
   flash: number;
   knock: THREE.Vector2;
+  /** 攻撃の予兆：頭の上に出る「！」 */
+  mark: THREE.Sprite;
 }
+
+/** ムービーで見せる敵の様子 */
+export type DemoPose = 'none' | 'windup' | 'stun' | 'rage';
 
 export interface CombatHost {
   state: GameState;
@@ -70,6 +75,8 @@ export class Combat {
   private iframe = 0;
   private shownHints = new Set<CombatHintKey>();
   private weapon: THREE.Group;
+  /** ムービー中の見た目（敵 id → 様子） */
+  private demo = new Map<string, { pose: DemoPose; flash: number }>();
 
   constructor(private host: CombatHost) {
     for (const def of host.stage.enemies ?? []) {
@@ -83,7 +90,16 @@ export class Combat {
           mats.push(o.material);
         }
       });
+      // 「！」は頭の少し上に
+      const top = new THREE.Box3().setFromObject(root).max.y - root.position.y;
+      const mark = new THREE.Sprite(new THREE.SpriteMaterial({ map: markTexture(), depthTest: false, transparent: true }));
+      mark.position.set(0, top + 0.35, 0);
+      mark.scale.setScalar(0.42);
+      mark.renderOrder = 10;
+      mark.visible = false;
+      root.add(mark);
       const e: Enemy = {
+        mark,
         def,
         root,
         home: root.position.clone(),
@@ -296,6 +312,9 @@ export class Combat {
     if (e.def.kind === 'shadow') this.shadowAI(e, dt);
     else this.ninomiyaAI(e, dt);
 
+    // 予兆の「！」
+    e.mark.visible = e.state === 'windup';
+    if (e.mark.visible) e.mark.scale.setScalar(0.42 + Math.max(0, e.timer) * 0.25);
     // 光り方：被弾は白、身構えは赤く脈打つ
     if (e.flash > 0) this.setGlow(e, 0xffffff, 0.9);
     else if (e.state === 'windup' || (e.state === 'charge' && e.timer > 0)) this.setGlow(e, 0xff2010, 0.5 + 0.5 * Math.sin(performance.now() * 0.03));
@@ -520,6 +539,54 @@ export class Combat {
     this.host.hud.setBoss(boss ? boss.def.bossName! : null, boss ? boss.hp / boss.def.hp : 0);
   }
 
+  // ---------------- ムービー用（戦闘が止まっている間だけ使う） ----------------
+
+  enemyRoot(id: string): THREE.Object3D {
+    const e = this.enemies.find((x) => x.def.id === id);
+    if (!e) throw new Error(`unknown enemy: ${id}`);
+    return e.root;
+  }
+
+  demoPose(id: string, pose: DemoPose): void {
+    const d = this.demo.get(id) ?? { pose: 'none', flash: 0 };
+    d.pose = pose;
+    this.demo.set(id, d);
+  }
+
+  demoFlash(id: string): void {
+    const d = this.demo.get(id) ?? { pose: 'none' as DemoPose, flash: 0 };
+    d.flash = 0.15;
+    this.demo.set(id, d);
+  }
+
+  /** ムービー中、様子に合わせて光らせる・「！」を出す・ふらつかせる */
+  demoUpdate(dt: number): void {
+    const now = performance.now();
+    for (const [id, d] of this.demo) {
+      const e = this.enemies.find((x) => x.def.id === id)!;
+      d.flash = Math.max(0, d.flash - dt);
+      e.mark.visible = d.pose === 'windup';
+      if (e.mark.visible) e.mark.scale.setScalar(0.42 + 0.06 * Math.sin(now * 0.02));
+      e.root.rotation.z = d.pose === 'stun' ? Math.sin(now * 0.02) * 0.08 : 0;
+      if (d.flash > 0) this.setGlow(e, 0xffffff, 0.9);
+      else if (d.pose === 'windup') this.setGlow(e, 0xff2010, 0.5 + 0.5 * Math.sin(now * 0.03));
+      else if (d.pose === 'rage') this.setGlow(e, 0xff3010, 0.55 + 0.3 * Math.sin(now * 0.05));
+      else if (d.pose === 'stun') this.setGlow(e, 0x4060ff, 0.35);
+      else this.setGlow(e, 0x000000, 0);
+    }
+  }
+
+  endDemo(): void {
+    for (const id of this.demo.keys()) {
+      const e = this.enemies.find((x) => x.def.id === id)!;
+      e.mark.visible = false;
+      e.root.rotation.z = 0;
+      this.setGlow(e, 0x000000, 0);
+      this.syncBody(e);
+    }
+    this.demo.clear();
+  }
+
   // ---------------- 竹刀（画面右下に見える） ----------------
 
   private makeWeapon(): THREE.Group {
@@ -554,4 +621,29 @@ export class Combat {
     this.weapon.rotation.set(0.35 - s * 1.2, -0.25 + s * 0.6, -0.3 - s * 0.9);
     this.weapon.position.set(0.32 - s * 0.2, -0.32 + s * 0.05, -0.55);
   }
+}
+
+/** 予兆の「！」：赤い菱形に白い字 */
+let markTex: THREE.Texture | null = null;
+function markTexture(): THREE.Texture {
+  if (markTex) return markTex;
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const ctx = c.getContext('2d')!;
+  ctx.translate(64, 64);
+  ctx.rotate(Math.PI / 4);
+  ctx.fillStyle = 'rgba(200,20,10,0.92)';
+  ctx.fillRect(-38, -38, 76, 76);
+  ctx.strokeStyle = '#ffd8c8';
+  ctx.lineWidth = 5;
+  ctx.strokeRect(-38, -38, 76, 76);
+  ctx.rotate(-Math.PI / 4);
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 64px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('!', 0, 4);
+  markTex = new THREE.CanvasTexture(c);
+  markTex.colorSpace = THREE.SRGBColorSpace;
+  return markTex;
 }

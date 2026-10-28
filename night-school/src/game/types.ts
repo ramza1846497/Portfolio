@@ -1,3 +1,4 @@
+import type { MovieScript } from './movie';
 import type * as THREE from 'three';
 import type { AudioEngine, SfxName } from '../engine/audio';
 import type { CollisionWorld } from '../engine/collision';
@@ -78,6 +79,8 @@ export type Action =
   | { meter: number }
   /** 操作説明のパネルを出して、閉じるまで待つ（StageDef.tutorials の名前） */
   | { tutorial: string }
+  /** 敵の動きを見せるショートムービーを流して、終わるまで待つ（StageDef.movies の名前） */
+  | { movie: string }
   /** 画面下に短いヒントを出す（待たずに次へ進む） */
   | { hint: string; duration?: number }
   /** 敵をすべて初期位置・満タンの体力に戻す（気絶したときなど） */
@@ -246,6 +249,8 @@ export interface StageDef {
   tutorials?: Record<string, TutorialDef>;
   /** 戦闘中に一度だけ出すヒント（初めて敵が身構えた・初めて攻撃を受けた など） */
   combatHints?: Partial<Record<CombatHintKey, string>>;
+  /** ショートムービー（カメラ・敵・お手本の動きをコードで書く） */
+  movies?: Record<string, MovieScript>;
 }
 
 export type CombatHintKey = 'windup' | 'hurt' | 'hit' | 'stun' | 'charge';

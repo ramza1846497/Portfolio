@@ -32,6 +32,7 @@ export interface RunnerHost {
   /** 怪異メーターを一瞬振らせる */
   meterSpike(level: number): void;
   tutorial(name: string): Promise<void>;
+  movie(name: string): Promise<void>;
   hint(text: string, seconds?: number): void;
   resetEnemies(): void;
   unblock(tag: string): void;
@@ -203,6 +204,8 @@ export class ScriptRunner {
       this.host.meterSpike(a.meter);
     } else if ('tutorial' in a) {
       await this.host.tutorial(a.tutorial);
+    } else if ('movie' in a) {
+      await this.host.movie(a.movie);
     } else if ('hint' in a) {
       this.host.hint(a.hint, a.duration);
     } else if ('enemies' in a) {

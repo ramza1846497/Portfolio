@@ -49,6 +49,7 @@ export function validateStage(stage: StageDef, map: MapNames): string[] {
       if ('look' in a && !map.objects.has(a.look)) errors.push(`${where}: unknown object "${a.look}"`);
       if ('actor' in a && !actors.has(a.actor)) errors.push(`${where}: unknown actor "${a.actor}"`);
       if ('tutorial' in a && !stage.tutorials?.[a.tutorial]) errors.push(`${where}: unknown tutorial "${a.tutorial}"`);
+      if ('movie' in a && !stage.movies?.[a.movie]) errors.push(`${where}: unknown movie "${a.movie}"`);
       if ('choice' in a) a.choice.options.forEach((o) => (cond(o.when, where), actions(o.actions, where)));
       if ('sequence' in a) {
         actions(a.sequence.correct, where);
