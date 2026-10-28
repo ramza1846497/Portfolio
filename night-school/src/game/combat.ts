@@ -18,7 +18,7 @@ const DODGE_COOLDOWN = 0.9;
 const IFRAME_DODGE = 0.35;
 const IFRAME_HURT = 0.9;
 
-type EnemyState = 'idle' | 'chase' | 'windup' | 'lunge' | 'charge' | 'slam' | 'recover' | 'stun' | 'hurt' | 'dying' | 'dead';
+type EnemyState = 'idle' | 'chase' | 'windup' | 'lunge' | 'charge' | 'slam' | 'recover' | 'backoff' | 'stun' | 'hurt' | 'dying' | 'dead';
 
 interface Enemy {
   def: EnemyDef;
@@ -223,7 +223,8 @@ export class Combat {
       this.host.audio.play('clank');
       return;
     }
-    const dmg = e.state === 'stun' ? 2 : 1;
+    // 石の体：ふだんは浅くしか効かない。気絶中が本当の狙い目
+    const dmg = e.def.kind === 'ninomiya' ? (e.state === 'stun' ? 2 : 0.5) : 1;
     e.hp -= dmg;
     e.flash = 0.18;
     this.hint('hit');
@@ -377,7 +378,7 @@ export class Combat {
         break;
       case 'chase':
         this.face(e, dx, dz);
-        if (d > 2.4) this.moveEnemy(e, (dx / d) * 1.1 * rage * dt, (dz / d) * 1.1 * rage * dt);
+        if (d > 2.0) this.moveEnemy(e, (dx / d) * 1.1 * rage * dt, (dz / d) * 1.1 * rage * dt);
         if (e.cooldown <= 0) {
           if (d < 2.6) {
             e.state = 'windup';
@@ -432,8 +433,20 @@ export class Combat {
       }
       case 'slam':
         if (e.timer <= 0) {
-          e.state = 'recover';
-          e.timer = 1.0;
+          // 踏みつけの後は距離をとって、突進の構えに入る
+          e.state = 'backoff';
+          e.timer = 1.4;
+        }
+        break;
+      case 'backoff':
+        this.face(e, dx, dz);
+        if (d > 0.01) this.moveEnemy(e, (-dx / d) * 2.4 * dt, (-dz / d) * 2.4 * dt);
+        if (d > 6 || e.timer <= 0) {
+          e.state = 'windup';
+          e.timer = 1.0 / rage;
+          e.dir.set(dx / Math.max(d, 1e-3), dz / Math.max(d, 1e-3));
+          this.host.audio.play('stomp');
+          this.hint('charge');
         }
         break;
       case 'stun':

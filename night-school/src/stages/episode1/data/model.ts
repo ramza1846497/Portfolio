@@ -20,7 +20,7 @@ export const model: StagePart = {
     {
       id: 'n_model',
       title: '人体模型',
-      body: '理科室の奥の人体模型。左胸の心臓の部品がない。\n右手に「音楽室」の札がついた鍵を握っている。',
+      body: '理科室の奥の人体模型。左胸の心臓の部品がない。\n右手に「体育館」の札がついた鍵を握っている。',
     },
     {
       id: 'n_scienceRule',
@@ -39,13 +39,12 @@ export const model: StagePart = {
     },
     {
       id: 'n_musicKey',
-      title: '音楽室の鍵',
+      title: '体育館の鍵',
       body: '人体模型が握っていた鍵。心臓を返すと、指がほどけた。',
     },
   ],
   items: [
     { id: 'heart', name: '人体模型の心臓' },
-    { id: 'musicKey', name: '音楽室の鍵' },
   ],
   interactables: [
     {
@@ -70,7 +69,7 @@ export const model: StagePart = {
                       { wait: 600 },
                       { sfx: 'pickup' },
                       { say: ['握りしめられていた右手の指が、ゆっくりとほどけていく。', '……鍵が落ちた。'] },
-                      { give: 'musicKey' },
+                      { give: 'gymKey' },
                       { note: 'n_musicKey' },
                     ],
                   },
@@ -87,7 +86,7 @@ export const model: StagePart = {
               say: [
                 '理科室の人体模型だ。半分だけ、皮膚がはがされている。',
                 '左胸に、ぽっかりと穴が開いている。心臓の部品がない。',
-                '右手に、何か握っている。……鍵だ。札に「音楽室」とある。',
+                '右手に、何か握っている。……鍵だ。札に「体育館」とある。',
                 '指が固く閉じていて、外れない。',
               ],
             },

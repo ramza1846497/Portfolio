@@ -5,7 +5,8 @@ import { OZ } from '../floor1';
  * 怪異に属さない部分：導入・脱出・七不思議の掲示板・職員室の手がかり・雰囲気づくりの物。
  *
  * 一夜の流れ
- *   2 階で目覚める → 十三階段で 1 階へ → 職員室で心臓を見つけ、人体模型に返す（音楽室の鍵）
+ *   2 階で目覚める → 十三階段で 1 階へ → 職員室で心臓を見つけ、人体模型に返す（体育館の鍵）
+ *   → 渡り廊下の影たちを祓い、体育館で二宮金次郎像を倒す（音楽室の鍵）
  *   → 2 階の音楽室でピアノの続きを弾く（女子トイレの鍵）→ 花子さんを呼ぶ（昇降口の鍵）
  *   → 1 階の昇降口から脱出
  *
@@ -31,7 +32,7 @@ export const common: StagePart = {
     {
       id: 'n_keybox',
       title: '鍵の保管箱',
-      body: '職員室の鍵の保管箱。\n「音楽室」「女子便所」「昇降口」の鍵だけが、なくなっている。',
+      body: '職員室の鍵の保管箱。\n「体育館」「音楽室」「女子便所」「昇降口」の鍵だけが、なくなっている。',
     },
     {
       id: 'n_journal',
@@ -163,7 +164,7 @@ export const common: StagePart = {
       reactions: [
         {
           actions: [
-            { say: ['鍵の保管箱。', '「音楽室」「女子便所」「昇降口」……この三つだけ、鍵がない。'] },
+            { say: ['鍵の保管箱。', '「体育館」「音楽室」「女子便所」「昇降口」……この四つだけ、鍵がない。'] },
             { note: 'n_keybox' },
           ],
         },
@@ -207,8 +208,8 @@ export const common: StagePart = {
       { addVar: 'faints', value: 1 },
       { setVar: 'hp', value: 50 },
       {
-        if: { var: 'floor', eq: 1 },
-        then: [{ teleport: 'f1Stairs' }],
+        if: { any: [{ var: 'floor', eq: 1 }, { var: 'floor', eq: 5 }] },
+        then: [{ if: { var: 'floor', eq: 5 }, then: [{ teleport: 'wingStart' }], else: [{ teleport: 'f1Stairs' }] }],
         else: [
           {
             if: { var: 'floor', eq: 2 },
@@ -284,6 +285,9 @@ export const objectives: StageDef['objectives'] = [
   { when: { flag: 'toiletKeyAppeared' }, text: 'ピアノの上の鍵を取る' },
   { when: { flag: 'musicOpen' }, text: '音楽室のピアノを調べる' },
   { when: { item: 'musicKey' }, text: '二階の音楽室を開ける' },
+  { when: { all: [{ flag: 'bossAwake' }, { notFlag: 'bossDead' }] }, text: '二宮金次郎像を倒す（突進は横に避ける）' },
+  { when: { flag: 'gymOpen' }, text: '体育館を調べる' },
+  { when: { item: 'gymKey' }, text: '体育館の扉を開ける（一階の渡り廊下の先）' },
   { when: { all: [{ item: 'heart' }, { flag: 'modelHunting' }] }, text: '人体模型に心臓を返す（背を向けるな）' },
   { when: { all: [{ flag: 'modelHunting' }, { notFlag: 'modelCalm' }] }, text: '人体模型から逃げて、心臓を探す' },
   { when: { item: 'heart' }, text: '心臓を理科室の人体模型に返す' },

@@ -449,7 +449,9 @@ export class Game {
     const dt = Math.min(this.timer.getDelta(), 0.05);
     this.input.update();
     this.player.update(dt);
-    this.lights.update(dt, this.player.pos.z);
+    // 歩いて移れる区域（1 階 ⇔ 渡り廊下・体育館）もあるので毎フレーム見る
+    this.updateFloor();
+    this.lights.update(dt, this.player.pos.x, this.player.pos.z);
     if (!this.cleared) this.updateMeter(dt);
     this.updateOpenables(dt);
     for (const anim of this.builder.animations) anim(time / 1000);

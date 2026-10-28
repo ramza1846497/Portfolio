@@ -53,12 +53,11 @@ export function buildFloor1({ builder: b, lights }: BuildContext): void {
     [2.2, 4.4],
     [5.2, 7.4],
     [19, 21.4],
-    [22.2, 24.6],
     [25.4, 27.8],
     [28.6, 31],
   ];
   const hall = { from: 32.4, to: 43.6, top: 2.4 };
-  b.wallX(zS - 0.05, -3.4, 44, 'wall', [...southWindows.map(([f, t]) => windowOpening(f, t)), doorOpening(12.4), hall], H, 0.1);
+  b.wallX(zS - 0.05, -3.4, 44, 'wall', [...southWindows.map(([f, t]) => windowOpening(f, t)), doorOpening(12.4), doorOpening(22.6, 1.6), hall], H, 0.1);
   for (const [f, t] of southWindows) windowPane(b, 'x', zS, f, t, 0.9, 2.4, -1);
   b.wallZ(44, zN, OZ + 10, 'wall');
 
@@ -152,7 +151,7 @@ function buildStaffRoom(b: WorldBuilder, lights: BuildContext['lights']): void {
 
   // 鍵の保管箱（西の壁）
   b.box([28.1, 1.3, OZ - 4.6], [28.18, 1.9, OZ - 3.8], 'metalGray');
-  wallPlane(b, noticeTexture('keybox', '鍵', ['理科室　　○', '職員室　　○', '音楽室　　－', '女子便所　－', '昇降口　　－']), 0.55, 0.7, [28.19, 1.6, OZ - 4.2], Math.PI / 2);
+  wallPlane(b, noticeTexture('keybox', '鍵', ['理科室　　○', '職員室　　○', '体育館　　－', '音楽室　　－', '女子便所　－', '昇降口　　－']), 0.55, 0.7, [28.19, 1.6, OZ - 4.2], Math.PI / 2);
   b.hitbox('keybox', [28.1, 1.2, OZ - 4.7], [28.4, 2.0, OZ - 3.7]);
 
   const aid = firstAidKit(b);

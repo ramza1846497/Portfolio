@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 
 const FLASH_INTENSITY = 30;
+/** この距離より遠い蛍光灯の光は計算しない */
+const LIGHT_RANGE = 24;
 
 export type FixtureMode = 'steady' | 'flicker' | 'dim' | 'dead';
 
@@ -9,6 +11,7 @@ interface Fixture {
   tubeMat: THREE.MeshBasicMaterial;
   base: number;
   mode: FixtureMode;
+  x: number;
   z: number;
   /** strobe(…, tag) で、この明かりだけを明滅させるための名前 */
   tag?: string;
@@ -76,7 +79,7 @@ export class LightRig {
       light.position.set(x, y - 0.25, z);
       this.scene.add(light);
     }
-    this.fixtures.push({ light, tubeMat, base, mode, z, tag, timer: Math.random() * 2, on: mode !== 'dead', sLeft: 0, sTimer: 0, sOn: true, sPower: 1.3 });
+    this.fixtures.push({ light, tubeMat, base, mode, x, z, tag, timer: Math.random() * 2, on: mode !== 'dead', sLeft: 0, sTimer: 0, sOn: true, sPower: 1.3 });
   }
 
   setBlackout(on: boolean): void {
@@ -100,10 +103,10 @@ export class LightRig {
   }
 
   /**
-   * playerZ から離れた階の明かりは消しておく（光源の数を減らしてスマホの負荷を下げる）。
-   * 階は z を大きくずらして配置している前提。
+   * プレイヤーから離れた明かりは消しておく（光源の数を減らしてスマホの負荷を下げる）。
+   * 光の届く距離は 9m なので、少し余裕を見て切る。
    */
-  update(dt: number, playerZ = 0): void {
+  update(dt: number, playerX = 0, playerZ = 0): void {
     if (this.strobeLeft > 0) this.strobeLeft -= dt;
     let anyDark = false;
 
@@ -131,7 +134,7 @@ export class LightRig {
       if (this.blackout) k = 0;
       if (f.light) {
         f.light.intensity = f.base * k;
-        f.light.visible = Math.abs(f.z - playerZ) < 30;
+        f.light.visible = Math.hypot(f.x - playerX, f.z - playerZ) < LIGHT_RANGE;
       }
       const lit = (f.mode !== 'dead' || f.sLeft > 0) && k > 0;
       f.tubeMat.color.setHex(lit ? (f.mode === 'dim' ? 0x9fb4b8 : 0xeaffff) : 0x2a2a2a);

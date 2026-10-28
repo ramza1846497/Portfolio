@@ -8,14 +8,16 @@ import { houses } from './data/houses';
 import { outside } from './data/outside';
 import { piano } from './data/piano';
 import { stairs } from './data/stairs';
+import { wing } from './data/wing';
 import { OZ, buildFloor1 } from './floor1';
 import { buildFloor2 } from './floor2';
 import { clerkActor } from './clerk';
 import { buildHouses, ZH, ZM } from './houses';
 import { modelActor } from './model';
 import { buildOutside, ZO } from './outside';
+import { buildWing } from './wing';
 
-const parts = mergeParts([common, combat, stairs, model, piano, hanako, nurse, outside, houses]);
+const parts = mergeParts([common, combat, stairs, model, wing, piano, hanako, nurse, outside, houses]);
 
 /** 第一話「トイレの花子さん」：七不思議のうち五つが現れる一夜 */
 export const episode1: StageDef = {
@@ -25,6 +27,7 @@ export const episode1: StageDef = {
   build: (ctx) => {
     buildFloor2(ctx);
     buildFloor1(ctx);
+    buildWing(ctx);
     buildOutside(ctx);
     buildHouses(ctx);
   },
@@ -39,5 +42,5 @@ export const episode1: StageDef = {
   combatHints,
   faintScript: 'faint',
   // 2 = 2 階、1 = 1 階、0 = 校舎の外、3 = 花子さんの家のあたり、4 = 自分の家のあたり
-  floorOf: (_x, z) => (z > (ZH + ZM) / 2 ? 4 : z > (ZO + ZH) / 2 ? 3 : z > (OZ + ZO) / 2 ? 0 : z > OZ / 2 ? 1 : 2),
+  floorOf: (x, z) => (z > (ZH + ZM) / 2 ? 4 : z > (ZO + ZH) / 2 ? 3 : z > (OZ + ZO) / 2 ? 0 : z > OZ + 9.4 || (z > OZ + 1.6 && x > 22.3 && x < 24.5) ? 5 : z > OZ / 2 ? 1 : 2),
 };
