@@ -11,6 +11,8 @@ import { Tutorial } from '../ui/tutorial';
 import { Combat } from './combat';
 import { Notebook } from '../ui/notebook';
 import { Movie } from './movie';
+import { PostFX } from '../engine/post';
+import { qualitySettings, type Quality } from '../engine/quality';
 import { WorldBuilder, type Openable } from '../world/builder';
 import { createMaterials } from '../world/materials';
 import { ScriptRunner } from './runner';
@@ -41,6 +43,7 @@ export class Game {
   readonly tutorial: Tutorial;
   readonly combat: Combat;
   readonly movie: Movie;
+  private post: PostFX | null = null;
   private actors = new Map<string, Actor>();
   /** 発火済みのトリガー */
   private firedTriggers = new Set<string>();
@@ -69,6 +72,7 @@ export class Game {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setClearColor(0x000000);
+    this.renderer.info.autoReset = false;
     container.appendChild(this.renderer.domElement);
 
     this.scene.fog = new THREE.FogExp2(0x020203, 0.07);
@@ -226,7 +230,8 @@ export class Game {
     this.renderer.render(this.scene, this.camera);
   }
 
-  start(): void {
+  start(quality: Quality): void {
+    this.applyQuality(quality);
     this.audio.unlock();
     this.audio.setHum(1);
     this.state.beginClock();
@@ -469,6 +474,37 @@ export class Game {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.post?.resize();
+  }
+
+  /** 画質：解像度・懐中電灯の影・後処理 */
+  private applyQuality(quality: Quality): void {
+    const q = qualitySettings(quality);
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, q.pixelRatio));
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    const shadows = q.shadowSize > 0;
+    this.renderer.shadowMap.enabled = shadows;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    const spot = this.lights.flashlight;
+    spot.castShadow = shadows;
+    spot.shadow.mapSize.set(q.shadowSize || 1, q.shadowSize || 1);
+    spot.shadow.bias = -0.0006;
+    spot.shadow.normalBias = 0.03;
+    spot.shadow.camera.near = 0.2;
+    spot.shadow.camera.far = 22;
+    this.scene.traverse((o) => {
+      if (!(o instanceof THREE.Mesh)) return;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      // 光らない物だけ影を落とす・受ける（半透明の物は落とすだけ）
+      const lit = mats.every((m) => !(m instanceof THREE.MeshBasicMaterial));
+      // 手に持った竹刀は、懐中電灯のすぐ前にあるので影を落とさない
+      let held = false;
+      for (let p = o.parent; p; p = p.parent) if (p === this.camera) held = true;
+      o.castShadow = shadows && lit && !held;
+      o.receiveShadow = shadows && lit && mats.every((m) => !m.transparent);
+      for (const m of mats) m.needsUpdate = true;
+    });
+    this.post = new PostFX(this.renderer, q);
   }
 
   private frame(time: number): void {
@@ -496,7 +532,10 @@ export class Game {
       this.target = null;
       this.hud.setTarget(null);
     }
-    this.renderer.render(this.scene, this.camera);
+    // 後処理は何回にも分けて描くので、描画回数は 1 フレーム分まとめて数える
+    this.renderer.info.reset();
+    if (this.post) this.post.render(this.scene, this.camera, time);
+    else this.renderer.render(this.scene, this.camera);
     this.updateDebug(dt);
   }
 

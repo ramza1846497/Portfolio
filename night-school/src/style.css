@@ -1025,3 +1025,35 @@ button {
 .movie-skip.on {
   display: block;
 }
+
+/* ---------- タイトル：画質 ---------- */
+
+.screen .quality {
+  position: absolute;
+  bottom: calc(18px + var(--safe-b));
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--dim);
+  letter-spacing: 0.2em;
+}
+
+.screen .quality span {
+  margin-right: 4px;
+}
+
+.screen .quality button {
+  padding: 6px 14px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: none;
+  color: var(--dim);
+  font: inherit;
+  cursor: pointer;
+}
+
+.screen .quality button.sel {
+  border-color: var(--accent);
+  color: var(--fg);
+}
