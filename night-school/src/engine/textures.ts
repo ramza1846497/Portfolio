@@ -626,24 +626,51 @@ function portraitTextureImpl(name: string, seedOffset: number): THREE.Texture {
   });
 }
 
-/** 人体模型の右半身：筋肉と内臓 */
+/** 人体模型の右半身：濡れたような筋肉の繊維と、白い腱 */
 export function muscleTexture(): THREE.Texture {
   return cached('muscle', () => {
-    const [c, ctx] = makeCanvas(128, 256);
-    ctx.fillStyle = '#8c2a22';
-    ctx.fillRect(0, 0, 128, 256);
-    ctx.strokeStyle = 'rgba(230,180,160,0.5)';
-    for (let i = 0; i < 40; i++) {
+    const [c, ctx] = makeCanvas(256, 512);
+    const grd = ctx.createLinearGradient(0, 0, 256, 0);
+    grd.addColorStop(0, '#6e1a16');
+    grd.addColorStop(0.5, '#8c2620');
+    grd.addColorStop(1, '#5e1512');
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, 256, 512);
+    // 筋肉の束：少しうねる細い線を何重にも
+    for (let i = 0; i < 260; i++) {
+      const light = rand() < 0.5;
+      ctx.strokeStyle = light ? `rgba(200,90,80,${0.15 + rand() * 0.25})` : `rgba(40,6,6,${0.2 + rand() * 0.3})`;
+      ctx.lineWidth = 0.6 + rand() * 1.6;
       ctx.beginPath();
-      const x = rand() * 128;
-      ctx.moveTo(x, 0);
-      ctx.bezierCurveTo(x + 10, 80, x - 10, 160, x + rand() * 10, 256);
+      const x = rand() * 256;
+      ctx.moveTo(x, -10);
+      ctx.bezierCurveTo(x + (rand() - 0.5) * 30, 170, x + (rand() - 0.5) * 30, 340, x + (rand() - 0.5) * 20, 522);
       ctx.stroke();
     }
-    ctx.fillStyle = '#b8742a';
-    ctx.fillRect(20, 110, 60, 40);
-    ctx.fillStyle = '#6a7a3a';
-    ctx.fillRect(30, 150, 50, 30);
+    // 束の境目の深い溝
+    ctx.strokeStyle = 'rgba(25,4,4,0.7)';
+    ctx.lineWidth = 2.5;
+    for (let i = 0; i < 7; i++) {
+      const x = 20 + i * 36 + rand() * 10;
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.bezierCurveTo(x + 14, 170, x - 14, 340, x + 6, 512);
+      ctx.stroke();
+    }
+    // 腱（白っぽい筋）と、黄色い脂肪のかたまり
+    for (let i = 0; i < 6; i++) {
+      ctx.fillStyle = `rgba(220,200,180,${0.35 + rand() * 0.3})`;
+      const y = rand() * 512;
+      ctx.beginPath();
+      ctx.ellipse(rand() * 256, y, 6 + rand() * 10, 24 + rand() * 30, (rand() - 0.5) * 0.4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    for (let i = 0; i < 10; i++) {
+      ctx.fillStyle = `rgba(190,150,70,${0.25 + rand() * 0.25})`;
+      ctx.beginPath();
+      ctx.arc(rand() * 256, rand() * 512, 3 + rand() * 7, 0, Math.PI * 2);
+      ctx.fill();
+    }
     return toTexture(c, false);
   });
 }

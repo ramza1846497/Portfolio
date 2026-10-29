@@ -26,12 +26,25 @@
 | tatami（畳） | tatami_mat |
 | roof（屋根） | grey_roof_tiles |
 | fence（ブロック塀） | concrete_block_wall |
+| bamboo（竹刀） | bamboo_wall_02 |
+| leather（防具袋・靴） | fabric_leather_02 |
+| hydrant（消火栓） | rusty_painted_metal |
+| labTop（理科室の机の天板） | concrete_wall_008 |
+| statueStone（二宮金次郎像） | rock_surface |
+| moss（像の苔） | mossy_rock |
+| porcelainSkin（人物の肌） | marble_01 |
+| clothWhite・clothRed・clothDark・clothGray（服） | cotton_jersey |
+| fleece（ソファ・座布団） | knitted_fleece |
 
 ## 3D モデル（public/models）
 
 [Poly Haven](https://polyhaven.com/models) の CC0 モデルを、gltf-transform で軽量化（ポリゴン削減・テクスチャ縮小）して使っています。
 
 SchoolDesk_01, SchoolChair_01, metal_office_desk, old_bed_frame, wall_clock, steel_frame_shelves_01,
-drawer_cabinet, metal_trash_can, wheelchair_01, medical_box, cardboard_box_01, plastic_broom, dustpan
+drawer_cabinet, metal_trash_can, wheelchair_01, medical_box, cardboard_box_01, plastic_broom, dustpan,
+chemistry_set, bunsen_burner, vintage_microscope, binder_notebook, office_notepads, stationery_supplies,
+desk_lamp_arm_01, bleach_bottle, medical_tape, television_02, tea_set_01, vintage_cabinet_01, vintage_microwave,
+russian_food_cans_01, long_life_food, plastic_crate_01, utility_box_01, steel_frame_shelves_02, security_camera_01,
+water_manhole_cover, alarm_clock_01, vintage_grandfather_clock_01, painted_wooden_bench, football
 
-人物（花子さん・影・店員・二宮金次郎像など）は外部素材ではなく、コードで組んだ形です。
+人物（花子さん・影の子ども・店員・二宮金次郎像・人体模型など）の形はコードで組んでおり、肌・服・石の質感に上の写真テクスチャを使っています。

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { BuildContext } from '../../game/types';
 import { noticeTexture, signTexture } from '../../engine/textures';
+import { pbrMaterial } from '../../world/pbr';
 import { OZ } from './floor1';
 import { ghostFigure, moonPatch, notice, shadowChild, sign, slidingDoor, wallPlane } from './parts';
 
@@ -119,8 +120,8 @@ function buildCourtyard({ builder: b, lights }: BuildContext): void {
     ['shadow3', 8, OZ + 13],
     ['shadow4', 16, OZ + 17.5],
   ];
-  for (const [id, x, z] of spots) {
-    const s = shadowChild();
+  for (const [i, [id, x, z]] of spots.entries()) {
+    const s = shadowChild(i + 5);
     s.position.set(x, 0, z);
     s.rotation.y = Math.PI;
     b.add(s, id);
@@ -219,9 +220,9 @@ function buildGym({ builder: b, lights }: BuildContext): void {
  */
 function ninomiyaStatue(): THREE.Group {
   const stone = 0x7a7a72;
-  const g = ghostFigure({ hair: 0x6a6a62, top: stone, bottom: stone, opacity: 1, height: 1.95, skirt: true, hairStyle: 'short', arms: 'book', skin: stone, socks: stone, shoes: 0x6a6a62 });
+  const g = ghostFigure({ hair: 0x6a6a62, top: stone, bottom: stone, opacity: 1, height: 1.95, skirt: true, hairStyle: 'short', arms: 'book', skin: stone, socks: stone, shoes: 0x6a6a62, stone: true });
   const s = 1.95 / 1.25;
-  const mat = () => new THREE.MeshLambertMaterial({ color: stone });
+  const mat = () => pbrMaterial('statueStone', { color: 0xc8c8c0 });
   // 開いた本（両手で持って、のぞきこむ）
   const book = new THREE.Mesh(new THREE.BoxGeometry(0.2 * s, 0.015 * s, 0.14 * s), mat());
   book.position.set(0, 0.75 * s, 0.2 * s);

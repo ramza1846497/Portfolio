@@ -1,7 +1,9 @@
 import * as THREE from 'three';
 import type { Opening, WorldBuilder } from '../../world/builder';
-import { blackboardTexture, muscleTexture, noticeTexture, signTexture } from '../../engine/textures';
+import { blackboardTexture, noticeTexture, signTexture } from '../../engine/textures';
 import { blackboardTrim, shinaiMesh } from './props';
+
+export { anatomyModel, ghostFigure, shadowChild } from './figures';
 
 /** 天井の高さ */
 export const H = 3;
@@ -251,169 +253,6 @@ export function keyMesh(b: WorldBuilder): THREE.Group {
   return key;
 }
 
-/**
- * 人の姿（おかっぱの女の子・店員・母親など）。原点が足元、正面は +z。
- * 箱ではなく、丸みのある形（カプセル・回転体・球）で組む。
- * skirt を省くと、背が低い子はスカート、大人はズボンになる。
- */
-export function ghostFigure(opts: {
-  hair: number;
-  top: number;
-  bottom: number;
-  opacity: number;
-  height?: number;
-  skirt?: boolean;
-  hairStyle?: 'bob' | 'short';
-  /** 腕：下ろす（既定）か、胸の前で本を持つ */
-  arms?: 'down' | 'book';
-  /** 肌・靴下・靴の色（石像などは全部同じ色にする） */
-  skin?: number;
-  socks?: number;
-  shoes?: number;
-}): THREE.Group {
-  const g = new THREE.Group();
-  const height = opts.height ?? 1.25;
-  // 体は身長 1.25m で作って、全体を縮尺する（外から足す目などは g の座標のまま）
-  const body = new THREE.Group();
-  body.scale.setScalar(height / 1.25);
-  g.add(body);
-  const child = height <= 1.4;
-  const skirt = opts.skirt ?? child;
-  const mat = (color: number, side: THREE.Side = THREE.FrontSide) =>
-    new THREE.MeshLambertMaterial({ color, side, transparent: opts.opacity < 1, opacity: opts.opacity, emissive: color, emissiveIntensity: 0.12, depthWrite: opts.opacity >= 1 });
-  const skin = mat(opts.skin ?? 0xd9cfc4);
-  const top = mat(opts.top);
-  const bottom = mat(opts.bottom);
-  const add = (geo: THREE.BufferGeometry, m: THREE.Material, x: number, y: number, z = 0, rz = 0, rx = 0) => {
-    const mesh = new THREE.Mesh(geo, m);
-    mesh.position.set(x, y, z);
-    mesh.rotation.set(rx, 0, rz);
-    body.add(mesh);
-    return mesh;
-  };
-  const lathe = (pts: [number, number][], segs = 20) => new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), segs);
-
-  // 足・脚（子どもは白い靴下）
-  for (const side of [-1, 1]) {
-    const x = side * 0.055;
-    const shoe = add(new THREE.SphereGeometry(0.045, 12, 8), mat(opts.shoes ?? 0x1a1612), x, 0.025, 0.02);
-    shoe.scale.set(0.85, 0.6, 1.5);
-    if (skirt) {
-      add(new THREE.CapsuleGeometry(0.033, 0.3, 4, 10), skin, x, 0.25);
-      add(new THREE.CylinderGeometry(0.036, 0.034, 0.12, 10), mat(opts.socks ?? 0xe8e6de), x, 0.1);
-    } else {
-      add(new THREE.CapsuleGeometry(0.045, 0.42, 4, 10), bottom, x, 0.29);
-    }
-  }
-  // 腰まわり：プリーツのスカート、またはズボンの腰
-  if (skirt) {
-    const sk = lathe([
-      [0.0, 0.62],
-      [0.118, 0.62],
-      [0.15, 0.55],
-      [0.19, 0.42],
-      [0.2, 0.4],
-    ], 32);
-    const pos = sk.getAttribute('position');
-    for (let k = 0; k < pos.count; k++) {
-      const vx = pos.getX(k);
-      const vz = pos.getZ(k);
-      const t = (0.62 - pos.getY(k)) / 0.22;
-      const f = 1 + 0.06 * t * Math.sin(Math.atan2(vz, vx) * 14);
-      pos.setXYZ(k, vx * f, pos.getY(k), vz * f);
-    }
-    sk.computeVertexNormals();
-    add(sk, mat(opts.bottom, THREE.DoubleSide), 0, 0);
-  } else {
-    add(lathe([[0.0, 0.5], [0.1, 0.5], [0.125, 0.56], [0.12, 0.64], [0.0, 0.64]]), bottom, 0, 0);
-  }
-  // 胴（ブラウス）・首・頭
-  add(
-    lathe([
-      [0.0, 0.58],
-      [0.112, 0.58],
-      [0.124, 0.68],
-      [0.135, 0.79],
-      [0.128, 0.86],
-      [0.095, 0.9],
-      [0.035, 0.92],
-      [0.0, 0.92],
-    ]),
-    top,
-    0,
-    0,
-  ).scale.set(1, 1, 0.72);
-  add(new THREE.CylinderGeometry(0.03, 0.033, 0.07, 10), skin, 0, 0.94);
-  add(new THREE.SphereGeometry(0.095, 20, 16), skin, 0, 1.06).scale.set(0.95, 1.05, 0.98);
-  // 腕：半袖（上腕は服の色）と、下ろした手
-  for (const side of [-1, 1]) {
-    if (opts.arms === 'book') {
-      // 肘を曲げて、前腕を胸の前へ
-      add(new THREE.CapsuleGeometry(0.032, 0.13, 4, 10), top, side * 0.155, 0.8, 0.02, side * 0.08, 0.25);
-      add(new THREE.CapsuleGeometry(0.026, 0.14, 4, 10), skin, side * 0.12, 0.7, 0.1, side * -0.5, -1.35);
-      add(new THREE.SphereGeometry(0.03, 10, 8), skin, side * 0.08, 0.72, 0.18);
-    } else {
-      add(new THREE.CapsuleGeometry(0.032, 0.13, 4, 10), top, side * 0.155, 0.8, 0, side * 0.08);
-      add(new THREE.CapsuleGeometry(0.026, 0.15, 4, 10), skin, side * 0.168, 0.6, 0.01, side * 0.04);
-      add(new THREE.SphereGeometry(0.03, 10, 8), skin, side * 0.172, 0.49, 0.015);
-    }
-  }
-  // 髪：頭頂から眉までを覆い、横と後ろはあごの高さで切りそろえる（顔の前だけ開ける）
-  const hair = mat(opts.hair, THREE.DoubleSide);
-  const bob = (opts.hairStyle ?? 'bob') === 'bob';
-  // 前髪は目の上まで。横と後ろは、頭の中心より少し上から下へ（すき間が出ないよう重ねる）
-  add(new THREE.SphereGeometry(0.104, 24, 14, 0, Math.PI * 2, 0, bob ? 1.62 : 1.3), hair, 0, 1.065).scale.set(0.97, 1.05, 1.0);
-  if (bob) {
-    const len = 0.14;
-    const topY = 1.085;
-    add(new THREE.CylinderGeometry(0.104, 0.113, len, 24, 1, true, 0.62, Math.PI * 2 - 1.24), hair, 0, topY - len / 2);
-  }
-  return g;
-}
-
-/** 人体模型。原点が台座の中心、正面は +z。heart は胸の心臓（別に表示を切り替える） */
-export function anatomyModel(b: WorldBuilder): { root: THREE.Group; heart: THREE.Mesh; keyInHand: THREE.Mesh } {
-  const root = new THREE.Group();
-  const skin = new THREE.MeshLambertMaterial({ color: 0xa8886c });
-  const muscle = new THREE.MeshLambertMaterial({ map: muscleTexture() });
-  const add = (w: number, h: number, d: number, x: number, y: number, z: number, m: THREE.Material) => {
-    const p = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
-    p.position.set(x, y, z);
-    root.add(p);
-    return p;
-  };
-  add(0.5, 0.06, 0.5, 0, 0.03, 0, b.mat('metalGray'));
-  add(0.03, 0.9, 0.03, 0, 0.5, -0.12, b.mat('metal'));
-  // 脚
-  add(0.11, 0.82, 0.12, -0.08, 0.47, 0, skin);
-  add(0.11, 0.82, 0.12, 0.08, 0.47, 0, muscle);
-  // 胴：左半分は皮膚、右半分は筋肉
-  add(0.17, 0.6, 0.2, -0.085, 1.18, 0, skin);
-  add(0.17, 0.6, 0.2, 0.085, 1.18, 0, muscle);
-  // 心臓の穴
-  add(0.08, 0.09, 0.02, -0.05, 1.3, 0.095, b.mat('dark'));
-  // 腕
-  add(0.07, 0.62, 0.08, -0.22, 1.12, 0, skin);
-  add(0.07, 0.62, 0.08, 0.22, 1.12, 0.02, muscle);
-  // 頭
-  add(0.11, 0.24, 0.2, -0.055, 1.62, 0, skin);
-  add(0.11, 0.24, 0.2, 0.055, 1.62, 0, muscle);
-  // 剥き出しの目
-  const eye = new THREE.MeshLambertMaterial({ color: 0xf0ece0, emissive: 0x222018 });
-  add(0.035, 0.03, 0.02, -0.05, 1.65, 0.1, eye);
-  add(0.035, 0.03, 0.02, 0.05, 1.65, 0.1, eye);
-  const heart = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), new THREE.MeshLambertMaterial({ color: 0x9a1a1a }));
-  heart.scale.set(1, 1.2, 0.8);
-  heart.position.set(-0.05, 1.3, 0.1);
-  root.add(heart);
-  // 右手に握った鍵
-  const keyInHand = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.1, 0.03), new THREE.MeshLambertMaterial({ color: 0xc9a54a, emissive: 0x3a2a08 }));
-  keyInHand.position.set(0.22, 0.78, 0.05);
-  root.add(keyInHand);
-  root.add(b.hitShape([0.55, 1.8, 0.5], [0, 0.9, 0]));
-  return { root, heart, keyInHand };
-}
-
 /** アップライトピアノ（正面は +x）。原点は鍵盤の中央の床 */
 export function piano(b: WorldBuilder): THREE.Group {
   // アップライトピアノ：黒い艶のある本体、蓋、鍵盤（白鍵 52・黒鍵 36）、ペダル。正面は +x
@@ -528,18 +367,6 @@ export function firstAidKit(b: WorldBuilder): THREE.Group {
   h.position.y = 0.163;
   g.add(h);
   g.add(b.hitShape([0.45, 0.3, 0.35], [0, 0.1, 0]));
-  return g;
-}
-
-/** ザコ敵「影の子ども」：黒く半透明な子どもの形に、赤い目が二つ */
-export function shadowChild(): THREE.Group {
-  const g = ghostFigure({ hair: 0x050505, top: 0x0a0a0c, bottom: 0x0a0a0c, opacity: 0.82, height: 1.2 });
-  const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff3020 });
-  for (const x of [-0.045, 0.045]) {
-    const eye = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.02, 0.01), eyeMat);
-    eye.position.set(x, 1.04, 0.1);
-    g.add(eye);
-  }
   return g;
 }
 

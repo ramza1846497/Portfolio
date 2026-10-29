@@ -261,7 +261,7 @@ function buildHome({ builder: b, lights }: BuildContext): void {
   motherBack.position.set(21, 0, zN + 1.05);
   motherBack.rotation.y = Math.PI;
   b.add(motherBack, 'mother');
-  const motherFront = ghostFigure({ hair: 0x1a1612, top: 0x8a6a5a, bottom: 0x4a4a5a, opacity: 1, height: 1.62 });
+  const motherFront = ghostFigure({ hair: 0x1a1612, top: 0x8a6a5a, bottom: 0x4a4a5a, opacity: 1, height: 1.62, face: 'hollow' });
   motherFront.position.set(21, 0, zN + 1.05);
   b.add(motherFront, 'motherTurned');
   lights.addFluorescent(21, HH - 0.05, ZM - 3, 'flicker', 0, 1.8, 'kitchen');
