@@ -3,7 +3,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 
 /**
- * 外部の 3D モデル（public/models の .glb）。
+ * 外部の 3D モデル（public/models の .gltf.json。データを埋め込んだ glTF）。
  * 起動時にまとめて読み込み、ステージを組み立てるときに使う。読み込めなかった物は null のまま
  * （組み立て側は今までの箱で代わりに作る）。
  */
@@ -16,7 +16,7 @@ export class ModelLibrary {
     await Promise.all(
       names.map(async (name) => {
         try {
-          const gltf = await loader.loadAsync(`./models/${name}.glb`);
+          const gltf = await loader.loadAsync(`./models/${name}.gltf.json`);
           gltf.scene.updateMatrixWorld(true);
           // 透過（ガラス）の材質は、画面全体をもう一度描くので重い。うすい半透明に置き換える
           gltf.scene.traverse((o) => {
