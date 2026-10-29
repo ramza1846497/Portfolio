@@ -41,6 +41,7 @@ const begin = () => {
   if (!game || !tapped) return;
   title.remove();
   game.start(quality);
+  game.input.grabKeyboard();
 };
 title.addEventListener(
   'pointerup',

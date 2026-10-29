@@ -29,7 +29,7 @@ export class Input {
   private joyKnob: HTMLDivElement;
   readonly isTouch: boolean;
 
-  constructor(surface: HTMLElement) {
+  constructor(private surface: HTMLElement) {
     this.isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
 
     this.joyBase = document.createElement('div');
@@ -40,6 +40,11 @@ export class Input {
     document.body.appendChild(this.joyBase);
 
     surface.addEventListener('pointerdown', this.onDown);
+    // claude.ai などの枠（iframe）の中で遊ぶと、枠の外をクリックしたあとキーが届かなくなる。
+    // 画面のどこかを押したら、キーボードの入力をこのページに取り戻す
+    surface.tabIndex = 0;
+    surface.style.outline = 'none';
+    window.addEventListener('pointerdown', () => this.grabKeyboard(), true);
     window.addEventListener('pointermove', this.onMove, { passive: false });
     window.addEventListener('pointerup', this.onUp);
     window.addEventListener('pointercancel', this.onUp);
@@ -95,6 +100,14 @@ export class Input {
     }
     this.move.x = x;
     this.move.y = y;
+  }
+
+  /** キーボードの入力をこのページ（ゲーム画面）に向ける */
+  grabKeyboard(): void {
+    window.focus();
+    const a = document.activeElement;
+    // 手帳の中のボタンなどを押したときは、そちらにフォーカスを残す
+    if (!a || a === document.body || a === this.surface) this.surface.focus({ preventScroll: true });
   }
 
   private onDown = (e: PointerEvent): void => {
