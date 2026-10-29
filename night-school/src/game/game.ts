@@ -12,6 +12,7 @@ import { Combat } from './combat';
 import { Notebook } from '../ui/notebook';
 import { Movie } from './movie';
 import { PostFX } from '../engine/post';
+import { Atmosphere } from '../engine/atmosphere';
 import { qualitySettings, type Quality } from '../engine/quality';
 import { upgradeMaterials } from '../world/pbr';
 import type { ModelLibrary } from '../engine/models';
@@ -46,6 +47,7 @@ export class Game {
   readonly combat: Combat;
   readonly movie: Movie;
   private post: PostFX | null = null;
+  private atmosphere: Atmosphere;
   private actors = new Map<string, Actor>();
   /** 発火済みのトリガー */
   private firedTriggers = new Set<string>();
@@ -85,6 +87,7 @@ export class Game {
     this.input = new Input(this.renderer.domElement);
     this.lights = new LightRig(this.scene, this.camera);
     this.player = new Player(this.camera, this.collision, this.input);
+    this.atmosphere = new Atmosphere(this.scene, this.camera, this.lights.flashlight);
     this.player.onStep = () => this.audio.play('step');
     this.hud = new Hud(this.input);
     this.raycaster.far = INTERACT_DISTANCE;
@@ -485,6 +488,7 @@ export class Game {
   private applyQuality(quality: Quality): void {
     const q = qualitySettings(quality);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, q.pixelRatio));
+    this.atmosphere.setPixelRatio(this.renderer.getPixelRatio());
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     upgradeMaterials(this.scene, this.builder.materials, quality === 'low', this.renderer.capabilities.getMaxAnisotropy() >= 4 ? 4 : 1);
     const shadows = q.shadowSize > 0;
@@ -516,7 +520,7 @@ export class Game {
       o.receiveShadow = shadows && lit && mats.every((m) => !m.transparent);
       for (const m of mats) m.needsUpdate = true;
     });
-    this.post = new PostFX(this.renderer, q);
+    this.post = new PostFX(this.renderer, q, this.scene, this.camera);
   }
 
   private frame(time: number): void {
@@ -527,6 +531,7 @@ export class Game {
     // 歩いて移れる区域（1 階 ⇔ 渡り廊下・体育館）もあるので毎フレーム見る
     this.updateFloor();
     this.lights.update(dt, this.player.pos.x, this.player.pos.z);
+    this.atmosphere.update(time / 1000);
     if (!this.cleared) this.updateMeter(dt);
     this.updateOpenables(dt);
     for (const anim of this.builder.animations) anim(time / 1000);

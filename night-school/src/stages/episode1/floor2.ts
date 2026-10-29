@@ -24,6 +24,7 @@ import {
   windowPane,
   shadowChild,
   shinaiProp,
+  corridorBeams,
 } from './parts';
 
 /**
@@ -87,6 +88,7 @@ export function buildFloor2({ builder: b, lights }: BuildContext): void {
   lamp.position.set(9.8, 1.45, -1.33);
   b.add(lamp);
 
+  corridorBeams(b, [2, 8.5, 16, 24.5, 33.5, 41], 0);
   lights.addFluorescent(5, H - 0.08, 0, 'dim');
   lights.addFluorescent(12, H - 0.08, 0, 'flicker');
   lights.addFluorescent(20, H - 0.08, 0, 'steady', 0, 3);

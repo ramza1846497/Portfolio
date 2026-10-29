@@ -90,6 +90,7 @@ export function createMaterials(): Record<string, MaterialDef> {
     roof: { material: lambert({ color: 0x25272c }), texW: 2 },
     metal: { material: lambert({ color: 0x8d918f }) },
     frame: { material: lambert({ color: 0x7c807d }) },
+    skirting: { material: lambert({ color: 0x2a2a24 }) },
     porcelain: { material: lambert({ color: 0xd9d6cc }) },
     red: { material: lambert({ color: 0x8c1a14 }) },
     dark: { material: lambert({ color: 0x0b0b0b }) },

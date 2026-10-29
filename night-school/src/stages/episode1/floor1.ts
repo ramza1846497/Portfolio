@@ -20,6 +20,7 @@ import {
   wallPlane,
   windowOpening,
   windowPane,
+  corridorBeams,
 } from './parts';
 
 /**
@@ -69,6 +70,7 @@ export function buildFloor1({ builder: b, lights }: BuildContext): void {
   slidingDoor(b, 'nurseDoor', 12.4, zS - 0.05, 1.2, true);
   sign(b, '保健室', 13.0, 2.45, zS - 0.12, Math.PI, 0.7);
 
+  corridorBeams(b, [2, 10, 18, 26.5, 34.5, 41.5], OZ);
   lights.addFluorescent(6, H - 0.08, OZ, 'flicker');
   lights.addFluorescent(14, H - 0.08, OZ, 'dead');
   lights.addFluorescent(22, H - 0.08, OZ, 'dim', 0, 3);

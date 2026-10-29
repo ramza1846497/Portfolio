@@ -469,6 +469,11 @@ export function officeDesk(b: WorldBuilder, x: number, z: number, papers: boolea
   }
 }
 
+/** 廊下の天井の梁（構造の柱の間隔で並ぶ）。蛍光灯と重ならない位置を渡す */
+export function corridorBeams(b: WorldBuilder, xs: number[], zc: number): void {
+  for (const x of xs) b.box([x - 0.16, H - 0.26, zc - 1.42], [x + 0.16, H - 0.002, zc + 1.42], 'storeWall');
+}
+
 /** 廊下の扉の穴 */
 export const doorOpening = (from: number, width = 1.2): Opening => ({ from, to: from + width, top: 2.1 });
 export const windowOpening = (from: number, to: number): Opening => ({ from, to, bottom: 0.9, top: 2.4 });

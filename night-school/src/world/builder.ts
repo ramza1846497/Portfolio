@@ -27,6 +27,9 @@ export interface Opening {
 
 export type Vec3 = [number, number, number];
 
+/** 枠・幅木を付ける壁の材質（建物の中の壁） */
+const TRIMMED = new Set(['wall', 'tile', 'homeWall', 'plaster', 'storeWall']);
+
 /** 開閉する物（個室の扉など）。open アクションで回転・スライドさせる */
 export interface Openable {
   pivot: THREE.Object3D;
@@ -182,6 +185,60 @@ export class WorldBuilder {
       cursor = o.to;
     }
     seg(cursor, hi, 0, h, true);
+    this.trim(axis, fixed, lo, hi, matKey, ops, h, t);
+  }
+
+  /**
+   * 壁の見切り：扉・窓のまわりの枠（両面）と、開口部の内側の枠、床ぎわの幅木。
+   * 平らな壁に穴があいただけ、に見えないようにする。
+   */
+  private trim(axis: 'x' | 'z', fixed: number, lo: number, hi: number, matKey: string, ops: Opening[], h: number, t: number): void {
+    if (!TRIMMED.has(matKey) || !this.materials.frame) return;
+    const cw = 0.06; // 枠の見付け
+    const cd = 0.018; // 壁から出る厚み
+    const put = (a1: number, a2: number, y1: number, y2: number, d1: number, d2: number, mat: string) => {
+      if (a2 - a1 <= 1e-4 || y2 - y1 <= 1e-4) return;
+      if (axis === 'x') this.box([a1, y1, fixed + d1], [a2, y2, fixed + d2], mat);
+      else this.box([fixed + d1, y1, a1], [fixed + d2, y2, a2], mat);
+    };
+    for (const o of ops) {
+      if (o.to - o.from > 3) continue; // 昇降口のような大きな開口は枠なし
+      const bottom = o.bottom ?? 0;
+      const a1 = Math.max(lo, o.from - cw);
+      const a2 = Math.min(hi, o.to + cw);
+      const top = Math.min(h, o.top + cw);
+      for (const side of [-1, 1]) {
+        const f = (side * t) / 2;
+        const d1 = side < 0 ? f - cd : f;
+        const d2 = side < 0 ? f : f + cd;
+        put(a1, o.from, bottom > 0 ? bottom - cw : 0, top, d1, d2, 'frame');
+        put(o.to, a2, bottom > 0 ? bottom - cw : 0, top, d1, d2, 'frame');
+        put(a1, a2, o.top, top, d1, d2, 'frame');
+        if (bottom > 0) put(a1, a2, bottom - cw, bottom, d1, d2, 'frame');
+      }
+      // 開口部の内側（壁の厚みの部分）も枠で包む
+      put(o.from, o.from + 0.02, bottom, o.top, -t / 2, t / 2, 'frame');
+      put(o.to - 0.02, o.to, bottom, o.top, -t / 2, t / 2, 'frame');
+      put(o.from, o.to, o.top - 0.02, o.top, -t / 2, t / 2, 'frame');
+      if (bottom > 0) put(o.from, o.to, bottom, bottom + 0.02, -t / 2, t / 2, 'frame');
+    }
+    // 幅木：床まで届く壁の区間に、両面とも
+    if (!this.materials.skirting) return;
+    let cursor = lo;
+    const spans: [number, number][] = [];
+    for (const o of ops) {
+      if ((o.bottom ?? 0) === 0) {
+        spans.push([cursor, o.from]);
+        cursor = o.to;
+      }
+    }
+    spans.push([cursor, hi]);
+    for (const [s, e] of spans) {
+      for (const side of [-1, 1]) {
+        const f = (side * t) / 2;
+        put(s, e, 0, 0.09, side < 0 ? f - 0.012 : f, side < 0 ? f : f + 0.012, 'skirting');
+      }
+    }
   }
 
   /** 個別メッシュを登録（name があれば named に入れる） */
