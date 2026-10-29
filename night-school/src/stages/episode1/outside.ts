@@ -60,8 +60,7 @@ function buildRoad(b: WorldBuilder, lights: BuildContext['lights']): void {
         const t = k / 8;
         pts.push(new THREE.Vector3(a + span * t, y - Math.sin(t * Math.PI) * 0.45, ZO + 3.43 + dz));
       }
-      const wire = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 16, 0.008, 4), b.mat('dark'));
-      b.add(wire);
+      b.mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 16, 0.008, 4), 'dark');
     }
   }
   // マンホールと配電箱

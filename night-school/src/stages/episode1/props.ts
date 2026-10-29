@@ -198,7 +198,7 @@ export function blackboardTrim(b: WorldBuilder, x: number, zc: number, facing: 1
     const c = new THREE.Mesh(cyl(0.006, 0.006, 0.07, 8), new THREE.MeshStandardMaterial({ color, roughness: 1 }));
     c.rotation.x = Math.PI / 2;
     c.position.set(f + facing * 0.05, yc - h / 2 - 0.044, zc + dz);
-    b.add(c);
+    b.staticMesh(c);
   }
   b.box([f + facing * 0.02, yc - h / 2 - 0.05, zc + 1.2], [f + facing * 0.07, yc - h / 2 - 0.02, zc + 1.33], 'clothDark');
 }
@@ -260,14 +260,14 @@ export function specimenShelf(b: WorldBuilder, x1: number, x2: number, z1: numbe
     for (let z = z1 + 0.3; z < z2 - 0.2; z += 0.55) {
       const jar = new THREE.Mesh(cyl(0.085, 0.085, 0.26, 18), glass);
       jar.position.set(f - 0.08, y + 0.13, z);
-      b.add(jar);
+      b.staticMesh(jar);
       const liq = new THREE.Mesh(cyl(0.078, 0.078, 0.2, 18), liquid);
       liq.position.set(f - 0.08, y + 0.1, z);
-      b.add(liq);
+      b.staticMesh(liq);
       const s = new THREE.Mesh(new THREE.IcosahedronGeometry(0.045, 1), thing);
       s.scale.set(1, 1.5 + (z % 0.3), 0.8);
       s.position.set(f - 0.08, y + 0.1, z);
-      b.add(s);
+      b.staticMesh(s);
       put(b, cyl(0.09, 0.09, 0.025, 18), 'dark', [f - 0.08, y + 0.27, z]);
     }
   }
@@ -395,7 +395,7 @@ export function sofa(b: WorldBuilder, x1: number, x2: number, z1: number, z2: nu
   const part = (w: number, h: number, d: number, x: number, y: number, z: number) => {
     const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d, 2, 2, 2), cloth);
     m.position.set(x, y, z);
-    b.add(m);
+    b.staticMesh(m);
   };
   const cx = (x1 + x2) / 2;
   part(x2 - x1 - 0.3, 0.16, z2 - z1 - 0.18, cx, 0.36, (z1 + z2) / 2 + 0.06);

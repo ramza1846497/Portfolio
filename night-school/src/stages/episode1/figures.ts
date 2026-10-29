@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { WorldBuilder } from '../../world/builder';
 import { muscleTexture } from '../../engine/textures';
 import { pbrMaterial } from '../../world/pbr';
@@ -191,7 +192,7 @@ function tinted(key: string, color: number, base: number, o: { opacity: number; 
  * socket は眼窩の深さ、cheek はほおのこけ具合（どちらも半径に対する割合）
  */
 function headGeometry(r: number, socket: number, cheek = 0.02): THREE.BufferGeometry {
-  const geo = new THREE.SphereGeometry(r, 48, 36);
+  const geo = new THREE.SphereGeometry(r, 36, 28);
   const pos = geo.getAttribute('position');
   const n = new THREE.Vector3();
   const bump = (nx: number, ny: number, cx: number, cy: number, sx: number, sy: number) => {
@@ -327,6 +328,51 @@ function weather(root: THREE.Object3D, seed: number): void {
     geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
     o.material.vertexColors = true;
   });
+}
+
+/**
+ * container の中の部品を、材質ごとに 1 つのメッシュにまとめる（描く回数と影の計算を減らす）。
+ * keep に入れた物（別に動かす・表示を切り替える物）と、その中身はまとめない。
+ */
+function mergeByMaterial(container: THREE.Object3D, keep: Set<THREE.Object3D> = new Set()): void {
+  container.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(container.matrixWorld).invert();
+  const groups = new Map<THREE.Material, THREE.BufferGeometry[]>();
+  const done: THREE.Mesh[] = [];
+  const visit = (o: THREE.Object3D) => {
+    if (keep.has(o)) return;
+    if (o instanceof THREE.Mesh && !Array.isArray(o.material)) {
+      let geo = (o.geometry as THREE.BufferGeometry).clone();
+      geo.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld));
+      if (geo.index) geo = geo.toNonIndexed();
+      for (const name of Object.keys(geo.attributes)) if (!['position', 'normal', 'uv', 'color'].includes(name)) geo.deleteAttribute(name);
+      if (!geo.getAttribute('uv')) geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(geo.getAttribute('position').count * 2), 2));
+      const list = groups.get(o.material) ?? [];
+      list.push(geo);
+      groups.set(o.material, list);
+      done.push(o);
+    }
+    for (const c of o.children) visit(c);
+  };
+  for (const c of container.children) visit(c);
+  for (const m of done) {
+    m.removeFromParent();
+    m.geometry.dispose();
+  }
+  // 中身がなくなった入れ物（関節の Group など）を片づける
+  const prune = (o: THREE.Object3D) => {
+    for (const c of [...o.children]) {
+      if (keep.has(c)) continue;
+      prune(c);
+      if (c.type === 'Group' && c.children.length === 0) c.removeFromParent();
+    }
+  };
+  prune(container);
+  for (const [mat, geos] of groups) {
+    const merged = mergeGeometries(geos);
+    if (!merged) continue;
+    container.add(new THREE.Mesh(merged, mat));
+  }
 }
 
 /** 黒い穴のような目・口（光を返さない） */
@@ -498,7 +544,7 @@ export function ghostFigure(opts: {
       ? strandHair({
           c: hairC,
           r: 0.1,
-          count: 420,
+          count: 300,
           len: () => 0.3,
           // 前髪は眉の上、横と後ろはあごの線で切りそろえる
           cut: (th) => (Math.cos(th) > 0.55 ? 1.092 : 0.99),
@@ -509,7 +555,7 @@ export function ghostFigure(opts: {
       : strandHair({
           c: hairC,
           r: 0.1,
-          count: 320,
+          count: 220,
           len: (th) => (Math.cos(th) > 0.55 ? 0.05 : 0.08),
           cut: (th) => (Math.cos(th) > 0.55 ? 1.1 : 1.04),
           width: 0.016,
@@ -534,6 +580,7 @@ export function ghostFigure(opts: {
     weather(g, 9);
   }
   projectUVs(g, opts.stone ? 2.2 : 4);
+  mergeByMaterial(body);
   return g;
 }
 
@@ -691,7 +738,7 @@ export function shadowChild(seed = 3): THREE.Group {
     strandHair({
       c: headC,
       r: 0.094,
-      count: 460,
+      count: 320,
       // 正面は目の少し下まで（すき間から目がのぞく）、横と後ろは胸まで
       len: (th) => (Math.cos(th) > 0.55 ? 0.2 : 0.42),
       width: 0.013,
@@ -717,8 +764,19 @@ export function shadowChild(seed = 3): THREE.Group {
 
   const phase = rand() * 10;
   const baseRz = 0.42;
+  // 指は軽く曲げた形で固める（部品をまとめるため、指そのものは動かさない）
+  fingers.forEach((f, i) => {
+    f.rotation.z = (i < 4 ? -1 : 1) * 0.05;
+    f.rotation.x = 0.25;
+    (f.userData.tip as THREE.Group).rotation.x = 0.55;
+  });
   projectUVs(g, 4);
-  animate(head, (t) => {
+  // 体・胴・頭をそれぞれ材質ごとにまとめる（動かすのは胴と頭の入れ物だけ）
+  mergeByMaterial(headGroup);
+  mergeByMaterial(torso, new Set([neck]));
+  mergeByMaterial(body, new Set([torso]));
+  const headMesh = headGroup.children.find((c): c is THREE.Mesh => c instanceof THREE.Mesh)!;
+  animate(headMesh, (t) => {
     const tt = t + phase;
     // 首：かしげたまま小刻みに震え、ときどき別の角度へかくっと跳ねる
     const seg = Math.floor(tt / 1.6);
@@ -729,14 +787,6 @@ export function shadowChild(seed = 3): THREE.Group {
     const snap = local < 0.06 ? local / 0.06 : 1;
     headGroup.rotation.z = baseRz + jerkZ * snap * Math.exp(-local * 1.5) + Math.sin(tt * 41) * 0.012;
     headGroup.rotation.x = -0.12 + jerkX * snap * Math.exp(-local * 1.5);
-    hair.rotation.x = Math.sin(tt * 0.8) * 0.02;
-    // 指をゆっくり握ったり開いたり
-    fingers.forEach((f, i) => {
-      const c = 0.25 + 0.35 * Math.max(0, Math.sin(tt * 1.7 + i * 0.6));
-      f.rotation.z = (i < 4 ? -1 : 1) * 0.05;
-      f.rotation.x = c * 0.5;
-      (f.userData.tip as THREE.Group).rotation.x = c;
-    });
     // 浅い息
     torso.scale.set(1, 1 + Math.sin(tt * 2.2) * 0.012, 1);
     // 目の光がゆらぐ
@@ -888,6 +938,7 @@ export function anatomyModel(b: WorldBuilder): { root: THREE.Group; heart: THREE
     if (o instanceof THREE.Mesh && o.material === muscle) o.userData.keepUV = true;
   });
   projectUVs(root, 3);
+  mergeByMaterial(root, new Set<THREE.Object3D>([heart, keyInHand]));
   root.add(b.hitShape([0.55, 1.8, 0.5], [0, 0.9, 0]));
   return { root, heart, keyInHand };
 }

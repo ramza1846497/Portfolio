@@ -109,7 +109,7 @@ function buildCourtyard({ builder: b, lights }: BuildContext): void {
     bush.position.set(x, 0.35, z1 + 0.6);
     bush.scale.set(1.3, 0.7, 0.9);
     bush.rotation.y = x;
-    b.add(bush);
+    b.staticMesh(bush);
   }
   moonPatch(b, 8, 16, OZ + 11, OZ + 19);
   lights.addFluorescent(3.0, 3.2, OZ + 15, 'dim', Math.PI / 2, 2.4);

@@ -66,6 +66,7 @@ export class WorldBuilder {
   /** 毎フレーム呼ばれる見た目の動き（光る目印など）。引数は経過秒 */
   readonly animations: ((time: number) => void)[] = [];
   private pending = new Map<string, THREE.BufferGeometry[]>();
+  private pendingMat = new Map<THREE.Material, THREE.BufferGeometry[]>();
   /** 外部モデル（ないときは各部品が箱で代わりを作る） */
   models: ModelLibrary | null = null;
   /** 同じモデルを何度も置くときは、部品ごとにまとめて 1 回で描く */
@@ -98,6 +99,23 @@ export class WorldBuilder {
   mesh(geo: THREE.BufferGeometry, matKey: string): void {
     this.applyWorldUV(geo, matKey);
     this.queue(matKey, geo);
+  }
+
+  /**
+   * 動かさない飾りのメッシュ（独自の材質のもの）。位置・回転・大きさを形に焼き込み、
+   * 同じ材質どうしを最後に 1 つにまとめる
+   */
+  staticMesh(mesh: THREE.Mesh): void {
+    mesh.updateMatrix();
+    let geo = (mesh.geometry as THREE.BufferGeometry).clone().applyMatrix4(mesh.matrix);
+    if (geo.index) geo = geo.toNonIndexed();
+    for (const name of Object.keys(geo.attributes)) if (!['position', 'normal', 'uv'].includes(name)) geo.deleteAttribute(name);
+    if (!geo.getAttribute('uv')) geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(geo.getAttribute('position').count * 2), 2));
+    const mat = mesh.material as THREE.Material;
+    const list = this.pendingMat.get(mat) ?? [];
+    list.push(geo);
+    this.pendingMat.set(mat, list);
+    mesh.geometry.dispose();
   }
 
   /** 個別に動かせる直方体（原点 = pivot）。親グループに入れて返す */
@@ -301,6 +319,18 @@ export class WorldBuilder {
       for (const g of geos) g.dispose();
     }
     this.pending.clear();
+    for (const [material, geos] of this.pendingMat) {
+      const merged = mergeGeometries(geos, false);
+      if (!merged) continue;
+      merged.computeBoundingSphere();
+      const mesh = new THREE.Mesh(merged, material);
+      mesh.matrixAutoUpdate = false;
+      mesh.userData.static = true;
+      this.root.add(mesh);
+      if (!material.transparent) this.occluders.push(mesh);
+      for (const g of geos) g.dispose();
+    }
+    this.pendingMat.clear();
     for (const { geometry, material, matrices } of this.instances.values()) {
       const mesh = new THREE.InstancedMesh(geometry, material, matrices.length);
       matrices.forEach((m, i) => mesh.setMatrixAt(i, m));
