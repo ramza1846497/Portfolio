@@ -103,6 +103,19 @@ export function blackboard(b: WorldBuilder, id: string, key: string, lines: stri
 
 /** 机と椅子 1 組（黒板は -x 側）。fallen=true で椅子が倒れている */
 export function desk(b: WorldBuilder, x: number, z: number, fallen: boolean): void {
+  // 写真のモデル（正面 +z）を、黒板（-x）に向ける
+  if (b.prop('SchoolDesk_01', [x, 0, z], -Math.PI / 2, 0.85)) {
+    const cx = x + 0.5;
+    if (fallen) {
+      // 椅子が後ろへ倒れている
+      b.prop('SchoolChair_01', [cx + 0.35, 0.3, z], [Math.PI / 2, -Math.PI / 2, 0], 0.9);
+      b.collision.add(x - 0.25, z - 0.3, cx + 0.8, z + 0.3);
+    } else {
+      chair(b, cx, z);
+      b.collision.add(x - 0.25, z - 0.3, cx + 0.25, z + 0.3);
+    }
+    return;
+  }
   // 天板（x 方向に奥行き 0.45、z 方向に幅 0.6）
   b.box([x - 0.23, 0.68, z - 0.3], [x + 0.22, 0.71, z + 0.3], 'wood');
   b.box([x - 0.2, 0.52, z - 0.27], [x + 0.18, 0.62, z + 0.27], 'metalGray');
@@ -127,6 +140,7 @@ export function desk(b: WorldBuilder, x: number, z: number, fallen: boolean): vo
 
 /** 椅子（背もたれが +x 側） */
 export function chair(b: WorldBuilder, cx: number, z: number): void {
+  if (b.prop('SchoolChair_01', [cx, 0, z], -Math.PI / 2, 0.9)) return;
   b.box([cx - 0.19, 0.42, z - 0.2], [cx + 0.19, 0.45, z + 0.2], 'wood');
   b.box([cx + 0.17, 0.45, z - 0.2], [cx + 0.2, 0.85, z + 0.2], 'wood');
   for (const [lx, lz] of [
@@ -230,32 +244,123 @@ export function keyMesh(b: WorldBuilder): THREE.Group {
   return key;
 }
 
-/** 幽霊の姿（おかっぱの女の子など）。原点が足元 */
-export function ghostFigure(opts: { hair: number; top: number; bottom: number; opacity: number; height?: number }): THREE.Group {
+/**
+ * 人の姿（おかっぱの女の子・店員・母親など）。原点が足元、正面は +z。
+ * 箱ではなく、丸みのある形（カプセル・回転体・球）で組む。
+ * skirt を省くと、背が低い子はスカート、大人はズボンになる。
+ */
+export function ghostFigure(opts: {
+  hair: number;
+  top: number;
+  bottom: number;
+  opacity: number;
+  height?: number;
+  skirt?: boolean;
+  hairStyle?: 'bob' | 'short';
+  /** 腕：下ろす（既定）か、胸の前で本を持つ */
+  arms?: 'down' | 'book';
+  /** 肌・靴下・靴の色（石像などは全部同じ色にする） */
+  skin?: number;
+  socks?: number;
+  shoes?: number;
+}): THREE.Group {
   const g = new THREE.Group();
-  const s = (opts.height ?? 1.25) / 1.25;
-  const mat = (color: number) =>
-    new THREE.MeshLambertMaterial({ color, transparent: opts.opacity < 1, opacity: opts.opacity, emissive: color, emissiveIntensity: 0.12, depthWrite: opts.opacity >= 1 });
-  const skin = mat(0xd9d4cc);
-  const part = (w: number, h: number, d: number, y: number, m: THREE.Material, x = 0, z = 0) => {
-    const p = new THREE.Mesh(new THREE.BoxGeometry(w * s, h * s, d * s), m);
-    p.position.set(x * s, y * s, z * s);
-    g.add(p);
+  const height = opts.height ?? 1.25;
+  // 体は身長 1.25m で作って、全体を縮尺する（外から足す目などは g の座標のまま）
+  const body = new THREE.Group();
+  body.scale.setScalar(height / 1.25);
+  g.add(body);
+  const child = height <= 1.4;
+  const skirt = opts.skirt ?? child;
+  const mat = (color: number, side: THREE.Side = THREE.FrontSide) =>
+    new THREE.MeshLambertMaterial({ color, side, transparent: opts.opacity < 1, opacity: opts.opacity, emissive: color, emissiveIntensity: 0.12, depthWrite: opts.opacity >= 1 });
+  const skin = mat(opts.skin ?? 0xd9cfc4);
+  const top = mat(opts.top);
+  const bottom = mat(opts.bottom);
+  const add = (geo: THREE.BufferGeometry, m: THREE.Material, x: number, y: number, z = 0, rz = 0, rx = 0) => {
+    const mesh = new THREE.Mesh(geo, m);
+    mesh.position.set(x, y, z);
+    mesh.rotation.set(rx, 0, rz);
+    body.add(mesh);
+    return mesh;
   };
-  part(0.07, 0.42, 0.07, 0.21, skin, -0.06);
-  part(0.07, 0.42, 0.07, 0.21, skin, 0.06);
-  part(0.32, 0.26, 0.24, 0.53, mat(opts.bottom));
-  part(0.28, 0.3, 0.17, 0.8, mat(opts.top));
-  part(0.06, 0.34, 0.06, 0.78, skin, -0.18);
-  part(0.06, 0.34, 0.06, 0.78, skin, 0.18);
-  part(0.2, 0.22, 0.19, 1.07, skin);
-  // おかっぱ：頭の上・後ろ・横を覆い、前髪で目元を隠す
-  const hair = mat(opts.hair);
-  part(0.23, 0.08, 0.22, 1.19, hair);
-  part(0.23, 0.22, 0.05, 1.08, hair, 0, -0.105);
-  part(0.035, 0.22, 0.21, 1.07, hair, -0.115);
-  part(0.035, 0.22, 0.21, 1.07, hair, 0.115);
-  part(0.22, 0.07, 0.03, 1.13, hair, 0, 0.1);
+  const lathe = (pts: [number, number][], segs = 20) => new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), segs);
+
+  // 足・脚（子どもは白い靴下）
+  for (const side of [-1, 1]) {
+    const x = side * 0.055;
+    const shoe = add(new THREE.SphereGeometry(0.045, 12, 8), mat(opts.shoes ?? 0x1a1612), x, 0.025, 0.02);
+    shoe.scale.set(0.85, 0.6, 1.5);
+    if (skirt) {
+      add(new THREE.CapsuleGeometry(0.033, 0.3, 4, 10), skin, x, 0.25);
+      add(new THREE.CylinderGeometry(0.036, 0.034, 0.12, 10), mat(opts.socks ?? 0xe8e6de), x, 0.1);
+    } else {
+      add(new THREE.CapsuleGeometry(0.045, 0.42, 4, 10), bottom, x, 0.29);
+    }
+  }
+  // 腰まわり：プリーツのスカート、またはズボンの腰
+  if (skirt) {
+    const sk = lathe([
+      [0.0, 0.62],
+      [0.118, 0.62],
+      [0.15, 0.55],
+      [0.19, 0.42],
+      [0.2, 0.4],
+    ], 32);
+    const pos = sk.getAttribute('position');
+    for (let k = 0; k < pos.count; k++) {
+      const vx = pos.getX(k);
+      const vz = pos.getZ(k);
+      const t = (0.62 - pos.getY(k)) / 0.22;
+      const f = 1 + 0.06 * t * Math.sin(Math.atan2(vz, vx) * 14);
+      pos.setXYZ(k, vx * f, pos.getY(k), vz * f);
+    }
+    sk.computeVertexNormals();
+    add(sk, mat(opts.bottom, THREE.DoubleSide), 0, 0);
+  } else {
+    add(lathe([[0.0, 0.5], [0.1, 0.5], [0.125, 0.56], [0.12, 0.64], [0.0, 0.64]]), bottom, 0, 0);
+  }
+  // 胴（ブラウス）・首・頭
+  add(
+    lathe([
+      [0.0, 0.58],
+      [0.112, 0.58],
+      [0.124, 0.68],
+      [0.135, 0.79],
+      [0.128, 0.86],
+      [0.095, 0.9],
+      [0.035, 0.92],
+      [0.0, 0.92],
+    ]),
+    top,
+    0,
+    0,
+  ).scale.set(1, 1, 0.72);
+  add(new THREE.CylinderGeometry(0.03, 0.033, 0.07, 10), skin, 0, 0.94);
+  add(new THREE.SphereGeometry(0.095, 20, 16), skin, 0, 1.06).scale.set(0.95, 1.05, 0.98);
+  // 腕：半袖（上腕は服の色）と、下ろした手
+  for (const side of [-1, 1]) {
+    if (opts.arms === 'book') {
+      // 肘を曲げて、前腕を胸の前へ
+      add(new THREE.CapsuleGeometry(0.032, 0.13, 4, 10), top, side * 0.155, 0.8, 0.02, side * 0.08, 0.25);
+      add(new THREE.CapsuleGeometry(0.026, 0.14, 4, 10), skin, side * 0.12, 0.7, 0.1, side * -0.5, -1.35);
+      add(new THREE.SphereGeometry(0.03, 10, 8), skin, side * 0.08, 0.72, 0.18);
+    } else {
+      add(new THREE.CapsuleGeometry(0.032, 0.13, 4, 10), top, side * 0.155, 0.8, 0, side * 0.08);
+      add(new THREE.CapsuleGeometry(0.026, 0.15, 4, 10), skin, side * 0.168, 0.6, 0.01, side * 0.04);
+      add(new THREE.SphereGeometry(0.03, 10, 8), skin, side * 0.172, 0.49, 0.015);
+    }
+  }
+  // 髪：頭頂から眉までを覆い、横と後ろはあごの高さで切りそろえる（顔の前だけ開ける）
+  const hair = mat(opts.hair, THREE.DoubleSide);
+  const bob = (opts.hairStyle ?? 'bob') === 'bob';
+  // 前髪は目の上まで。横と後ろは、頭の中心より少し上から下へ（すき間が出ないよう重ねる）
+  add(new THREE.SphereGeometry(0.104, 24, 14, 0, Math.PI * 2, 0, bob ? 1.62 : 1.3), hair, 0, 1.065).scale.set(0.97, 1.05, 1.0);
+  if (bob) {
+    const len = 0.14;
+    const topY = 1.085;
+    add(new THREE.CylinderGeometry(0.104, 0.113, len, 24, 1, true, 0.62, Math.PI * 2 - 1.24), hair, 0, topY - len / 2);
+  }
   return g;
 }
 
@@ -352,8 +457,12 @@ export function labTable(b: WorldBuilder, x: number, z: number): void {
 
 /** 職員室の事務机（灰色のスチール） */
 export function officeDesk(b: WorldBuilder, x: number, z: number, papers: boolean): void {
-  b.box([x - 0.6, 0, z - 0.35], [x + 0.6, 0.7, z + 0.35], 'metalGray', { collide: true });
-  b.box([x - 0.62, 0.7, z - 0.37], [x + 0.62, 0.73, z + 0.37], 'frame');
+  if (b.prop('metal_office_desk', [x, 0, z], 0, [0.62, 0.92, 0.78])) {
+    b.collision.add(x - 0.62, z - 0.37, x + 0.62, z + 0.37);
+  } else {
+    b.box([x - 0.6, 0, z - 0.35], [x + 0.6, 0.7, z + 0.35], 'metalGray', { collide: true });
+    b.box([x - 0.62, 0.7, z - 0.37], [x + 0.62, 0.73, z + 0.37], 'frame');
+  }
   if (papers) {
     b.box([x - 0.4, 0.73, z - 0.2], [x - 0.05, 0.76, z + 0.15], 'porcelain');
     b.box([x + 0.15, 0.73, z - 0.25], [x + 0.45, 0.95, z - 0.05], 'dark');
@@ -367,6 +476,13 @@ export const windowOpening = (from: number, to: number): Opening => ({ from, to,
 /** 救急箱（白い箱に赤十字）。原点は箱の底の中心 */
 export function firstAidKit(b: WorldBuilder): THREE.Group {
   const g = new THREE.Group();
+  const model = b.propObject('medical_box');
+  if (model) {
+    model.scale.setScalar(0.7);
+    g.add(model);
+    g.add(b.hitShape([0.45, 0.3, 0.35], [0, 0.1, 0]));
+    return g;
+  }
   const box = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.16, 0.22), b.mat('porcelain'));
   box.position.y = 0.08;
   g.add(box);

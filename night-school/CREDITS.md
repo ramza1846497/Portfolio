@@ -1,0 +1,37 @@
+# 素材の出典
+
+外部の素材はすべて **CC0（パブリックドメイン）** です。著作権表示は不要ですが、感謝を込めて出典を記します。
+
+## テクスチャ（public/textures）
+
+[Poly Haven](https://polyhaven.com/textures) の CC0 テクスチャを、色合いの調整・縮小・WebP 化して使っています。
+法線マップ（`*_n.webp`）と粗さマップ（`*_r.webp`）は元の素材名、色（`*_d.webp`）はゲーム内の材質名です。
+
+| ゲーム内の材質 | 元の素材 |
+|---|---|
+| wall（校舎の壁・腰壁つき） | plastered_wall_04 |
+| floor（廊下） | linoleum_brown |
+| woodfloor（教室・体育館） | wood_floor |
+| ceiling（天井） | ceiling_interior |
+| tile（トイレの壁） | rounded_square_tiled_wall |
+| tilefloor（トイレの床） | square_tiles_02 |
+| wood（机・扉） | oak_veneer_01 |
+| stall・stallDoor・locker・doorMetal・metalGray（塗装した鉄） | rusty_painted_metal |
+| concrete | concrete_wall_008 |
+| asphalt（道路） | asphalt_02 |
+| grass（中庭） | sparse_grass |
+| plaster（花子さんの家の壁） | clay_plaster |
+| homeWall（自分の家の壁） | plastered_wall_02 |
+| storeWall・counter（コンビニ） | plastered_wall_04 |
+| tatami（畳） | tatami_mat |
+| roof（屋根） | grey_roof_tiles |
+| fence（ブロック塀） | concrete_block_wall |
+
+## 3D モデル（public/models）
+
+[Poly Haven](https://polyhaven.com/models) の CC0 モデルを、gltf-transform で軽量化（ポリゴン削減・テクスチャ縮小・meshopt 圧縮）して使っています。
+
+SchoolDesk_01, SchoolChair_01, metal_office_desk, old_bed_frame, wall_clock, steel_frame_shelves_01,
+drawer_cabinet, metal_trash_can, wheelchair_01, medical_box, cardboard_box_01, plastic_broom, dustpan
+
+人物（花子さん・影・店員・二宮金次郎像など）は外部素材ではなく、コードで組んだ形です。

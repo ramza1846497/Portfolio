@@ -79,14 +79,15 @@ export function createMaterials(): Record<string, MaterialDef> {
     },
     doorGlass: { material: new THREE.MeshLambertMaterial({ color: 0x9ab0b0, transparent: true, opacity: 0.25, depthWrite: false }) },
     // 和室・民家
-    tatami: { material: lambert({ map: tatamiTexture() }), texW: 0.9, texH: 1.8 },
+    // 写真の畳は 1 枚の画像に 2 畳（1.8m 四方）
+    tatami: { material: lambert({ map: tatamiTexture() }), texW: 1.8 },
     fusuma: { material: lambert({ map: fusumaTexture() }), texW: 0.9, texH: 1.8 },
-    fence: { material: lambert({ map: fenceTexture() }), texW: 1.2, texH: 1.8 },
+    fence: { material: lambert({ map: fenceTexture() }), texW: 2, texH: 2 },
     plaster: { material: lambert({ map: paintedMetalTexture('#a89c84') }), texW: 1.2 },
     homeWall: { material: lambert({ map: paintedMetalTexture('#c8c0ac') }), texW: 1.2 },
     lacquer: { material: new THREE.MeshPhongMaterial({ color: 0x0e0a08, specular: 0x554433, shininess: 60 }) },
     gold: { material: lambert({ color: 0xb08a3a, emissive: 0x1a1206 }) },
-    roof: { material: lambert({ color: 0x25272c }) },
+    roof: { material: lambert({ color: 0x25272c }), texW: 2 },
     metal: { material: lambert({ color: 0x8d918f }) },
     frame: { material: lambert({ color: 0x7c807d }) },
     porcelain: { material: lambert({ color: 0xd9d6cc }) },

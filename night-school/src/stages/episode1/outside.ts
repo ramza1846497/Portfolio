@@ -200,7 +200,7 @@ function buildStore(b: WorldBuilder, lights: BuildContext['lights']): void {
   b.collision.add(71, z1, 72, z1 + 1.8);
   // 後ろの棚（たばこ）
   b.box([72, 1.2, z1 + 0.1], [78, 2.4, z1 + 0.4], 'goodsA');
-  const clerk = ghostFigure({ hair: 0x161616, top: 0x5a5a7a, bottom: 0x22222a, opacity: 1, height: 1.75 });
+  const clerk = ghostFigure({ hair: 0x161616, top: 0x5a5a7a, bottom: 0x22222a, opacity: 1, height: 1.75, hairStyle: 'short' });
   clerk.position.set(72.8, 0, z1 + 0.55);
   b.add(clerk, 'clerk');
 

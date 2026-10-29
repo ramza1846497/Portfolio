@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { CollisionWorld } from '../engine/collision';
+import type { ModelLibrary } from '../engine/models';
 
 /**
  * Box / Plane を並べてステージを組み立てるためのヘルパー。
@@ -62,6 +63,10 @@ export class WorldBuilder {
   /** 毎フレーム呼ばれる見た目の動き（光る目印など）。引数は経過秒 */
   readonly animations: ((time: number) => void)[] = [];
   private pending = new Map<string, THREE.BufferGeometry[]>();
+  /** 外部モデル（ないときは各部品が箱で代わりを作る） */
+  models: ModelLibrary | null = null;
+  /** 同じモデルを何度も置くときは、部品ごとにまとめて 1 回で描く */
+  private instances = new Map<string, { geometry: THREE.BufferGeometry; material: THREE.Material; matrices: THREE.Matrix4[] }>();
   private hitMat = new THREE.MeshBasicMaterial({ visible: false });
 
   constructor(
@@ -98,6 +103,38 @@ export class WorldBuilder {
     }
     const mesh = new THREE.Mesh(geo, typeof matKey === 'string' ? this.mat(matKey) : matKey);
     return mesh;
+  }
+
+  /**
+   * 外部モデルを置く（動かない物）。rot は [x, y, z]（y を先に回す）か y だけ。
+   * モデルがなければ何もせず false を返すので、呼び出し側が箱で代わりを作る。
+   */
+  prop(name: string, pos: Vec3, rot: Vec3 | number = 0, scale: number | Vec3 = 1): boolean {
+    const parts = this.models?.parts(name);
+    if (!parts) return false;
+    const r = typeof rot === 'number' ? [0, rot, 0] : rot;
+    const s = typeof scale === 'number' ? [scale, scale, scale] : scale;
+    const m = new THREE.Matrix4().compose(
+      new THREE.Vector3(pos[0], pos[1], pos[2]),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(r[0], r[1], r[2], 'YXZ')),
+      new THREE.Vector3(s[0], s[1], s[2]),
+    );
+    parts.forEach((p, i) => {
+      const key = `${name}#${i}`;
+      let entry = this.instances.get(key);
+      if (!entry) {
+        entry = { geometry: p.geometry, material: p.material, matrices: [] };
+        this.instances.set(key, entry);
+      }
+      entry.matrices.push(m.clone().multiply(p.matrix));
+    });
+    return true;
+  }
+
+  /** 外部モデルの複製（動かす物・調べられる物の見た目に）。なければ null */
+  propObject(name: string): THREE.Object3D | null {
+    const root = this.models?.get(name);
+    return root ? root.clone(true) : null;
   }
 
   /** 水平な面（床・天井）。up=false で下向き */
@@ -194,11 +231,21 @@ export class WorldBuilder {
       merged.computeBoundingSphere();
       const mesh = new THREE.Mesh(merged, this.mat(key));
       mesh.matrixAutoUpdate = false;
+      // 壁・床などの結合済みの物（影は受けるだけ）
+      mesh.userData.static = true;
       this.root.add(mesh);
       this.occluders.push(mesh);
       for (const g of geos) g.dispose();
     }
     this.pending.clear();
+    for (const { geometry, material, matrices } of this.instances.values()) {
+      const mesh = new THREE.InstancedMesh(geometry, material, matrices.length);
+      matrices.forEach((m, i) => mesh.setMatrixAt(i, m));
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.computeBoundingSphere();
+      this.root.add(mesh);
+    }
+    this.instances.clear();
   }
 
   private queue(key: string, geo: THREE.BufferGeometry): void {

@@ -13,6 +13,8 @@ import { Notebook } from '../ui/notebook';
 import { Movie } from './movie';
 import { PostFX } from '../engine/post';
 import { qualitySettings, type Quality } from '../engine/quality';
+import { upgradeMaterials } from '../world/pbr';
+import type { ModelLibrary } from '../engine/models';
 import { WorldBuilder, type Openable } from '../world/builder';
 import { createMaterials } from '../world/materials';
 import { ScriptRunner } from './runner';
@@ -67,6 +69,7 @@ export class Game {
   constructor(
     container: HTMLElement,
     readonly stage: StageDef,
+    models: ModelLibrary | null = null,
   ) {
     this.renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
@@ -87,6 +90,7 @@ export class Game {
     this.raycaster.far = INTERACT_DISTANCE;
 
     this.builder = new WorldBuilder(this.scene, this.collision, createMaterials());
+    this.builder.models = models;
     stage.build({ builder: this.builder, lights: this.lights });
     this.builder.finalize();
     for (const d of stage.interactables) this.defs.set(d.id, d);
@@ -482,6 +486,7 @@ export class Game {
     const q = qualitySettings(quality);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, q.pixelRatio));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    upgradeMaterials(this.scene, this.builder.materials, quality === 'low', this.renderer.capabilities.getMaxAnisotropy() >= 4 ? 4 : 1);
     const shadows = q.shadowSize > 0;
     this.renderer.shadowMap.enabled = shadows;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
@@ -491,16 +496,23 @@ export class Game {
     spot.shadow.bias = -0.0006;
     spot.shadow.normalBias = 0.03;
     spot.shadow.camera.near = 0.2;
-    spot.shadow.camera.far = 22;
+    // 影は近くだけ（遠くの物まで影を描くと重い）
+    spot.shadow.camera.far = 12;
     this.scene.traverse((o) => {
       if (!(o instanceof THREE.Mesh)) return;
       const mats = Array.isArray(o.material) ? o.material : [o.material];
       // 光らない物だけ影を落とす・受ける（半透明の物は落とすだけ）
       const lit = mats.every((m) => !(m instanceof THREE.MeshBasicMaterial));
       // 手に持った竹刀は、懐中電灯のすぐ前にあるので影を落とさない
+      // ステージの物だけ（照明器具などは落とさない）
       let held = false;
-      for (let p = o.parent; p; p = p.parent) if (p === this.camera) held = true;
-      o.castShadow = shadows && lit && !held;
+      let inStage = false;
+      for (let p = o.parent; p; p = p.parent) {
+        if (p === this.camera) held = true;
+        if (p === this.builder.root) inStage = true;
+      }
+      // 壁・床は影を落とさない（懐中電灯は目の位置なので、壁の影はほとんど見えず、描く量だけ倍になる）
+      o.castShadow = shadows && lit && inStage && !held && !o.userData.static;
       o.receiveShadow = shadows && lit && mats.every((m) => !m.transparent);
       for (const m of mats) m.needsUpdate = true;
     });

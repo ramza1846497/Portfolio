@@ -139,6 +139,8 @@ export function buildFloor2({ builder: b, lights }: BuildContext): void {
 function classroom(b: WorldBuilder, label: string, x1: number, x2: number, boardId: string, podiumId: string, boardLines: string[]): void {
   roomShell(b, x1, x2, -9.5, -1.5);
   blackboard(b, boardId, label, boardLines, x1, -5.5, 1);
+  // 黒板の上の時計（止まっている）
+  b.prop('wall_clock', [x1 + 0.11, 2.62, -5.5], Math.PI / 2, 1);
   b.box([x1 + 0.9, 0, -6.2], [x1 + 1.7, 1.0, -4.8], 'wood', { collide: true });
   b.hitbox(podiumId, [x1 + 0.9, 0, -6.2], [x1 + 1.7, 1.0, -4.8]);
   const cols = [x1 + 2.6, x1 + 4.8, x1 + 7.0];
@@ -219,6 +221,9 @@ function buildToilet(b: WorldBuilder, lights: BuildContext['lights']): void {
   windowPane(b, 'x', z2 + 0.06, highWin.from, highWin.to, highWin.bottom!, highWin.top, -1);
   moonPatch(b, 14.0, 15.6, 6.6, 8.3);
   sign(b, '女子', 14.4, 2.45, 1.39, Math.PI, 0.6);
+  // 入口の脇に立てかけたほうきとちりとり（清掃中）
+  b.prop('plastic_broom', [8.3, 0, 2.0], [0, Math.PI / 2, 0.12]);
+  b.prop('dustpan', [8.45, 0, 2.55], 0.4);
 
   // 入口の扉（内側へ開く）と、清掃中の鎖
   const door = new THREE.Group();

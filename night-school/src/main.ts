@@ -2,9 +2,10 @@ import * as THREE from 'three';
 import { Game } from './game/game';
 import { stages } from './stages';
 import { QUALITY_LABELS, loadQuality, saveQuality, type Quality } from './engine/quality';
+import { MODEL_NAMES, ModelLibrary } from './engine/models';
 
 const stage = stages[0];
-const game = new Game(document.getElementById('app')!, stage);
+let game: Game | null = null;
 
 // タイトル画面：最初のタップで音声を有効にして開始する
 const title = document.createElement('div');
@@ -13,7 +14,7 @@ title.innerHTML = `
   <div class="episode">夜の学校　${stage.episode}</div>
   <h1>${stage.title}</h1>
   <div class="sub">怪異の「決まり」を調べ、校舎から脱出せよ。<br>ヘッドホン推奨</div>
-  <div class="tap">タップしてはじめる</div>
+  <div class="tap">読み込み中…</div>
   <div class="quality"><span>画質</span></div>`;
 document.body.appendChild(title);
 
@@ -34,20 +35,35 @@ for (const q of ['high', 'normal', 'low'] as const) {
   qBox.appendChild(b);
 }
 
+// 読み込みが終わる前にタップされたら、終わりしだい始める
+let tapped = false;
+const begin = () => {
+  if (!game || !tapped) return;
+  title.remove();
+  game.start(quality);
+};
 title.addEventListener(
   'pointerup',
   () => {
-    title.remove();
+    tapped = true;
     // スマホでは全画面にする（対応していない端末では何もしない）
     if (matchMedia('(pointer: coarse)').matches) {
       document.documentElement.requestFullscreen?.({ navigationUI: 'hide' }).catch(() => {});
     }
-    game.start(quality);
+    begin();
   },
   { once: true },
 );
 
-// ?debug を付けると、テスト用にゲームへ触れるようにする
-if (new URLSearchParams(location.search).has('debug')) {
-  Object.assign(window, { game, THREE });
-}
+// 3D モデルを読み込んでから校舎を組み立てる（読み込めなかった物は箱で作る）
+const tap = title.querySelector('.tap')!;
+const models = new ModelLibrary();
+void models
+  .load(MODEL_NAMES, (done, total) => (tap.textContent = `読み込み中… ${Math.round((done / total) * 100)}%`))
+  .then(() => {
+    game = new Game(document.getElementById('app')!, stage, models);
+    tap.textContent = 'タップしてはじめる';
+    // ?debug を付けると、テスト用にゲームへ触れるようにする
+    if (new URLSearchParams(location.search).has('debug')) Object.assign(window, { game, THREE });
+    begin();
+  });

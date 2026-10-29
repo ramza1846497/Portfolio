@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { BuildContext } from '../../game/types';
 import { noticeTexture, signTexture } from '../../engine/textures';
 import { OZ } from './floor1';
-import { moonPatch, notice, shadowChild, sign, slidingDoor, wallPlane } from './parts';
+import { ghostFigure, moonPatch, notice, shadowChild, sign, slidingDoor, wallPlane } from './parts';
 
 /**
  * 1 階の南：渡り廊下・中庭・体育館。
@@ -207,38 +207,38 @@ function buildGym({ builder: b, lights }: BuildContext): void {
   b.spawn('gymIn', 23.4, ZG1 + 1.5, Math.PI);
 }
 
-/** 二宮金次郎像：薪を背負い、本を読みながら歩く石像。原点は足元、正面は +z */
+/**
+ * 二宮金次郎像：薪を背負い、本を読みながら歩く石像。原点は足元、正面は +z。
+ * 人の形は ghostFigure（丸みのある体）を石の色で作り、本と背負子・薪を足す。
+ */
 function ninomiyaStatue(): THREE.Group {
-  const g = new THREE.Group();
-  const stone = () => new THREE.MeshLambertMaterial({ color: 0x7a7a72 });
-  const part = (w: number, h: number, d: number, x: number, y: number, z: number) => {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), stone());
-    m.position.set(x, y, z);
-    g.add(m);
-    return m;
-  };
-  const s = 1.25; // 子どもの像だが、大きい
-  part(0.16 * s, 0.75 * s, 0.18 * s, -0.11 * s, 0.38 * s, 0);
-  part(0.16 * s, 0.75 * s, 0.18 * s, 0.11 * s, 0.38 * s, 0);
-  part(0.46 * s, 0.6 * s, 0.3 * s, 0, 1.05 * s, 0);
-  part(0.12 * s, 0.5 * s, 0.12 * s, -0.27 * s, 1.05 * s, 0.12 * s);
-  part(0.12 * s, 0.5 * s, 0.12 * s, 0.27 * s, 1.05 * s, 0.12 * s);
-  part(0.28 * s, 0.3 * s, 0.28 * s, 0, 1.55 * s, 0.02 * s);
-  // 開いた本
-  part(0.34 * s, 0.03 * s, 0.24 * s, 0, 1.22 * s, 0.32 * s).rotation.x = -0.5;
-  // 背中の薪
-  for (let i = 0; i < 5; i++) {
-    const log = new THREE.Mesh(new THREE.CylinderGeometry(0.05 * s, 0.05 * s, 0.9 * s, 6), stone());
-    log.position.set((i - 2) * 0.1 * s, 1.3 * s, -0.26 * s);
+  const stone = 0x7a7a72;
+  const g = ghostFigure({ hair: 0x6a6a62, top: stone, bottom: stone, opacity: 1, height: 1.95, skirt: true, hairStyle: 'short', arms: 'book', skin: stone, socks: stone, shoes: 0x6a6a62 });
+  const s = 1.95 / 1.25;
+  const mat = () => new THREE.MeshLambertMaterial({ color: stone });
+  // 開いた本（両手で持って、のぞきこむ）
+  const book = new THREE.Mesh(new THREE.BoxGeometry(0.2 * s, 0.015 * s, 0.14 * s), mat());
+  book.position.set(0, 0.75 * s, 0.2 * s);
+  book.rotation.x = -0.6;
+  g.add(book);
+  // 背負子と薪
+  for (const x of [-0.1, 0.1]) {
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.012 * s, 0.012 * s, 0.75 * s, 6), mat());
+    post.position.set(x * s, 0.82 * s, -0.16 * s);
+    g.add(post);
+  }
+  for (let i = 0; i < 7; i++) {
+    const log = new THREE.Mesh(new THREE.CylinderGeometry(0.03 * s, 0.032 * s, 0.34 * s, 8), mat());
+    log.rotation.z = Math.PI / 2 + (i % 2 ? 0.08 : -0.06);
+    log.position.set(0, (0.78 + (i % 4) * 0.06) * s, (-0.2 - Math.floor(i / 4) * 0.06) * s);
     g.add(log);
   }
   // 目（暴れると赤く光る）
   const eyes = new THREE.MeshBasicMaterial({ color: 0x401010 });
-  for (const x of [-0.06, 0.06]) {
-    const eye = new THREE.Mesh(new THREE.BoxGeometry(0.04 * s, 0.02 * s, 0.01), eyes);
-    eye.position.set(x * s, 1.58 * s, 0.155 * s);
+  for (const x of [-0.035, 0.035]) {
+    const eye = new THREE.Mesh(new THREE.BoxGeometry(0.025 * s, 0.01 * s, 0.01), eyes);
+    eye.position.set(x * s, 1.045 * s, 0.093 * s);
     g.add(eye);
   }
   return g;
 }
-

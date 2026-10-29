@@ -166,6 +166,11 @@ function buildStaffRoom(b: WorldBuilder, lights: BuildContext['lights']): void {
   b.box([38.55, 0.5, OZ - 4.52], [38.65, 0.57, OZ - 4.49], 'metal');
   b.hitbox('nurseDrawer', [38.0, 0.3, OZ - 5.3], [39.2, 0.8, OZ - 4.5]);
 
+  // 奥の壁ぎわのスチール棚と書類棚、床の段ボール
+  if (b.prop('steel_frame_shelves_01', [30.2, 0, OZ - 9.1], 0, 0.085)) b.collision.add(29.7, OZ - 9.4, 30.7, OZ - 8.8);
+  if (b.prop('drawer_cabinet', [33.6, 0, OZ - 9.1], 0, 0.95)) b.collision.add(33.0, OZ - 9.4, 34.2, OZ - 8.8);
+  b.prop('cardboard_box_01', [31.4, 0, OZ - 8.9], 0.4);
+  b.prop('cardboard_box_01', [31.5, 0.33, OZ - 8.95], 1.1, 0.9);
   lights.addFluorescent(34, H - 0.08, OZ - 5.5, 'dim', Math.PI / 2, 2.2);
 }
 
@@ -231,11 +236,20 @@ function buildNurseRoom(b: WorldBuilder, lights: BuildContext['lights']): void {
   b.interactable('tornRule', torn);
   torn.add(b.hitShape([0.4, 0.3, 0.12], [0, 0, 0]));
 
+  // 窓ぎわの車いす
+  if (b.prop('wheelchair_01', [14.8, 0, z2 - 0.9], Math.PI + 0.4)) b.collision.add(14.3, z2 - 1.45, 15.3, z2 - 0.35);
   lights.addFluorescent(14.5, H - 0.08, z1 + 3.5, 'dim', Math.PI / 2, 1.8);
 }
 
 /** 保健室のベッド（頭が東側） */
 function bed(b: WorldBuilder, z: number): void {
+  // 鉄パイプのベッド（写真のモデル）に、マットレスと枕
+  if (b.prop('old_bed_frame', [16.95, 0, z], Math.PI / 2, 0.95)) {
+    b.collision.add(16.0, z - 0.45, 17.9, z + 0.45);
+    b.box([16.08, 0.42, z - 0.4], [17.82, 0.52, z + 0.4], 'porcelain');
+    b.box([17.4, 0.52, z - 0.28], [17.78, 0.6, z + 0.28], 'porcelain');
+    return;
+  }
   b.box([16.0, 0, z - 0.45], [17.9, 0.42, z + 0.45], 'metalGray', { collide: true });
   b.box([16.02, 0.42, z - 0.43], [17.88, 0.5, z + 0.43], 'porcelain');
   b.box([17.45, 0.5, z - 0.3], [17.85, 0.6, z + 0.3], 'porcelain');

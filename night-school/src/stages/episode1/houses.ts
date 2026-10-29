@@ -32,6 +32,8 @@ function buildAlley({ builder: b, lights }: BuildContext): void {
   }
   b.collision.add(-2.5, ZH - 1.6, -2, ZH + 1.6);
   b.box([9.8, 0, ZH + 1.2], [10.1, 6, ZH + 1.5], 'pole');
+  // 塀ぎわの古いごみ箱
+  if (b.prop('metal_trash_can', [4.5, 0, ZH - 1.25], Math.PI, 0.9)) b.collision.add(3.7, ZH - 1.6, 5.3, ZH - 1.0);
   lights.addFluorescent(10, 4.2, ZH + 0.6, 'flicker', Math.PI / 2, 2.6);
 
   // 先へ先へと現れる花子さん
