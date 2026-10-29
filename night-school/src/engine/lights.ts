@@ -1,13 +1,20 @@
 import * as THREE from 'three';
 
 const FLASH_INTENSITY = 30;
-/** この距離より遠い蛍光灯の光は計算しない */
-const LIGHT_RANGE = 24;
+/**
+ * 蛍光灯の光源は、この数だけ用意して近くの器具に割り当てる。
+ * 光源の数が変わると全部の材質のシェーダーを作り直すことになり、歩くたびに引っかかるので、数は固定にする
+ */
+const POOL = 4;
+/** この距離より遠い蛍光灯の光は計算しない（端で急に消えないよう、手前から弱める） */
+const LIGHT_RANGE = 14;
 
 export type FixtureMode = 'steady' | 'flicker' | 'dim' | 'dead';
 
 interface Fixture {
-  light: THREE.PointLight | null;
+  /** 光を出す器具か（切れた蛍光灯は管の色だけ） */
+  hasLight: boolean;
+  y: number;
   tubeMat: THREE.MeshBasicMaterial;
   base: number;
   mode: FixtureMode;
@@ -33,6 +40,7 @@ interface Fixture {
 export class LightRig {
   readonly flashlight: THREE.SpotLight;
   private fixtures: Fixture[] = [];
+  private pool: THREE.PointLight[] = [];
   private blackout = false;
   /** 全体の明滅中（懐中電灯も乱れる） */
   private strobeLeft = 0;
@@ -58,6 +66,13 @@ export class LightRig {
     camera.add(spot);
     camera.add(spot.target);
     this.flashlight = spot;
+
+    for (let i = 0; i < POOL; i++) {
+      const l = new THREE.PointLight(0xd8f0ff, 0, 9, 1.8);
+      l.position.set(0, -100, 0);
+      scene.add(l);
+      this.pool.push(l);
+    }
   }
 
   /** 懐中電灯が照らしている物までの距離を伝える（遠い・何もなければ大きな値） */
@@ -80,14 +95,8 @@ export class LightRig {
     group.add(tube);
     this.scene.add(group);
 
-    let light: THREE.PointLight | null = null;
     const base = mode === 'dim' ? intensity * 0.45 : intensity;
-    if (mode !== 'dead') {
-      light = new THREE.PointLight(0xd8f0ff, base, 9, 1.8);
-      light.position.set(x, y - 0.25, z);
-      this.scene.add(light);
-    }
-    this.fixtures.push({ light, tubeMat, base, mode, x, z, tag, timer: Math.random() * 2, on: mode !== 'dead', sLeft: 0, sTimer: 0, sOn: true, sPower: 1.3 });
+    this.fixtures.push({ hasLight: mode !== 'dead', y: y - 0.25, tubeMat, base, mode, x, z, tag, timer: Math.random() * 2, on: mode !== 'dead', sLeft: 0, sTimer: 0, sOn: true, sPower: 1.3 });
   }
 
   setBlackout(on: boolean): void {
@@ -111,12 +120,12 @@ export class LightRig {
   }
 
   /**
-   * プレイヤーから離れた明かりは消しておく（光源の数を減らしてスマホの負荷を下げる）。
-   * 光の届く距離は 9m なので、少し余裕を見て切る。
+   * 光源はプレイヤーに近い器具から順に、用意した数だけ割り当てる。
    */
   update(dt: number, playerX = 0, playerZ = 0): void {
     if (this.strobeLeft > 0) this.strobeLeft -= dt;
     let anyDark = false;
+    const near: { f: Fixture; d: number; k: number }[] = [];
 
     for (const f of this.fixtures) {
       if (f.mode === 'flicker') {
@@ -140,13 +149,26 @@ export class LightRig {
         if (!f.sOn) anyDark = true;
       }
       if (this.blackout) k = 0;
-      if (f.light) {
-        f.light.intensity = f.base * k;
-        f.light.visible = Math.hypot(f.x - playerX, f.z - playerZ) < LIGHT_RANGE;
+      if (f.hasLight) {
+        const d = Math.hypot(f.x - playerX, f.z - playerZ);
+        if (d < LIGHT_RANGE) near.push({ f, d, k });
       }
       const lit = (f.mode !== 'dead' || f.sLeft > 0) && k > 0;
       f.tubeMat.color.setHex(lit ? (f.mode === 'dim' ? 0x9fb4b8 : 0xeaffff) : 0x2a2a2a);
     }
+
+    near.sort((a, b) => a.d - b.d);
+    this.pool.forEach((l, i) => {
+      const n = near[i];
+      if (!n) {
+        l.intensity = 0;
+        return;
+      }
+      l.position.set(n.f.x, n.f.y, n.f.z);
+      // 遠い明かりは手前から弱めて、割り当てが入れ替わっても目立たないように
+      const edge = Math.min(1, (LIGHT_RANGE - n.d) / 4);
+      l.intensity = n.f.base * n.k * edge;
+    });
 
     let flash = 1;
     if (this.flashFlicker > 0) {

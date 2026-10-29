@@ -6,6 +6,7 @@ declare module 'n8ao' {
     renderToScreen: boolean;
     configuration: Record<string, unknown>;
     setSize(width: number, height: number): void;
+    dispose(): void;
     render(renderer: THREE.WebGLRenderer, writeBuffer: THREE.WebGLRenderTarget | null, readBuffer: THREE.WebGLRenderTarget | null, deltaTime: number, maskActive: boolean): void;
   }
 }

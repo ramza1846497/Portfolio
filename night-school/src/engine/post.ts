@@ -87,6 +87,14 @@ export class PostFX {
     this.resize();
   }
 
+  /** 隅の陰（AO）を切る（重いときの自動調整）。切ったら true */
+  dropAO(): boolean {
+    if (!this.ao) return false;
+    this.ao.dispose();
+    this.ao = null;
+    return true;
+  }
+
   resize(): void {
     const size = this.renderer.getDrawingBufferSize(new THREE.Vector2());
     this.scene.setSize(size.x, size.y);

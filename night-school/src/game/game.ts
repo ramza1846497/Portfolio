@@ -70,6 +70,9 @@ export class Game {
   private debugEl: HTMLDivElement | null = null;
   private frames = 0;
   private fpsTime = 0;
+  /** 解像度の自動調整：重いときは描く画素を減らし、余裕が出たら戻す */
+  private lastFrameAt = 0;
+  private res = { max: 1, min: 1, cur: 1, time: 0, frames: 0, fast: 0, slow: 0, warned: false, settle: 3, level: 0, raisedFrom: 0 };
 
   constructor(
     container: HTMLElement,
@@ -492,6 +495,8 @@ export class Game {
     const q = qualitySettings(quality);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, q.pixelRatio));
     this.atmosphere.setPixelRatio(this.renderer.getPixelRatio());
+    const pr = this.renderer.getPixelRatio();
+    this.res = { max: pr, min: Math.min(pr, Math.max(0.55, pr * 0.45)), cur: pr, time: 0, frames: 0, fast: 0, slow: 0, warned: false, settle: 3, level: 0, raisedFrom: 0 };
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     upgradeMaterials(this.scene, this.builder.materials, quality === 'low', this.renderer.capabilities.getMaxAnisotropy() >= 4 ? 4 : 1);
     const shadows = q.shadowSize > 0;
@@ -537,6 +542,7 @@ export class Game {
   private frame(time: number): void {
     this.timer.update(time);
     const dt = Math.min(this.timer.getDelta(), 0.05);
+    this.adaptResolution();
     this.input.update();
     this.player.update(dt);
     // 歩いて移れる区域（1 階 ⇔ 渡り廊下・体育館）もあるので毎フレーム見る
@@ -566,6 +572,67 @@ export class Game {
     if (this.post) this.post.render(this.scene, this.camera, time);
     else this.renderer.render(this.scene, this.camera);
     this.updateDebug(dt);
+  }
+
+  /**
+   * 1 秒ごとに描けた枚数を見て、少ないときは解像度を下げ、余裕が続けば少しずつ戻す。
+   * 読み込み直後や、ほかのタブから戻った直後の長い 1 フレームは数えない
+   */
+  private adaptResolution(): void {
+    const r = this.res;
+    const now = performance.now();
+    const dt = (now - (this.lastFrameAt || now)) / 1000;
+    this.lastFrameAt = now;
+    if (dt > 0.5 || dt <= 0) return;
+    if (r.settle > 0) {
+      r.settle -= dt;
+      return;
+    }
+    r.time += dt;
+    r.frames++;
+    if (r.time < 1) return;
+    const fps = r.frames / r.time;
+    r.time = 0;
+    r.frames = 0;
+    let next = r.cur;
+    // 重いときは、見た目への影響が小さい順に軽くする：
+    // 解像度を少し下げる → 隅の陰（AO）を切る → 解像度をさらに下げる → 懐中電灯の影を切る → いちばん低い解像度
+    const floors = [r.max * 0.8, r.max * 0.8, r.max * 0.62, r.max * 0.62, r.min];
+    const floor = Math.max(r.min, floors[Math.min(r.level, floors.length - 1)]);
+    if (fps < 45) {
+      r.fast = 0;
+      // 上げた直後に重くなったなら、そこを上限にして行ったり来たりしないように
+      if (r.raisedFrom > 0) r.max = r.raisedFrom;
+      r.raisedFrom = 0;
+      if (r.cur > floor + 0.01) next = Math.max(floor, r.cur * (fps < 30 ? 0.8 : 0.9));
+      else if (r.level === 1 && this.post?.dropAO()) r.level++;
+      else if (r.level === 3 && this.renderer.shadowMap.enabled) {
+        this.renderer.shadowMap.enabled = false;
+        this.scene.traverse((o) => {
+          const m = (o as THREE.Mesh).material;
+          if (m) for (const x of Array.isArray(m) ? m : [m]) x.needsUpdate = true;
+        });
+        r.level++;
+        r.settle = 2;
+      } else if (r.level < 4) r.level++;
+    } else if (fps > 57) {
+      r.raisedFrom = 0;
+      if (++r.fast >= 4 && r.cur < r.max) {
+        next = Math.min(r.max, r.cur * 1.1);
+        r.raisedFrom = r.cur;
+        r.fast = 0;
+      }
+    } else {
+      r.fast = 0;
+    }
+    if (Math.abs(next - r.cur) < 0.01) return;
+    r.cur = next;
+    this.renderer.setPixelRatio(next);
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.atmosphere.setPixelRatio(next);
+    this.post?.resize();
+    // 次の判定は、解像度を変えた直後の乱れが落ち着いてから
+    r.settle = 0.5;
   }
 
   private updateOpenables(dt: number): void {
@@ -670,7 +737,7 @@ export class Game {
     this.fpsTime += dt;
     if (this.fpsTime >= 0.5) {
       const p = this.player.pos;
-      this.debugEl.textContent = `fps ${(this.frames / this.fpsTime).toFixed(0)}  x ${p.x.toFixed(2)} z ${p.z.toFixed(2)}  calls ${this.renderer.info.render.calls}`;
+      this.debugEl.textContent = `fps ${(this.frames / this.fpsTime).toFixed(0)}  x ${p.x.toFixed(2)} z ${p.z.toFixed(2)}  calls ${this.renderer.info.render.calls}  res ${this.res.cur.toFixed(2)}`;
       this.frames = 0;
       this.fpsTime = 0;
     }
