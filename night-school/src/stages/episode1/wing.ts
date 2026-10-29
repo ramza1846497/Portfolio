@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { BuildContext } from '../../game/types';
 import { noticeTexture, signTexture } from '../../engine/textures';
 import { pbrMaterial } from '../../world/pbr';
+import { hedge, leafyTree } from './foliage';
 import { OZ } from './floor1';
 import { ghostFigure, moonPatch, notice, shadowChild, sign, slidingDoor, wallPlane } from './parts';
 
@@ -99,17 +100,12 @@ function buildCourtyard({ builder: b, lights }: BuildContext): void {
     [18.5, OZ + 18],
     [4.5, OZ + 18.6],
   ]) {
-    b.box([x - 0.15, 0, z - 0.15], [x + 0.15, 2.4, z + 0.15], 'wood', { collide: true });
-    b.add(tree(b, x, z));
+    leafyTree(b, x, z, Math.round(x * 7 + z));
   }
   // 校舎ぞいの植え込み
   for (let x = x1 + 1; x < x2 - 2; x += 1.6) {
     if (x > 9 && x < 15) continue;
-    const bush = new THREE.Mesh(new THREE.IcosahedronGeometry(0.55, 0), b.mat(x % 3.2 < 1.6 ? 'leaves' : 'leavesDark'));
-    bush.position.set(x, 0.35, z1 + 0.6);
-    bush.scale.set(1.3, 0.7, 0.9);
-    bush.rotation.y = x;
-    b.staticMesh(bush);
+    hedge(b, x, z1 + 0.6, 1.5, 0.9, 0.8, Math.round(x * 10));
   }
   moonPatch(b, 8, 16, OZ + 11, OZ + 19);
   lights.addFluorescent(3.0, 3.2, OZ + 15, 'dim', Math.PI / 2, 2.4);
@@ -126,35 +122,6 @@ function buildCourtyard({ builder: b, lights }: BuildContext): void {
     s.rotation.y = Math.PI;
     b.add(s, id);
   }
-}
-
-/** 中庭の木：幹の上に、ごつごつした葉の塊をいくつか重ねる */
-function tree(b: BuildContext['builder'], x: number, z: number): THREE.Group {
-  const g = new THREE.Group();
-  const blobs: [number, number, number, number][] = [
-    [0, 3.0, 0, 1.2],
-    [0.7, 2.7, 0.3, 0.85],
-    [-0.6, 2.8, -0.4, 0.9],
-    [0.2, 3.7, -0.2, 0.8],
-    [-0.3, 2.5, 0.6, 0.7],
-  ];
-  blobs.forEach(([dx, y, dz, r], i) => {
-    const m = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), b.mat(i % 2 ? 'leavesDark' : 'leaves'));
-    m.position.set(x + dx, y, z + dz);
-    m.rotation.set(i, i * 2, 0);
-    g.add(m);
-  });
-  // 枝
-  for (const [dx, dz] of [
-    [0.5, 0.2],
-    [-0.4, -0.3],
-  ]) {
-    const br = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.07, 1.0, 5), b.mat('wood'));
-    br.position.set(x + dx * 0.6, 2.4, z + dz * 0.6);
-    br.rotation.set(dz * 1.2, 0, -dx * 1.2);
-    g.add(br);
-  }
-  return g;
 }
 
 /** 体育館：広い板張り。南に舞台、その前に二宮金次郎像 */

@@ -32,9 +32,9 @@
 | labTop（理科室の机の天板） | concrete_wall_008 |
 | statueStone（二宮金次郎像） | rock_surface |
 | moss（像の苔） | mossy_rock |
-| porcelainSkin（人物の肌） | marble_01 |
 | clothWhite・clothRed・clothDark・clothGray（服） | cotton_jersey |
 | fleece（ソファ・座布団） | knitted_fleece |
+| bark（中庭の木の幹） | japanese_camphor_bark |
 
 ## 3D モデル（public/models）
 
@@ -47,4 +47,4 @@ desk_lamp_arm_01, bleach_bottle, medical_tape, television_02, tea_set_01, vintag
 russian_food_cans_01, long_life_food, plastic_crate_01, utility_box_01, steel_frame_shelves_02, security_camera_01,
 water_manhole_cover, alarm_clock_01, vintage_grandfather_clock_01, painted_wooden_bench, football
 
-人物（花子さん・影の子ども・店員・二宮金次郎像・人体模型など）の形はコードで組んでおり、肌・服・石の質感に上の写真テクスチャを使っています。
+人物（花子さん・影の子ども・店員・二宮金次郎像・人体模型など）の形はコードで組んでおり、服・石の質感に上の写真テクスチャを使っています。肌（porcelainSkin・skin_n・skin_r）、木の葉、コンビニの商品の包装は、コードで描いた自作の絵です。

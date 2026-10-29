@@ -2,8 +2,9 @@ import * as THREE from 'three';
 import type { BuildContext } from '../../game/types';
 import { guardRail, utilityPole } from './props';
 import type { WorldBuilder } from '../../world/builder';
-import { fridgeTexture, newspaperTexture, noticeTexture, paperTexture, signTexture, storeSignTexture } from '../../engine/textures';
+import { newspaperTexture, noticeTexture, paperTexture, signTexture, storeSignTexture } from '../../engine/textures';
 import { H, ghostFigure, wallPlane } from './parts';
+import { drinkCooler, fillShelves, storeItemMesh, type GoodsRow } from './store';
 
 /**
  * 校舎の外（z = ZO 付近）。1 階からさらに z をずらした場所に作る。
@@ -216,23 +217,40 @@ function buildStore(b: WorldBuilder, lights: BuildContext['lights']): void {
   b.hitbox('register', [76.7, 0.85, z1 + 1.0], [77.9, 1.32, z1 + 2.0]);
   b.collision.add(71, z1, 72, z1 + 1.8);
   // 後ろの棚（たばこ）
-  b.box([72, 1.2, z1 + 0.1], [78, 2.4, z1 + 0.4], 'goodsA');
+  b.box([72, 1.2, z1 + 0.08], [78, 2.4, z1 + 0.12], 'shelf');
+  const packRows: GoodsRow[] = [];
+  for (const y of [1.2, 1.5, 1.8, 2.1]) {
+    b.box([72, y, z1 + 0.12], [78, y + 0.015, z1 + 0.32], 'shelf');
+    packRows.push({ x1: 72, x2: 78, y: y + 0.015, front: z1 + 0.32, depthDir: -1, room: 0.25, kinds: ['pack'] });
+  }
+  fillShelves(b, packRows, 5);
   const clerk = ghostFigure({ hair: 0x161616, top: 0x5a5a7a, bottom: 0x22222a, opacity: 1, height: 1.75, hairStyle: 'short' });
   clerk.position.set(72.8, 0, z1 + 0.55);
   b.add(clerk, 'clerk');
 
   // 商品棚（二列）
   for (const z of [ZO - 2.0, ZO + 2.0]) {
-    // 商品の面は少し奥に。棚板・値札レール・端の板・台輪で、ゴンドラ棚らしく
-    b.box([72.55, 0.1, z - 0.36], [77.45, 1.5, z + 0.36], z < ZO ? 'goodsA' : 'goodsB');
+    // 背中合わせの棚の仕切り板。棚板・値札レール・端の板・台輪で、ゴンドラ棚らしく
+    b.box([72.55, 0.1, z - 0.02], [77.45, 1.5, z + 0.02], 'shelf');
     b.collision.add(72.5, z - 0.4, 77.5, z + 0.4);
     b.box([72.5, 0, z - 0.4], [77.5, 0.1, z + 0.4], 'dark');
-    for (const y of [0.1, 0.48, 0.86, 1.22]) {
+    const levels = [0.1, 0.48, 0.86, 1.22];
+    for (const y of levels) {
       b.box([72.5, y, z - 0.42], [77.5, y + 0.025, z + 0.42], 'shelf');
       for (const side of [-1, 1]) b.box([72.5, y + 0.025, z + side * 0.42 - 0.008], [77.5, y + 0.06, z + side * 0.42 + 0.008], 'porcelain');
     }
-    for (const x of [72.45, 77.55]) b.box([x - 0.03, 0, z - 0.42], [x + 0.03, 1.55, z + 0.42], 'shelf');
-    b.box([72.45, 1.5, z - 0.42], [77.55, 1.54, z + 0.42], 'shelf');
+    // 両面に商品を並べる（下の段は大きな箱、上はお菓子・カップ麺など）
+    const rows: GoodsRow[] = [];
+    for (const side of [-1, 1] as const) {
+      const faceZ = z + side * 0.4;
+      const avoid = SALE.filter(([, , iz]) => Math.abs(iz - faceZ) < 0.3).map(([ix, iy]) => [ix, iy] as [number, number]);
+      levels.forEach((y, i) => {
+        const room = (levels[i + 1] ?? 1.5) - y - 0.06;
+        const kinds: GoodsRow['kinds'] = i === 0 ? ['box'] : z < ZO ? (i === 3 ? ['box', 'cup'] : ['box', 'box', 'cup']) : ['cup', 'box'];
+        rows.push({ x1: 72.5, x2: 77.5, y: y + 0.025, front: faceZ, depthDir: side > 0 ? -1 : 1, room, kinds, avoid });
+      });
+    }
+    fillShelves(b, rows, z < ZO ? 11 : 12);
     // 一番上に並ぶ缶詰・保存食
     for (let x = 72.8; x < 77.3; x += 0.55) {
       b.prop(x % 1.1 < 0.55 ? 'russian_food_cans_01' : 'long_life_food', [x, 1.54, z + (z < ZO ? 0.15 : -0.15)], z < ZO ? 0 : Math.PI);
@@ -247,12 +265,9 @@ function buildStore(b: WorldBuilder, lights: BuildContext['lights']): void {
     [78.6, 0, z2 - 0.5, 0.4],
   ]) b.prop('plastic_crate_01', [cx, cy, cz], r);
   b.collision.add(78.35, z2 - 0.75, 79.25, z2 - 0.25);
-  // 冷蔵ケース
-  b.box([79.3, 0, ZO - 5], [79.9, 2.2, ZO + 5], 'counter', { collide: true });
-  const fridge = new THREE.Mesh(new THREE.PlaneGeometry(10, 2.0), new THREE.MeshBasicMaterial({ map: fridgeTexture() }));
-  fridge.rotation.y = -Math.PI / 2;
-  fridge.position.set(79.28, 1.05, ZO);
-  b.add(fridge);
+  // 冷蔵ケース（ガラス扉の中に飲み物）
+  drinkCooler(b, 79.3, ZO - 5, ZO + 5, [[ZO + 1.0, 0.95]]);
+  b.collision.add(79.25, ZO - 5, 80, ZO + 5);
   // 雑誌・新聞のラック（南西の窓際）
   b.box([70.2, 0, ZO + 2.2], [70.7, 0.9, ZO + 6.4], 'shelf', { collide: true });
   const paper = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.5), new THREE.MeshLambertMaterial({ map: newspaperTexture() }));
@@ -261,13 +276,10 @@ function buildStore(b: WorldBuilder, lights: BuildContext['lights']): void {
   b.interactable('newspaper', paper);
   paper.add(b.hitShape([0.5, 0.6, 0.2], [0, 0, 0]));
 
-  // 売り物（調べてカゴに入れる）
+  // 売り物（調べてカゴに入れる）。位置は SALE と同じ
   item(b, 'kiku', 71.3, 0, ZO + 2.1, 'bucket');
-  item(b, 'manju', 73.6, 1.0, ZO - 1.55, 0xd8c8a8);
-  item(b, 'senko', 76.4, 0.62, ZO - 1.55, 0x5a7a4a);
-  item(b, 'onigiri', 73.6, 1.0, ZO + 1.55, 0xf0f0f0);
-  item(b, 'candy', 76.4, 0.62, ZO + 1.55, 0xe05a8a);
-  item(b, 'milk', 79.22, 1.2, ZO + 1.0, 0xffffff);
+  for (const [x, y, z, id, color] of SALE) item(b, id, x, y, z, color);
+  item(b, 'milk', 79.45, 0.915, ZO + 1.0, 0xffffff);
 
   // 店の明かり（ここだけは明るい）
   lights.addFluorescent(73, H - 0.06, ZO - 3, 'steady', 0, 5, 'store');
@@ -277,6 +289,14 @@ function buildStore(b: WorldBuilder, lights: BuildContext['lights']): void {
 }
 
 /** 売り物。color は箱の色、'bucket' なら菊の花のバケツ */
+/** 棚に置いてある売り物（x, 棚板の高さ, z）。棚の商品はこのまわりを空けて並べる */
+const SALE: [number, number, number, string, number][] = [
+  [73.6, 0.885, ZO - 1.7, 'manju', 0xd8c8a8],
+  [76.4, 0.505, ZO - 1.7, 'senko', 0x5a7a4a],
+  [73.6, 0.885, ZO + 1.7, 'onigiri', 0xf0f0f0],
+  [76.4, 0.505, ZO + 1.7, 'candy', 0xe05a8a],
+];
+
 function item(b: WorldBuilder, id: string, x: number, y: number, z: number, color: number | 'bucket'): void {
   const g = new THREE.Group();
   g.position.set(x, y, z);
@@ -295,11 +315,11 @@ function item(b: WorldBuilder, id: string, x: number, y: number, z: number, colo
     }
     g.add(b.hitShape([0.5, 1.0, 0.5], [0, 0.5, 0]));
   } else {
-    for (let i = 0; i < 3; i++) {
-      const box = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.16, 0.1), new THREE.MeshLambertMaterial({ color, emissive: color, emissiveIntensity: 0.08 }));
-      box.position.set((i - 1) * 0.15, 0.08, 0);
-      g.add(box);
-    }
+    const look = storeItemMesh(id as 'manju' | 'senko' | 'onigiri' | 'candy' | 'milk');
+    // 冷蔵ケースの牛乳は、ガラス越しに手前（-x）を向ける
+    if (id === 'milk') look.rotation.y = -Math.PI / 2;
+    else if (z > ZO) look.rotation.y = Math.PI;
+    g.add(look);
     g.add(b.hitShape([0.55, 0.3, 0.25], [0, 0.1, 0]));
   }
   b.interactable(id, g);

@@ -50,6 +50,7 @@ const PBR: Record<string, PbrDef> = {
   clothDark: { d: 'clothDark_d', src: 'cotton_jersey' },
   clothGray: { d: 'clothGray_d', src: 'cotton_jersey' },
   fleece: { d: 'fleece_d', src: 'knitted_fleece' },
+  bark: { d: 'bark_d', src: 'japanese_camphor_bark' },
 };
 
 const texCache = new Map<string, THREE.Texture>();

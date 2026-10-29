@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import type { BuildContext } from '../../game/types';
 import { calendarTexture, familyPhotoTexture, noticeTexture, paperTexture, signTexture, staticTexture } from '../../engine/textures';
 import { ghostFigure, slidingDoor, wallPlane } from './parts';
-import { chabudai, dialPhone, faucet, leggedTable, oldFridge, sofa, tansu } from './props';
+import { blockWall, gableRoof, townHouse } from './town';
+import { chabudai, dialPhone, faucet, leggedTable, oldFridge, sofa, tansu, utilityPole } from './props';
 
 /**
  * コンビニの先：花子さんの家（z = ZH）と、自分の家（z = ZM）。
@@ -24,15 +25,14 @@ export function buildHouses(ctx: BuildContext): void {
 /** 古い住宅街の路地：板塀に挟まれた一本道。突き当たりが花子さんの家 */
 function buildAlley({ builder: b, lights }: BuildContext): void {
   b.plane(-2, ZH - 1.6, 24, ZH + 1.6, 0, 'asphalt');
-  for (const side of [-1, 1]) {
+  for (const side of [-1, 1] as const) {
     const z = ZH + side * 1.65;
-    b.box([-2, 0, z - 0.05], [24, 1.8, z + 0.05], 'fence', { collide: true });
-    // 塀の向こうの家々の影
-    // （花子さんの家 x 24〜 に重ならないように）
-    for (let x = -2; x < 18; x += 6) b.box([x + 0.5, 0, ZH + side * 3], [x + 5, 4.5 + ((x * 7) % 3), ZH + side * 9], 'roof');
+    blockWall(b, -2, 24, z, 1.8, side);
+    // 塀の向こうの家々（花子さんの家 x 24〜 に重ならないように）
+    for (let x = -2, i = 0; x < 18; x += 6.5, i++) townHouse(b, x + 0.4, x + 5.6, ZH + side * 2.6, side, 40 + i * 2 + (side > 0 ? 1 : 0));
   }
   b.collision.add(-2.5, ZH - 1.6, -2, ZH + 1.6);
-  b.box([9.8, 0, ZH + 1.2], [10.1, 6, ZH + 1.5], 'pole');
+  utilityPole(b, 9.95, ZH + 1.35);
   // 塀ぎわの古いごみ箱
   if (b.prop('metal_trash_can', [4.5, 0, ZH - 1.25], Math.PI, 0.9)) b.collision.add(3.7, ZH - 1.6, 5.3, ZH - 1.0);
   lights.addFluorescent(10, 4.2, ZH + 0.6, 'flicker', Math.PI / 2, 2.6);
@@ -81,7 +81,7 @@ function buildHanakoHouse({ builder: b, lights }: BuildContext): void {
   b.plane(32, ZH + 0.9, x2, zS, 0.01, 'tatami');
   b.plane(x1, zN, x2, zS, HH, 'plaster', false);
   // 天井と屋根の下面が同じ高さだとちらつくので、屋根は少し浮かせる
-  b.box([x1 - 0.3, HH + 0.02, zN - 0.3], [x2 + 0.3, HH + 0.6, zS + 0.3], 'roof');
+  gableRoof(b, x1, x2, zN, zS, HH + 0.02, 1.8, 0.45);
 
   // 外壁（入口は西の中央）と、襖の間仕切り
   b.wallZ(x1, zN, zS, 'plaster', [{ from: ZH - 0.7, to: ZH + 0.7, top: 2.0 }], HH);
@@ -170,13 +170,13 @@ function buildHanakoHouse({ builder: b, lights }: BuildContext): void {
 /** 自分の家の前の道 */
 function buildHomeStreet({ builder: b, lights }: BuildContext): void {
   b.plane(-2, ZM - 1.8, 12, ZM + 1.8, 0, 'asphalt');
-  for (const side of [-1, 1]) {
+  for (const side of [-1, 1] as const) {
     const z = ZM + side * 1.85;
-    b.box([-2, 0, z - 0.05], [11, 1.4, z + 0.05], 'concrete', { collide: true });
-    for (let x = -2; x < 7; x += 5) b.box([x + 0.3, 0, ZM + side * 3], [x + 4.6, 5, ZM + side * 9], 'roof');
+    blockWall(b, -2, 11, z, 1.4, side);
+    for (let x = -2, i = 0; x < 7; x += 5.5, i++) townHouse(b, x + 0.3, x + 5, ZM + side * 2.8, side, 60 + i * 2 + (side > 0 ? 1 : 0));
   }
   b.collision.add(-2.5, ZM - 1.8, -2, ZM + 1.8);
-  b.box([5, 0, ZM - 1.6], [5.25, 6, ZM - 1.35], 'pole');
+  utilityPole(b, 5.12, ZM - 1.48);
   lights.addFluorescent(5.1, 4.2, ZM - 0.8, 'steady', Math.PI / 2, 2.6);
   b.spawn('homeStreet', -1, ZM, -Math.PI / 2);
 }
@@ -194,7 +194,7 @@ function buildHome({ builder: b, lights }: BuildContext): void {
   b.plane(x1, zN, x2, zS, 0.01, 'woodfloor');
   b.plane(x1, zN, x2, zS, HH, 'storeCeil', false);
   // 天井と屋根の下面が同じ高さだとちらつくので、屋根は少し浮かせる
-  b.box([x1 - 0.3, HH + 0.02, zN - 0.3], [x2 + 0.3, HH + 0.6, zS + 0.3], 'roof');
+  gableRoof(b, x1, x2, zN, zS, HH + 0.02, 1.8, 0.45);
   b.wallZ(x1, zN, zS, 'homeWall', [{ from: ZM - 0.6, to: ZM + 0.6, top: 2.0 }], HH);
   b.wallZ(x2, zN, zS, 'homeWall', [], HH);
   b.wallX(zN, x1, x2, 'homeWall', [], HH);
