@@ -104,9 +104,8 @@ function strandHair(o: {
     const theta = rand() * Math.PI * 2;
     const signed = theta > Math.PI ? theta - Math.PI * 2 : theta;
     if (o.part && signed > o.part[0] && signed < o.part[1]) continue;
-    const front = Math.cos(theta) > 0.55;
-    // 生え際：正面はおでこの上まで、横・後ろは耳の上まで
-    const maxPolar = front ? 0.95 : 1.35;
+    // 生え際：正面はおでこの上まで、横・後ろは耳の上まで（間はなめらかにつなぐ）
+    const maxPolar = 1.35 - 0.4 * THREE.MathUtils.smoothstep(Math.cos(theta), 0.2, 0.75);
     const polar = Math.acos(1 - rand() * (1 - Math.cos(maxPolar)));
     const hx = Math.sin(theta);
     const hz = Math.cos(theta);
@@ -375,6 +374,28 @@ function mergeByMaterial(container: THREE.Object3D, keep: Set<THREE.Object3D> = 
   }
 }
 
+/**
+ * 半透明の人物を、いちばん手前の面だけ透けて見えるようにする。
+ * 先に奥行きだけを書く（色は書かない）複製を描いておくと、体の奥の部品（後ろ髪・背中の肩ひもなど）が
+ * 顔や服ごしに透けて見えなくなる。
+ */
+function depthPrepass(container: THREE.Object3D): void {
+  const depthOnly = new THREE.MeshBasicMaterial({ colorWrite: false, side: THREE.DoubleSide });
+  for (const c of [...container.children]) {
+    if (!(c instanceof THREE.Mesh)) continue;
+    const d = new THREE.Mesh(c.geometry, depthOnly);
+    d.position.copy(c.position);
+    d.quaternion.copy(c.quaternion);
+    d.scale.copy(c.scale);
+    d.renderOrder = -1;
+    d.userData.depthOnly = true;
+    container.add(d);
+    const m = c.material as THREE.Material;
+    m.depthWrite = false;
+    m.depthFunc = THREE.LessEqualDepth;
+  }
+}
+
 /** 黒い穴のような目・口（光を返さない） */
 const voidMat = () => new THREE.MeshBasicMaterial({ color: 0x020101 });
 
@@ -500,6 +521,8 @@ export function ghostFigure(opts: {
   const hS = V(0.93, 1.06, 0.98);
   const head = add(headGeometry(0.095, face === 'hollow' ? 0.12 : 0.07, face === 'hollow' ? 0.05 : 0.02), skin, hC.x, hC.y);
   head.scale.copy(hS);
+  // 顔は球の UV のまま（投影し直すと、顔の真ん中に模様の継ぎ目が出る）
+  head.userData.keepUV = true;
   for (const side of [-1, 1]) {
     if (face === 'hollow') {
       const e = add(new THREE.SphereGeometry(0.017, 12, 8), voidMat(), 0, 0);
@@ -539,7 +562,7 @@ export function ghostFigure(opts: {
     const capMat = hairMat.clone();
     capMat.roughness = 0.85;
     add(new THREE.SphereGeometry(0.1, 24, 14, 0, Math.PI * 2, 0, 1.2), capMat, 0, 1.065, -0.004).scale.set(0.96, 1.04, 1.0);
-    if (bob) add(new THREE.CylinderGeometry(0.098, 0.106, 0.1, 24, 1, true, 0.75, Math.PI * 2 - 1.5), capMat, 0, 1.04, -0.004);
+    if (bob) add(new THREE.CylinderGeometry(0.098, 0.106, 0.1, 24, 1, true, 1.3, Math.PI * 2 - 2.6), capMat, 0, 1.04, -0.004);
     const geo = bob
       ? strandHair({
           c: hairC,
@@ -547,7 +570,11 @@ export function ghostFigure(opts: {
           count: 300,
           len: () => 0.3,
           // 前髪は眉の上、横と後ろはあごの線で切りそろえる
-          cut: (th) => (Math.cos(th) > 0.55 ? 1.092 : 0.99),
+          // 正面の眉の高さから、ほおの横をあごの高さへ、なめらかに切り下げる
+          cut: (th) => {
+            const t = THREE.MathUtils.smoothstep(Math.cos(th), 0.2, 0.75);
+            return 0.99 + (1.092 - 0.99) * t;
+          },
           width: 0.018,
           messy: 0.03,
           spread: 0.05,
@@ -581,6 +608,7 @@ export function ghostFigure(opts: {
   }
   projectUVs(g, opts.stone ? 2.2 : 4);
   mergeByMaterial(body);
+  if (op < 1) depthPrepass(body);
   return g;
 }
 
@@ -701,6 +729,7 @@ export function shadowChild(seed = 3): THREE.Group {
   const hS = V(0.9, 1.08, 0.96);
   const head = new THREE.Mesh(headGeometry(0.088, 0.16, 0.08), skin);
   head.scale.copy(hS);
+  head.userData.keepUV = true;
   head.position.copy(headC);
   headGroup.add(head);
   // こけたほお、ひび割れのような黒い口

@@ -44,7 +44,7 @@ const PBR: Record<string, PbrDef> = {
   labTop: { d: 'labTop_d', src: 'concrete_wall_008', bump: 0.4 },
   statueStone: { d: 'statueStone_d', src: 'rock_surface' },
   moss: { d: 'moss_d', src: 'mossy_rock' },
-  porcelainSkin: { d: 'porcelainSkin_d', src: 'marble_01', bump: 0.3 },
+  porcelainSkin: { d: 'porcelainSkin_d', src: 'skin', bump: 0.4 },
   clothWhite: { d: 'clothWhite_d', src: 'cotton_jersey' },
   clothRed: { d: 'clothRed_d', src: 'cotton_jersey' },
   clothDark: { d: 'clothDark_d', src: 'cotton_jersey' },
