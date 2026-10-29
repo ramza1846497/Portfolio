@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { BuildContext } from '../../game/types';
+import { guardRail, utilityPole } from './props';
 import type { WorldBuilder } from '../../world/builder';
 import { fridgeTexture, newspaperTexture, noticeTexture, paperTexture, signTexture, storeSignTexture } from '../../engine/textures';
 import { H, ghostFigure, wallPlane } from './parts';
@@ -36,19 +37,36 @@ function buildRoad(b: WorldBuilder, lights: BuildContext['lights']): void {
   // ガードレール（道から外へは出られない）
   for (const side of [-1, 1]) {
     const z = ZO + side * 2.75;
-    b.box([1, 0.55, z - 0.03], [58, 0.8, z + 0.03], 'rail');
-    for (let x = 1; x <= 58; x += 2) b.box([x - 0.04, 0, z - 0.04], [x + 0.04, 0.78, z + 0.04], 'rail');
+    guardRail(b, 1, 58, z, side as 1 | -1);
     b.collision.add(-4, z - 0.15, 60, z + 0.15);
   }
 
   // 電柱と街灯（ほとんど消えている）
-  for (const x of [6, 18, 30, 42, 54]) {
-    b.box([x - 0.13, 0, ZO + 3.3], [x + 0.13, 7.5, ZO + 3.56], 'pole');
-    b.box([x - 0.5, 6.6, ZO + 3.38], [x + 0.5, 6.7, ZO + 3.48], 'pole');
-    b.box([x - 0.05, 5.0, ZO + 2.0], [x + 0.05, 5.06, ZO + 3.4], 'pole');
+  for (const x of [6, 18, 30, 42, 54]) utilityPole(b, x, ZO + 3.43, { transformer: x === 30, lamp: true });
+  // 電線（電柱のあいだで少したるむ）
+  const poles = [-6, 6, 18, 30, 42, 54, 66];
+  for (const [y, dz] of [
+    [7.38, -0.5],
+    [7.38, 0],
+    [7.38, 0.5],
+    [6.66, -0.4],
+    [6.66, 0.4],
+  ]) {
+    for (let i = 0; i < poles.length - 1; i++) {
+      const a = poles[i];
+      const span = poles[i + 1] - a;
+      const pts: THREE.Vector3[] = [];
+      for (let k = 0; k <= 8; k++) {
+        const t = k / 8;
+        pts.push(new THREE.Vector3(a + span * t, y - Math.sin(t * Math.PI) * 0.45, ZO + 3.43 + dz));
+      }
+      const wire = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 16, 0.008, 4), b.mat('dark'));
+      b.add(wire);
+    }
   }
-  // 電線
-  for (const y of [6.66, 7.3]) b.box([-3, y, ZO + 3.42], [58, y + 0.02, ZO + 3.44], 'dark');
+  // マンホールと配電箱
+  for (const x of [12, 36, 50]) b.prop('water_manhole_cover', [x, 0.002, ZO - 0.9], x * 0.3);
+  if (b.prop('utility_box_01', [30.6, 0, ZO + 3.2], Math.PI)) b.collision.add(30.3, ZO + 2.95, 30.9, ZO + 3.45);
   lights.addFluorescent(18, 4.95, ZO + 2.0, 'flicker', Math.PI / 2, 3.2, 'street');
   lights.addFluorescent(42, 4.95, ZO + 2.0, 'dim', Math.PI / 2, 3.2, 'street');
   for (const x of [6, 30, 54]) lights.addFluorescent(x, 4.95, ZO + 2.0, 'dead', Math.PI / 2);
@@ -206,9 +224,30 @@ function buildStore(b: WorldBuilder, lights: BuildContext['lights']): void {
 
   // 商品棚（二列）
   for (const z of [ZO - 2.0, ZO + 2.0]) {
-    b.box([72.5, 0, z - 0.4], [77.5, 1.5, z + 0.4], z < ZO ? 'goodsA' : 'goodsB', { collide: true });
+    // 商品の面は少し奥に。棚板・値札レール・端の板・台輪で、ゴンドラ棚らしく
+    b.box([72.55, 0.1, z - 0.36], [77.45, 1.5, z + 0.36], z < ZO ? 'goodsA' : 'goodsB');
+    b.collision.add(72.5, z - 0.4, 77.5, z + 0.4);
+    b.box([72.5, 0, z - 0.4], [77.5, 0.1, z + 0.4], 'dark');
+    for (const y of [0.1, 0.48, 0.86, 1.22]) {
+      b.box([72.5, y, z - 0.42], [77.5, y + 0.025, z + 0.42], 'shelf');
+      for (const side of [-1, 1]) b.box([72.5, y + 0.025, z + side * 0.42 - 0.008], [77.5, y + 0.06, z + side * 0.42 + 0.008], 'porcelain');
+    }
+    for (const x of [72.45, 77.55]) b.box([x - 0.03, 0, z - 0.42], [x + 0.03, 1.55, z + 0.42], 'shelf');
     b.box([72.45, 1.5, z - 0.42], [77.55, 1.54, z + 0.42], 'shelf');
+    // 一番上に並ぶ缶詰・保存食
+    for (let x = 72.8; x < 77.3; x += 0.55) {
+      b.prop(x % 1.1 < 0.55 ? 'russian_food_cans_01' : 'long_life_food', [x, 1.54, z + (z < ZO ? 0.15 : -0.15)], z < ZO ? 0 : Math.PI);
+    }
   }
+  // レジ横の電子レンジ、天井の防犯カメラ、奥の空きケース
+  b.prop('vintage_microwave', [73.2, 1.04, z1 + 1.45], Math.PI, 0.55);
+  b.prop('security_camera_01', [79.7, H - 0.05, z1 + 0.3], [0, -Math.PI * 0.75, 0], 1);
+  for (const [cx, cy, cz, r] of [
+    [79.0, 0, z2 - 0.5, 0.1],
+    [79.0, 0.26, z2 - 0.5, -0.2],
+    [78.6, 0, z2 - 0.5, 0.4],
+  ]) b.prop('plastic_crate_01', [cx, cy, cz], r);
+  b.collision.add(78.35, z2 - 0.75, 79.25, z2 - 0.25);
   // 冷蔵ケース
   b.box([79.3, 0, ZO - 5], [79.9, 2.2, ZO + 5], 'counter', { collide: true });
   const fridge = new THREE.Mesh(new THREE.PlaneGeometry(10, 2.0), new THREE.MeshBasicMaterial({ map: fridgeTexture() }));

@@ -91,6 +91,13 @@ export function createMaterials(): Record<string, MaterialDef> {
     metal: { material: lambert({ color: 0x8d918f }) },
     frame: { material: lambert({ color: 0x7c807d }) },
     skirting: { material: lambert({ color: 0x2a2a24 }) },
+    // 小物（写真の質感に差し替わる）
+    bamboo: { material: lambert({ color: 0xc8b078 }), texW: 1 },
+    leather: { material: lambert({ color: 0x3a2418 }), texW: 0.5 },
+    hydrant: { material: lambert({ color: 0xa8261c }), texW: 1 },
+    labTop: { material: lambert({ color: 0x262626 }), texW: 1 },
+    statueStone: { material: lambert({ color: 0x807d72 }), texW: 1.5 },
+    clothDark: { material: lambert({ color: 0x18171b }), texW: 0.6 },
     porcelain: { material: lambert({ color: 0xd9d6cc }) },
     red: { material: lambert({ color: 0x8c1a14 }) },
     dark: { material: lambert({ color: 0x0b0b0b }) },

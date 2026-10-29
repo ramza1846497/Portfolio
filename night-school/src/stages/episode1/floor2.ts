@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { BuildContext } from '../../game/types';
 import type { Opening, WorldBuilder } from '../../world/builder';
+import { boguBag, faucet, hydrantBox, lockerX, podium, squatToilet } from './props';
 import { bulletinTexture, paperTexture, portraitTexture, scrawlTexture } from '../../engine/textures';
 import {
   H,
@@ -83,7 +84,7 @@ export function buildFloor2({ builder: b, lights }: BuildContext): void {
   board.position.set(36.6, 1.55, -1.385);
   b.interactable('board', board);
   b.box([35.55, 0.88, -1.4], [37.65, 0.92, -1.36], 'wood');
-  b.box([9.4, 0.3, -1.4], [10.2, 1.3, -1.25], 'red');
+  hydrantBox(b, 9.4, 10.2, -1.4, 1);
   const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), new THREE.MeshBasicMaterial({ color: 0xff2a1a }));
   lamp.position.set(9.8, 1.45, -1.33);
   b.add(lamp);
@@ -123,7 +124,8 @@ export function buildFloor2({ builder: b, lights }: BuildContext): void {
   const shinai = shinaiProp(b);
   shinai.position.set(24.4, 0, -1.3);
   b.interactable('shinai', shinai);
-  b.box([24.6, 0, -1.4], [25.3, 0.45, -1.1], 'blanket');
+  boguBag(b, 24.95, -1.22);
+  b.collision.add(24.6, -1.4, 25.3, -1.05);
 
   // 西階段の前にうずくまる影（最初の敵）。倒すまで階段へは行けない
   const shadow = shadowChild();
@@ -143,7 +145,7 @@ function classroom(b: WorldBuilder, label: string, x1: number, x2: number, board
   blackboard(b, boardId, label, boardLines, x1, -5.5, 1);
   // 黒板の上の時計（止まっている）
   b.prop('wall_clock', [x1 + 0.11, 2.62, -5.5], Math.PI / 2, 1);
-  b.box([x1 + 0.9, 0, -6.2], [x1 + 1.7, 1.0, -4.8], 'wood', { collide: true });
+  podium(b, x1 + 0.9, x1 + 1.7, -6.2, -4.8);
   b.hitbox(podiumId, [x1 + 0.9, 0, -6.2], [x1 + 1.7, 1.0, -4.8]);
   const cols = [x1 + 2.6, x1 + 4.8, x1 + 7.0];
   const rows = [-2.7, -4.1, -5.5, -6.9, -8.3];
@@ -271,10 +273,7 @@ function buildToilet(b: WorldBuilder, lights: BuildContext['lights']): void {
     b.collision.add(hinge, fz - 0.03, hinge + dw, fz + 0.03, `${id}door`);
     b.openable(id, pivot, -1.75, `${id}door`);
 
-    b.box([c - 0.2, 0, 7.25], [c + 0.2, 0.06, 8.0], 'porcelain');
-    b.box([c - 0.14, 0.061, 7.4], [c + 0.14, 0.062, 7.9], 'dark');
-    b.box([c - 0.2, 0, 7.15], [c + 0.2, 0.22, 7.27], 'porcelain');
-    b.box([c + 0.25, 1.1, back - 0.1], [c + 0.45, 1.3, back], 'porcelain');
+    squatToilet(b, c, 7.15, 8.0, back);
   }
 
   const key = keyMesh(b);
@@ -291,10 +290,10 @@ function buildToilet(b: WorldBuilder, lights: BuildContext['lights']): void {
   b.box([15.35, 0.78, 3.0], [15.9, 0.86, 5.9], 'porcelain', { collide: true });
   b.box([15.5, 0, 3.05], [15.9, 0.78, 5.85], 'dark');
   for (const z of [3.5, 4.45, 5.4]) {
-    b.box([15.45, 0.84, z - 0.25], [15.8, 0.87, z + 0.25], 'dark');
-    b.box([15.75, 0.86, z - 0.02], [15.85, 1.05, z + 0.02], 'metal');
-    b.box([15.65, 1.0, z - 0.02], [15.85, 1.04, z + 0.02], 'metal');
+    b.box([15.45, 0.84, z - 0.25], [15.8, 0.862, z + 0.25], 'glassDark');
+    faucet(b, 15.82, 0.86, z);
   }
+  b.prop('bleach_bottle', [15.55, 0.86, 5.75], 0.6);
   b.hitbox('sink', [15.3, 0.7, 3.0], [15.9, 1.05, 5.9]);
   const mirror = new THREE.Mesh(new THREE.PlaneGeometry(2.7, 0.85), b.mat('mirror'));
   mirror.rotation.y = -Math.PI / 2;
@@ -302,8 +301,7 @@ function buildToilet(b: WorldBuilder, lights: BuildContext['lights']): void {
   b.interactable('mirror', mirror);
   b.box([15.86, 1.05, 3.05], [15.9, 1.95, 5.85], 'frame');
 
-  b.box([8.1, 0, 2.0], [8.65, 1.9, 2.95], 'locker', { collide: true });
-  b.box([8.649, 1.55, 2.3], [8.652, 1.62, 2.65], 'dark');
+  lockerX(b, 8.1, 8.65, 2.0, 2.95, 1.9);
   b.hitbox('locker', [8.1, 0, 2.0], [8.7, 1.9, 2.95]);
 
   lights.addFluorescent(12, H - 0.08, 4.2, 'flicker', 0, 3.2, 'toilet');

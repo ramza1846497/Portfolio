@@ -34,7 +34,7 @@ interface Enemy {
   cooldown: number;
   halfDone: boolean;
   /** 赤く光る・白く光るための材質一覧 */
-  mats: THREE.MeshLambertMaterial[];
+  mats: (THREE.MeshLambertMaterial | THREE.MeshStandardMaterial)[];
   flash: number;
   knock: THREE.Vector2;
   /** 攻撃の予兆：頭の上に出る「！」 */
@@ -84,9 +84,9 @@ export class Combat {
       if (!root) throw new Error(`enemy object not found: ${def.id}`);
       // 向き（y）のあとに前後の傾き（x）・ふらつき（z）をかける
       root.rotation.order = 'YXZ';
-      const mats: THREE.MeshLambertMaterial[] = [];
+      const mats: (THREE.MeshLambertMaterial | THREE.MeshStandardMaterial)[] = [];
       root.traverse((o) => {
-        if (o instanceof THREE.Mesh && o.material instanceof THREE.MeshLambertMaterial) {
+        if (o instanceof THREE.Mesh && (o.material instanceof THREE.MeshLambertMaterial || o.material instanceof THREE.MeshStandardMaterial)) {
           // 光らせる演出のため、敵ごとに材質を複製する
           o.material = o.material.clone();
           mats.push(o.material);
@@ -593,6 +593,16 @@ export class Combat {
 
   private makeWeapon(): THREE.Group {
     const g = new THREE.Group();
+    const custom = this.host.stage.weaponMesh?.();
+    if (custom) {
+      // 先を画面の奥（-z）へ向け、柄を手前に
+      custom.rotation.x = -Math.PI / 2;
+      custom.position.z = 0.22;
+      g.add(custom);
+      g.position.set(0.32, -0.32, -0.55);
+      g.visible = false;
+      return g;
+    }
     const bamboo = new THREE.MeshLambertMaterial({ color: 0xc8b078 });
     const blade = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.035, 0.95), bamboo);
     blade.position.z = -0.45;

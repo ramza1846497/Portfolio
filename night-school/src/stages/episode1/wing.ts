@@ -82,8 +82,9 @@ function buildCourtyard({ builder: b, lights }: BuildContext): void {
   // 夜空
   b.plane(x1 - 30, z1 - 30, x2 + 30, z2 + 30, 14, 'sky', false);
   // 台座
-  b.box([11.2, 0, OZ + 14.6], [12.8, 1.0, OZ + 16.2], 'concrete', { collide: true });
-  b.box([11.1, 1.0, OZ + 14.5], [12.9, 1.08, OZ + 16.3], 'concrete');
+  b.box([11.0, 0, OZ + 14.4], [13.0, 0.18, OZ + 16.4], 'statueStone');
+  b.box([11.2, 0.18, OZ + 14.6], [12.8, 1.0, OZ + 16.2], 'statueStone', { collide: true });
+  b.box([11.1, 1.0, OZ + 14.5], [12.9, 1.08, OZ + 16.3], 'statueStone');
   wallPlane(b, signTexture('勤勉'), 0.5, 0.19, [12, 0.6, OZ + 16.21], 0);
   b.hitbox('pedestal', [11.1, 0, OZ + 14.5], [12.9, 1.2, OZ + 16.3]);
   // 石の足跡（体育館の方へ）
@@ -186,6 +187,11 @@ function buildGym({ builder: b, lights }: BuildContext): void {
   b.box([GX1, 0, ZG2 - 4], [GX2, 1.0, ZG2], 'wood', { collide: true });
   b.box([GX1 + 3, 1.0, ZG2 - 1.2], [GX2 - 3, GH - 1.5, ZG2 - 1.0], 'red');
   sign(b, '体育館', 23.4, 2.75, ZG1 - 0.12, Math.PI, 0.9);
+
+  // 壁ぎわの長椅子と、転がったボール
+  for (const x of [12, 16, 28, 32]) if (b.prop('painted_wooden_bench', [x, 0, ZG1 + 0.45], 0)) b.collision.add(x - 0.58, ZG1 + 0.2, x + 0.58, ZG1 + 0.7);
+  b.prop('football', [14.5, 0, ZG1 + 6.2], 0.7);
+  b.prop('football', [30.2, 0, ZG2 - 6.8], 2.1);
 
   // 扉（体育館の鍵で開く）
   const door = slidingDoor(b, 'gymDoor', WX1, ZG1, WX2 - WX1, true);

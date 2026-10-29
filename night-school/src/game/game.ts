@@ -49,6 +49,7 @@ export class Game {
   private post: PostFX | null = null;
   private nearRay = new THREE.Raycaster(undefined, undefined, 0, 6);
   private nearFrame = 0;
+  private nearPoint = new THREE.Vector2();
   private atmosphere: Atmosphere;
   private actors = new Map<string, Actor>();
   /** 発火済みのトリガー */
@@ -520,7 +521,15 @@ export class Game {
       // 壁・床は影を落とさない（懐中電灯は目の位置なので、壁の影はほとんど見えず、描く量だけ倍になる）
       o.castShadow = shadows && lit && inStage && !held && !o.userData.static;
       o.receiveShadow = shadows && lit && mats.every((m) => !m.transparent);
-      for (const m of mats) m.needsUpdate = true;
+      for (const m of mats) {
+        m.needsUpdate = true;
+        // 字の描いてある物は、少しだけ暗めに（照らしても字が白く飛ばない）
+        const map = (m as THREE.MeshLambertMaterial).map;
+        if (map?.userData.text && !m.userData.textCapped && 'color' in m) {
+          (m as THREE.MeshLambertMaterial).color.multiplyScalar(0.8);
+          m.userData.textCapped = true;
+        }
+      }
     });
     this.post = new PostFX(this.renderer, q, this.scene, this.camera);
   }
@@ -616,9 +625,15 @@ export class Game {
   /** 画面中央から 2.5m 以内の、調べられる物を探す */
   /** 懐中電灯の先（画面の真ん中）の物までの距離を測って、明るさの調整に使う */
   private measureNear(): void {
-    this.nearRay.setFromCamera(this.center, this.camera);
-    const hit = this.nearRay.intersectObjects(this.builder.occluders, false)[0];
-    this.lights.setNearDistance(hit ? hit.distance : 10);
+    // 光の輪の真ん中・上・下の 3 か所で測り、いちばん近い物に合わせる（高い所の札、机の上の紙も）
+    const targets = [...this.builder.occluders, ...this.builder.pickables];
+    let near = 10;
+    for (const dy of [0, 0.22, -0.3]) {
+      this.nearRay.setFromCamera(this.nearPoint.set(0, dy), this.camera);
+      const hit = this.nearRay.intersectObjects(targets, true)[0];
+      if (hit) near = Math.min(near, hit.distance);
+    }
+    this.lights.setNearDistance(near);
   }
 
   private updateTarget(): void {

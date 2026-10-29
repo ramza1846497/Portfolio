@@ -360,7 +360,7 @@ export function skyTexture(): THREE.Texture {
 }
 
 /** 黒板。lines を手書き風のチョークで書く */
-export function blackboardTexture(key: string, lines: string[], options: { small?: string[] } = {}): THREE.Texture {
+function blackboardTextureImpl(key: string, lines: string[], options: { small?: string[] } = {}): THREE.Texture {
   return cached('bb' + key, () => {
     const [c, ctx] = makeCanvas(1024, 384);
     ctx.fillStyle = '#1f3a2c';
@@ -394,7 +394,7 @@ export function blackboardTexture(key: string, lines: string[], options: { small
 }
 
 /** 掲示板（コルク）と貼り紙 */
-export function bulletinTexture(): THREE.Texture {
+function bulletinTextureImpl(): THREE.Texture {
   return cached('bulletin', () => {
     const [c, ctx] = makeCanvas(512, 320);
     ctx.fillStyle = '#9c7445';
@@ -445,7 +445,7 @@ export function bulletinTexture(): THREE.Texture {
 }
 
 /** 文字だけの札（教室札など） */
-export function signTexture(text: string, bg = '#e6e2d3', fg = '#222'): THREE.Texture {
+function signTextureImpl(text: string, bg = '#e6e2d3', fg = '#222'): THREE.Texture {
   return cached('sign' + text + bg, () => {
     const [c, ctx] = makeCanvas(256, 96);
     ctx.fillStyle = bg;
@@ -463,7 +463,7 @@ export function signTexture(text: string, bg = '#e6e2d3', fg = '#222'): THREE.Te
 }
 
 /** 一枚の紙（教卓のメモなど） */
-export function paperTexture(key: string, lines: string[]): THREE.Texture {
+function paperTextureImpl(key: string, lines: string[]): THREE.Texture {
   return cached('paper' + key, () => {
     const [c, ctx] = makeCanvas(256, 192);
     ctx.fillStyle = '#e9e4d2';
@@ -484,7 +484,7 @@ export function paperTexture(key: string, lines: string[]): THREE.Texture {
 }
 
 /** 貼り紙（タイトル＋本文）。accent で見出しの色を変える */
-export function noticeTexture(key: string, title: string, lines: string[], accent = '#7a0d0d'): THREE.Texture {
+function noticeTextureImpl(key: string, title: string, lines: string[], accent = '#7a0d0d'): THREE.Texture {
   return cached('notice' + key, () => {
     const [c, ctx] = makeCanvas(256, 340);
     ctx.fillStyle = '#e6e0cc';
@@ -503,7 +503,7 @@ export function noticeTexture(key: string, title: string, lines: string[], accen
 }
 
 /** 壁の落書き（赤いなぐり書き） */
-export function scrawlTexture(key: string, lines: string[]): THREE.Texture {
+function scrawlTextureImpl(key: string, lines: string[]): THREE.Texture {
   return cached('scrawl' + key, () => {
     const [c, ctx] = makeCanvas(512, 256);
     ctx.clearRect(0, 0, 512, 256);
@@ -585,7 +585,7 @@ export function keysTexture(): THREE.Texture {
 }
 
 /** 音楽室の肖像画（顔は影だけ。目だけ白く光る） */
-export function portraitTexture(name: string, seedOffset: number): THREE.Texture {
+function portraitTextureImpl(name: string, seedOffset: number): THREE.Texture {
   return cached('portrait' + name, () => {
     const [c, ctx] = makeCanvas(160, 220);
     ctx.fillStyle = '#5a4020';
@@ -761,7 +761,7 @@ export function fridgeTexture(): THREE.Texture {
 }
 
 /** 新聞の一面 */
-export function newspaperTexture(): THREE.Texture {
+function newspaperTextureImpl(): THREE.Texture {
   return cached('newspaper', () => {
     const [c, ctx] = makeCanvas(256, 320);
     ctx.fillStyle = '#ddd6c0';
@@ -870,7 +870,7 @@ export function staticTexture(frame: number, message = ''): THREE.Texture {
 }
 
 /** 家族写真。blankIndex の人だけ顔がぼやけて見えない */
-export function familyPhotoTexture(key: string, people: number, blankIndex: number): THREE.Texture {
+function familyPhotoTextureImpl(key: string, people: number, blankIndex: number): THREE.Texture {
   return cached('photo' + key, () => {
     const [c, ctx] = makeCanvas(192, 144);
     ctx.fillStyle = '#5a4a32';
@@ -910,7 +910,7 @@ export function familyPhotoTexture(key: string, people: number, blankIndex: numb
 }
 
 /** カレンダー（二月）。markDay の日に赤い丸と書き込み */
-export function calendarTexture(key: string, markDay: number, note: string): THREE.Texture {
+function calendarTextureImpl(key: string, markDay: number, note: string): THREE.Texture {
   return cached('cal' + key, () => {
     const [c, ctx] = makeCanvas(160, 200);
     ctx.fillStyle = '#e8e4d6';
@@ -950,3 +950,24 @@ export function calendarTexture(key: string, markDay: number, note: string): THR
     return toTexture(c, false);
   });
 }
+
+/**
+ * 字や絵の描いてあるテクスチャには印を付ける（懐中電灯で白く飛ばないよう、明るさを少し抑えるため）
+ */
+function markText<A extends unknown[]>(make: (...args: A) => THREE.Texture): (...args: A) => THREE.Texture {
+  return (...args: A) => {
+    const t = make(...args);
+    t.userData.text = true;
+    return t;
+  };
+}
+export const blackboardTexture = markText(blackboardTextureImpl);
+export const bulletinTexture = markText(bulletinTextureImpl);
+export const signTexture = markText(signTextureImpl);
+export const paperTexture = markText(paperTextureImpl);
+export const noticeTexture = markText(noticeTextureImpl);
+export const scrawlTexture = markText(scrawlTextureImpl);
+export const portraitTexture = markText(portraitTextureImpl);
+export const newspaperTexture = markText(newspaperTextureImpl);
+export const familyPhotoTexture = markText(familyPhotoTextureImpl);
+export const calendarTexture = markText(calendarTextureImpl);

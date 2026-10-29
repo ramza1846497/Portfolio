@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { Opening, WorldBuilder } from '../../world/builder';
-import { blackboardTexture, keysTexture, muscleTexture, noticeTexture, signTexture } from '../../engine/textures';
+import { blackboardTexture, muscleTexture, noticeTexture, signTexture } from '../../engine/textures';
+import { blackboardTrim, shinaiMesh } from './props';
 
 /** 天井の高さ */
 export const H = 3;
@@ -98,7 +99,7 @@ export function blackboard(b: WorldBuilder, id: string, key: string, lines: stri
   bb.rotation.y = facing > 0 ? Math.PI / 2 : -Math.PI / 2;
   bb.position.set(x + facing * 0.115, 1.55, zc);
   b.interactable(id, bb);
-  b.box([x + facing * 0.1, 0.76, zc - 2.1], [x + facing * 0.22, 0.8, zc + 2.1], 'wood');
+  blackboardTrim(b, x, zc, facing);
 }
 
 /** 机と椅子 1 組（黒板は -x 側）。fallen=true で椅子が倒れている */
@@ -172,6 +173,12 @@ export function barricade(b: WorldBuilder, x0: number, dir: 1 | -1, oz = 0): voi
   for (const [dx, dz, y, flip] of spots) {
     const x = x0 + dir * dx;
     const z = oz + dz;
+    // 写真の机を、上下さかさま・ななめに積み上げる
+    const ry = -Math.PI / 2 + Math.sin(dx * 9 + dz * 5) * 0.35;
+    if (flip ? b.prop('SchoolDesk_01', [x, y + 0.76, z], [Math.PI, ry, Math.sin(dz * 3) * 0.08], 0.85) : b.prop('SchoolDesk_01', [x, y, z], [0, ry, Math.sin(dx * 7) * 0.05], 0.85)) {
+      if (!flip && y > 1) b.prop('SchoolChair_01', [x + 0.1, y + 0.76, z], [0.2, ry + 1.2, 0.3], 0.9);
+      continue;
+    }
     const top = flip ? y : y + 0.68;
     b.box([x - 0.23, top, z - 0.3], [x + 0.22, top + 0.03, z + 0.3], 'wood');
     b.box([x - 0.2, flip ? y + 0.06 : y + 0.52, z - 0.27], [x + 0.18, flip ? y + 0.16 : y + 0.62, z + 0.27], 'metalGray');
@@ -409,29 +416,45 @@ export function anatomyModel(b: WorldBuilder): { root: THREE.Group; heart: THREE
 
 /** アップライトピアノ（正面は +x）。原点は鍵盤の中央の床 */
 export function piano(b: WorldBuilder): THREE.Group {
+  // アップライトピアノ：黒い艶のある本体、蓋、鍵盤（白鍵 52・黒鍵 36）、ペダル。正面は +x
   const g = new THREE.Group();
-  const black = new THREE.MeshPhongMaterial({ color: 0x0c0c0e, specular: 0x666666, shininess: 70 });
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.3, 1.5), black);
-  body.position.set(-0.3, 0.65, 0);
-  g.add(body);
-  const shelf = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.05, 1.5), black);
-  shelf.position.set(0.12, 0.72, 0);
-  g.add(shelf);
-  const keys = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 0.18), new THREE.MeshLambertMaterial({ map: keysTexture() }));
-  keys.rotation.x = -Math.PI / 2;
-  keys.rotation.z = Math.PI / 2;
-  keys.position.set(0.14, 0.751, 0);
-  g.add(keys);
-  for (const z of [-0.7, 0.7]) {
-    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.72, 0.08), black);
-    leg.position.set(0.22, 0.36, z);
-    g.add(leg);
+  const black = new THREE.MeshPhongMaterial({ color: 0x0b0b0d, specular: 0x8a8a8a, shininess: 90 });
+  const add = (geo: THREE.BufferGeometry, m: THREE.Material, x: number, y: number, z: number) => {
+    const mesh = new THREE.Mesh(geo, m);
+    mesh.position.set(x, y, z);
+    g.add(mesh);
+    return mesh;
+  };
+  add(new THREE.BoxGeometry(0.55, 1.25, 1.52), black, -0.33, 0.645, 0);
+  add(new THREE.BoxGeometry(0.6, 0.03, 1.55), black, -0.31, 1.285, 0);
+  add(new THREE.BoxGeometry(0.04, 0.5, 1.36), black, -0.04, 1.05, 0);
+  add(new THREE.BoxGeometry(0.3, 0.08, 1.52), black, 0.05, 0.69, 0);
+  for (const z of [-0.74, 0.74]) {
+    add(new THREE.BoxGeometry(0.3, 0.2, 0.06), black, 0.05, 0.84, z);
+    add(new THREE.BoxGeometry(0.07, 0.62, 0.07), black, 0.17, 0.31, z);
+    add(new THREE.BoxGeometry(0.42, 0.05, 0.08), black, 0.02, 0.025, z);
   }
+  // 鍵盤
+  const white = new THREE.MeshStandardMaterial({ color: 0xf0ece0, roughness: 0.35 });
+  const ebony = new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.3 });
+  const kw = 1.36 / 52;
+  const wk = new THREE.InstancedMesh(new THREE.BoxGeometry(0.14, 0.02, kw * 0.92), white, 52);
+  const m = new THREE.Matrix4();
+  for (let i = 0; i < 52; i++) wk.setMatrixAt(i, m.makeTranslation(0.13, 0.74, -0.68 + kw * (i + 0.5)));
+  g.add(wk);
+  const blackIdx: number[] = [];
+  for (let i = 0; i < 51; i++) if (![2, 6].includes((i + 5) % 7)) blackIdx.push(i);
+  const bk = new THREE.InstancedMesh(new THREE.BoxGeometry(0.085, 0.022, kw * 0.55), ebony, blackIdx.length);
+  blackIdx.forEach((i, n) => bk.setMatrixAt(n, m.makeTranslation(0.1, 0.758, -0.68 + kw * (i + 1))));
+  g.add(bk);
+  // ペダル
+  const brass = new THREE.MeshStandardMaterial({ color: 0xb8923a, roughness: 0.35, metalness: 0.8 });
+  for (const z of [-0.08, 0, 0.08]) add(new THREE.BoxGeometry(0.1, 0.015, 0.03), brass, 0.02, 0.07, z);
   // 譜面
   const score = new THREE.Mesh(new THREE.PlaneGeometry(0.45, 0.3), new THREE.MeshLambertMaterial({ color: 0xe6e0cc }));
   score.rotation.y = Math.PI / 2;
   score.rotation.x = -0.2;
-  score.position.set(0.01, 1.0, 0);
+  score.position.set(-0.01, 1.0, 0);
   g.add(score);
   g.add(b.hitShape([0.9, 1.28, 1.6], [-0.1, 0.64, 0]));
   return g;
@@ -464,8 +487,14 @@ export function officeDesk(b: WorldBuilder, x: number, z: number, papers: boolea
     b.box([x - 0.62, 0.7, z - 0.37], [x + 0.62, 0.73, z + 0.37], 'frame');
   }
   if (papers) {
-    b.box([x - 0.4, 0.73, z - 0.2], [x - 0.05, 0.76, z + 0.15], 'porcelain');
-    b.box([x + 0.15, 0.73, z - 0.25], [x + 0.45, 0.95, z - 0.05], 'dark');
+    // 書類・ファイル・文房具（写真のモデル。なければ箱）
+    const ok = b.prop('office_notepads', [x - 0.25, 0.73, z], 0.3, 0.45);
+    b.prop('binder_notebook', [x + 0.3, 0.73, z - 0.15], 1.4, 0.8);
+    b.prop('stationery_supplies', [x + 0.42, 0.73, z + 0.2], -0.5);
+    if (!ok) {
+      b.box([x - 0.4, 0.73, z - 0.2], [x - 0.05, 0.76, z + 0.15], 'porcelain');
+      b.box([x + 0.15, 0.73, z - 0.25], [x + 0.45, 0.95, z - 0.05], 'dark');
+    }
   }
 }
 
@@ -517,13 +546,10 @@ export function shadowChild(): THREE.Group {
 /** 立てかけた竹刀（拾える物） */
 export function shinaiProp(b: WorldBuilder): THREE.Group {
   const g = new THREE.Group();
-  const blade = new THREE.Mesh(new THREE.BoxGeometry(0.035, 1.1, 0.035), new THREE.MeshLambertMaterial({ color: 0xc8b078 }));
-  blade.position.y = 0.6;
-  g.add(blade);
-  const grip = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.25, 0.045), new THREE.MeshLambertMaterial({ color: 0x5a3020 }));
-  grip.position.y = 0.12;
-  g.add(grip);
-  g.rotation.z = 0.18;
+  // 壁に立てかけた竹刀
+  const s = shinaiMesh();
+  s.rotation.z = 0.18;
+  g.add(s);
   g.add(b.hitShape([0.4, 1.3, 0.4], [0, 0.6, 0]));
   return g;
 }

@@ -245,6 +245,8 @@ export interface StageDef {
   enemies?: EnemyDef[];
   /** この持ち物を持っていると攻撃・回避ができる */
   weaponItem?: string;
+  /** 手に持った武器の見た目（原点は柄頭、+y が先）。ないときは簡単な棒 */
+  weaponMesh?: () => THREE.Object3D;
   /** 操作説明のパネル */
   tutorials?: Record<string, TutorialDef>;
   /** 戦闘中に一度だけ出すヒント（初めて敵が身構えた・初めて攻撃を受けた など） */

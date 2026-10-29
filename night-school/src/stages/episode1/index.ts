@@ -15,6 +15,7 @@ import { clerkActor } from './clerk';
 import { buildHouses, ZH, ZM } from './houses';
 import { modelActor } from './model';
 import { movies } from './movies';
+import { shinaiMesh } from './props';
 import { buildOutside, ZO } from './outside';
 import { buildWing } from './wing';
 
@@ -42,6 +43,7 @@ export const episode1: StageDef = {
   tutorials,
   combatHints,
   movies,
+  weaponMesh: shinaiMesh,
   faintScript: 'faint',
   // 2 = 2 階、1 = 1 階、0 = 校舎の外、3 = 花子さんの家のあたり、4 = 自分の家のあたり
   floorOf: (x, z) => (z > (ZH + ZM) / 2 ? 4 : z > (ZO + ZH) / 2 ? 3 : z > (OZ + ZO) / 2 ? 0 : z > OZ + 9.4 || (z > OZ + 1.6 && x > 22.3 && x < 24.5) ? 5 : z > OZ / 2 ? 1 : 2),

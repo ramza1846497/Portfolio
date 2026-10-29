@@ -94,6 +94,12 @@ export class WorldBuilder {
     if (opts.collide) this.collision.add(min[0], min[2], max[0], max[2]);
   }
 
+  /** 静的な任意の形（円柱・回転体など）。ワールド座標で置いた geometry を、材質ごとにまとめて描く */
+  mesh(geo: THREE.BufferGeometry, matKey: string): void {
+    this.applyWorldUV(geo, matKey);
+    this.queue(matKey, geo);
+  }
+
   /** 個別に動かせる直方体（原点 = pivot）。親グループに入れて返す */
   dynamicBox(size: Vec3, offset: Vec3, matKey: string | THREE.Material): THREE.Mesh {
     const geo = new THREE.BoxGeometry(size[0], size[1], size[2]);

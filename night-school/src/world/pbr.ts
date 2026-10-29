@@ -38,7 +38,59 @@ const PBR: Record<string, PbrDef> = {
   tatami: { d: 'tatami_d', src: 'tatami_mat' },
   roof: { d: 'roof_d', src: 'grey_roof_tiles' },
   fence: { d: 'fence_d', src: 'concrete_block_wall' },
+  bamboo: { d: 'bamboo_d', src: 'bamboo_wall_02' },
+  leather: { d: 'leather_d', src: 'fabric_leather_02' },
+  hydrant: { d: 'hydrant_d', src: 'rusty_painted_metal', bump: 0.5 },
+  labTop: { d: 'labTop_d', src: 'concrete_wall_008', bump: 0.4 },
+  statueStone: { d: 'statueStone_d', src: 'granite_wall' },
+  moss: { d: 'moss_d', src: 'mossy_stone_wall' },
+  porcelainSkin: { d: 'porcelainSkin_d', src: 'marble_01', bump: 0.3 },
+  clothWhite: { d: 'clothWhite_d', src: 'cotton_jersey' },
+  clothRed: { d: 'clothRed_d', src: 'cotton_jersey' },
+  clothDark: { d: 'clothDark_d', src: 'cotton_jersey' },
+  clothGray: { d: 'clothGray_d', src: 'cotton_jersey' },
+  fleece: { d: 'fleece_d', src: 'knitted_fleece' },
 };
+
+const texCache = new Map<string, THREE.Texture>();
+/** 写真の質感 1 枚（同じ物は使い回す）。読み込めないときは何も貼らないまま */
+function tex(name: string, color: boolean, repeat: number): THREE.Texture {
+  const key = `${name}@${repeat}`;
+  let t = texCache.get(key);
+  if (!t) {
+    t = new THREE.TextureLoader().load(`${BASE}${name}.webp`, undefined, undefined, () => console.warn(`[pbr] could not load ${name}`));
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(repeat, repeat);
+    t.anisotropy = 4;
+    if (color) t.colorSpace = THREE.SRGBColorSpace;
+    texCache.set(key, t);
+  }
+  return t;
+}
+
+/**
+ * 人物・敵・小物用：写真の質感の材質をすぐに作る（読み込みは後から追いつく）。
+ * repeat は UV 1 あたりに何回くり返すか（球や円柱の UV は 0〜1 なので、細かくしたいときに上げる）。
+ */
+export function pbrMaterial(key: string, opts: { repeat?: number; color?: number; transparent?: boolean; opacity?: number; side?: THREE.Side; roughness?: number } = {}): THREE.MeshStandardMaterial {
+  const p = PBR[key];
+  if (!p) throw new Error(`unknown pbr material: ${key}`);
+  const r = opts.repeat ?? 1;
+  const m = new THREE.MeshStandardMaterial({
+    map: tex(p.d, true, r),
+    normalMap: tex(`${p.src}_n`, false, r),
+    roughnessMap: tex(`${p.src}_r`, false, r),
+    color: opts.color ?? 0xffffff,
+    roughness: opts.roughness ?? 1,
+    metalness: 0,
+    transparent: opts.transparent ?? false,
+    opacity: opts.opacity ?? 1,
+    side: opts.side ?? THREE.FrontSide,
+    depthWrite: !(opts.transparent ?? false),
+  });
+  m.normalScale.set(p.bump ?? 1, p.bump ?? 1);
+  return m;
+}
 
 const BASE = './textures/';
 

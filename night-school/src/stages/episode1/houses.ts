@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { BuildContext } from '../../game/types';
 import { calendarTexture, familyPhotoTexture, noticeTexture, paperTexture, signTexture, staticTexture } from '../../engine/textures';
 import { ghostFigure, slidingDoor, wallPlane } from './parts';
+import { chabudai, dialPhone, faucet, leggedTable, oldFridge, sofa, tansu } from './props';
 
 /**
  * コンビニの先：花子さんの家（z = ZH）と、自分の家（z = ZM）。
@@ -100,12 +101,11 @@ function buildHanakoHouse({ builder: b, lights }: BuildContext): void {
   });
 
   // 居間：ちゃぶ台と、箪笥の上の黒電話
-  b.box([28.4, 0, ZH - 4.1], [29.6, 0.35, ZH - 2.9], 'wood', { collide: true });
-  b.box([26.1, 0, ZH - 5.4], [26.8, 0.75, ZH - 3.8], 'wood', { collide: true });
+  chabudai(b, 29.0, ZH - 3.5, 0.6);
+  tansu(b, 26.1, 26.8, ZH - 5.4, ZH - 3.8, 0.75);
   const phone = new THREE.Group();
   phone.position.set(26.45, 0.75, ZH - 4.6);
-  phone.add(b.dynamicBox([0.22, 0.09, 0.2], [0, 0.045, 0], 'lacquer'));
-  phone.add(b.dynamicBox([0.24, 0.05, 0.06], [0, 0.12, 0], 'lacquer'));
+  phone.add(dialPhone(0x0c0a0a));
   phone.add(b.hitShape([0.4, 0.35, 0.4], [0, 0.1, 0]));
   b.interactable('hanakoPhone', phone);
   lights.addFluorescent(29, HH - 0.05, ZH - 3.5, 'dim', 0, 2.2);
@@ -146,13 +146,16 @@ function buildHanakoHouse({ builder: b, lights }: BuildContext): void {
 
   // 台所：流しと、マッチの入った引き出し
   b.box([30.4, 0, ZH + 5.3], [31.9, 0.85, ZH + 5.95], 'counter', { collide: true });
-  b.box([30.6, 0.86, ZH + 5.4], [31.2, 0.87, ZH + 5.85], 'dark');
-  b.box([26.1, 0, ZH + 4.6], [26.8, 1.6, ZH + 5.9], 'porcelain', { collide: true });
+  b.box([30.6, 0.86, ZH + 5.4], [31.2, 0.87, ZH + 5.85], 'glassDark');
+  faucet(b, 30.9, 0.86, ZH + 5.9);
+  oldFridge(b, 26.1, 26.8, ZH + 4.6, ZH + 5.9, 1.6);
   b.hitbox('kitchenDrawer', [30.3, 0.4, ZH + 5.1], [31.95, 0.9, ZH + 5.95]);
-  b.box([28.2, 0, ZH + 2.6], [29.4, 0.7, ZH + 3.6], 'wood', { collide: true });
+  leggedTable(b, 28.2, 29.4, ZH + 2.6, ZH + 3.6, 0.7);
 
   // 子供部屋：学習机とランドセル、止まったカレンダー
-  b.box([36.2, 0, ZH + 5.2], [37.8, 0.72, ZH + 5.9], 'wood', { collide: true });
+  tansu(b, 36.2, 36.6, ZH + 5.2, ZH + 5.9, 0.68);
+  leggedTable(b, 36.2, 37.8, ZH + 5.2, ZH + 5.9, 0.72);
+  b.prop('alarm_clock_01', [37.5, 0.72, ZH + 5.6], -Math.PI / 2);
   const bag = new THREE.Group();
   bag.position.set(36.7, 0.72, ZH + 5.5);
   bag.add(b.dynamicBox([0.3, 0.32, 0.2], [0, 0.16, 0], 'red'));
@@ -226,8 +229,8 @@ function buildHome({ builder: b, lights }: BuildContext): void {
   b.box([23.3, 0, ZM - 0.4], [23.85, 0.8, ZM + 0.4], 'wood', { collide: true });
   const phone = new THREE.Group();
   phone.position.set(23.55, 0.8, ZM);
-  phone.add(b.dynamicBox([0.2, 0.08, 0.22], [0, 0.04, 0], 'porcelain'));
-  phone.add(b.dynamicBox([0.06, 0.05, 0.24], [0, 0.1, 0], 'porcelain'));
+  phone.rotation.y = Math.PI;
+  phone.add(dialPhone(0xe6dcc6));
   phone.add(b.hitShape([0.45, 0.35, 0.45], [0, 0.1, 0]));
   b.interactable('homePhone', phone);
 
@@ -247,13 +250,13 @@ function buildHome({ builder: b, lights }: BuildContext): void {
     const show = t % 4 < 0.6;
     screenMat.map = show ? tvA : Math.floor(t * 12) % 2 ? tvB : staticTexture(3);
   });
-  b.box([15.5, 0, ZM - 4.6], [17.5, 0.45, ZM - 3.8], 'blanket', { collide: true });
+  sofa(b, 15.5, 17.5, ZM - 4.6, ZM - 3.8);
   b.interactable('familyPhoto', wallPlane(b, familyPhotoTexture('home', 3, 2), 0.5, 0.38, [15.0, 1.55, ZM - 4.88], 0));
   lights.addFluorescent(15, HH - 0.05, ZM - 3, 'dim', 0, 1.6);
 
   // 台所：流しに向かって立つ「母」
   b.box([18.3, 0, zN + 0.15], [23.8, 0.9, zN + 0.75], 'counter', { collide: true });
-  b.box([20.0, 0, ZM - 2.9], [21.6, 0.72, ZM - 2.1], 'wood', { collide: true });
+  leggedTable(b, 20.0, 21.6, ZM - 2.9, ZM - 2.1, 0.72);
   const motherBack = ghostFigure({ hair: 0x1a1612, top: 0x8a6a5a, bottom: 0x4a4a5a, opacity: 1, height: 1.62 });
   motherBack.position.set(21, 0, zN + 1.05);
   motherBack.rotation.y = Math.PI;
@@ -264,10 +267,17 @@ function buildHome({ builder: b, lights }: BuildContext): void {
   lights.addFluorescent(21, HH - 0.05, ZM - 3, 'flicker', 0, 1.8, 'kitchen');
 
   // 自分の部屋：ベッドと机
-  b.box([12.2, 0, ZM + 3.2], [14.2, 0.45, ZM + 4.85], 'metalGray', { collide: true });
-  b.box([12.25, 0.45, ZM + 3.25], [14.15, 0.6, ZM + 4.8], 'blanket');
+  if (b.prop('old_bed_frame', [13.2, 0, ZM + 4.03], Math.PI / 2, [0.95, 0.95, 1.0])) {
+    b.collision.add(12.2, ZM + 3.2, 14.2, ZM + 4.85);
+    b.box([12.3, 0.42, ZM + 3.6], [14.1, 0.5, ZM + 4.45], 'porcelain');
+    b.box([12.3, 0.5, ZM + 3.55], [13.6, 0.58, ZM + 4.5], 'blanket');
+  } else {
+    b.box([12.2, 0, ZM + 3.2], [14.2, 0.45, ZM + 4.85], 'metalGray', { collide: true });
+    b.box([12.25, 0.45, ZM + 3.25], [14.15, 0.6, ZM + 4.8], 'blanket');
+  }
   b.hitbox('myBed', [12.2, 0.3, ZM + 3.2], [14.2, 0.8, ZM + 4.85]);
-  b.box([16.2, 0, ZM + 4.2], [17.8, 0.72, ZM + 4.85], 'wood', { collide: true });
+  leggedTable(b, 16.2, 17.8, ZM + 4.2, ZM + 4.85, 0.72);
+  b.prop('desk_lamp_arm_01', [17.5, 0.72, ZM + 4.65], Math.PI, 0.6);
   b.box([16.6, 0.72, ZM + 4.4], [17.2, 0.75, ZM + 4.75], 'porcelain');
   // 風呂場の扉（開かない）
   b.box([20.0, 0, ZM + 1.04], [21.0, 2.0, ZM + 1.08], 'porcelain', { collide: true });

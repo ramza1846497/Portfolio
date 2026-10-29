@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { BuildContext } from '../../game/types';
+import { labBench, lockerX, shoeLocker, specimenShelf } from './props';
 import type { WorldBuilder } from '../../world/builder';
 import { noticeTexture, paperTexture } from '../../engine/textures';
 import {
@@ -8,7 +9,6 @@ import {
   blackboard,
   firstAidKit,
   doorOpening,
-  labTable,
   moonPatch,
   notice,
   officeDesk,
@@ -93,18 +93,15 @@ function buildScience(b: WorldBuilder, lights: BuildContext['lights']): void {
   roomShell(b, 14, 26, zFar, zNear);
   roomPlate(b, '理科室', 15.6, zNear, 1);
   blackboard(b, 'blackboardScience', 'science', ['てこの原理', '支点・力点・作用点', '　　　　　　（自習）'], 14, OZ - 5.5, 1);
-  for (const x of [17.6, 21.6]) for (const z of [OZ - 7, OZ - 4]) labTable(b, x, z);
+  const tops = ['burner', 'chem', 'microscope', 'burner'] as const;
+  let ti = 0;
+  for (const x of [17.6, 21.6]) for (const z of [OZ - 7, OZ - 4]) labBench(b, x, z, tops[ti++]);
 
   const notes = notice(b, 'scirule', '理科室のきまり', ['一、薬品にさわらない', '二、走らない', '三、人体模型から', '　　目をはなさない', '四、……'], [19.6, 1.6, zNear - 0.115], Math.PI);
   b.interactable('scienceRule', notes);
 
   // 棚の標本びん
-  b.box([25.4, 0, OZ - 6.8], [25.9, 1.8, OZ - 3.2], 'wood', { collide: true });
-  for (let i = 0; i < 6; i++) {
-    const z = OZ - 6.5 + i * 0.55;
-    b.box([25.5, 1.0, z], [25.75, 1.25, z + 0.25], 'glassDark');
-    b.box([25.5, 1.45, z + 0.1], [25.75, 1.68, z + 0.3], 'porcelain');
-  }
+  specimenShelf(b, 25.4, 25.9, OZ - 6.8, OZ - 3.2);
   b.hitbox('specimens', [25.3, 0.9, OZ - 6.8], [25.9, 1.8, OZ - 3.2]);
 
   const model = anatomyModel(b);
@@ -221,8 +218,8 @@ function buildNurseRoom(b: WorldBuilder, lights: BuildContext['lights']): void {
   aid.position.set(11.6, 0.72, z1 + 2.1);
   aid.rotation.y = Math.PI / 2;
   b.interactable('firstAidNurse', aid);
-  b.box([11.1, 0, z1 + 4.0], [11.55, 1.9, z1 + 6.2], 'locker', { collide: true });
-  b.box([11.56, 0.9, z1 + 4.1], [11.57, 1.8, z1 + 6.1], 'glassDark');
+  lockerX(b, 11.1, 11.55, z1 + 4.0, z1 + 6.2, 1.9);
+  b.prop('medical_tape', [11.6, 0.73, z1 + 1.6], 0.8);
   b.hitbox('medicine', [11.1, 0.8, z1 + 4.0], [11.7, 1.9, z1 + 6.2]);
   b.box([12.6, 0, z1 + 6.6], [13.0, 0.08, z1 + 7.0], 'metal');
   notice(b, 'nurserule', '保健室では', ['しずかに', '', 'ねている人を', 'おこさないこと'], [x1 + 0.12, 1.5, z1 + 3.2], Math.PI / 2, '#1a5a3a');
@@ -273,8 +270,7 @@ function buildEntrance(b: WorldBuilder, lights: BuildContext['lights']): void {
       [32.4, 36.0],
       [40.0, 43.6],
     ]) {
-      b.box([x1, 0, z - 0.2], [x2, 1.8, z + 0.2], 'cubby', { collide: true });
-      b.box([x1, 1.8, z - 0.22], [x2, 1.84, z + 0.22], 'wood');
+      shoeLocker(b, x1, x2, z, x1 === 32.4 && z === OZ + 4.2);
     }
   }
   b.hitbox('shoes', [32.4, 0, OZ + 4.0], [36.0, 1.8, OZ + 4.4]);
