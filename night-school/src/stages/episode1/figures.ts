@@ -3,7 +3,8 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import type { WorldBuilder } from '../../world/builder';
 import { muscleTexture } from '../../engine/textures';
 import { pbrMaterial } from '../../world/pbr';
-import { ease, makeRig, wave, type Pose, type RigContext } from './rig';
+import { wave } from './rig';
+import { shadowCreature } from './creature';
 
 /*
  * 人の形をした登場人物・敵。写真の質感（布・陶器のような肌・石）を組み合わせ、
@@ -868,149 +869,42 @@ export function shadowChild(seed = 3): THREE.Group {
   for (const j of [body, ...joints]) mergeByMaterial(j, new Set(joints.filter((c) => c.parent === j)));
 
   const ph = rand() * 10;
-  // 髪は関節の目標ではなく、重さで垂れるように別に動かす
-  const { hair: _hair, ...bodyJoints } = J;
+  // 髪は重さで垂れるように、体とは別に動かす
   const qUp = new THREE.Quaternion();
   const qHead = new THREE.Quaternion();
   const qSway = new THREE.Quaternion();
   const sway = new THREE.Euler();
-  g.userData.rig = makeRig(g, bodyJoints, (c) => shadowPose(c, ph), (c) => {
-    const t = c.t + ph;
-    // 髪：頭がどれだけ傾いても、だいたい真下へ垂れる（少しだけ頭の傾きにつられる）
-    hairJ.parent!.updateWorldMatrix(true, false);
-    g.getWorldQuaternion(qUp);
-    hairJ.parent!.getWorldQuaternion(qHead);
-    const back = c.state === 'chase' ? Math.min(1, c.speed / 1.5) * 0.25 : c.state === 'lunge' ? 0.45 : 0;
-    qSway.setFromEuler(sway.set(back + 0.06 * wave(t, 0.9), 0, 0.05 * wave(t, 0.7, 2)));
-    const target = qUp.clone().slerp(qHead, 0.45).multiply(qSway);
-    hairJ.quaternion.copy(qHead.invert().multiply(target));
-    // 浅い息
-    torso.scale.set(1, 1 + Math.sin(t * 2.2) * 0.012, 1);
-    // 目の光がゆらぐ
-    const gl = 0.06 + 0.015 * Math.sin(t * 9) + 0.01 * Math.sin(t * 23);
-    for (const s of glows) s.scale.setScalar(gl);
-    for (const p of smoke) {
-      const life = (t * 0.35 + p.o) % 1;
-      const a = p.a + t * 0.3;
-      p.s.position.set(Math.cos(a) * p.r * (1 + life), 0.05 + life * 0.55, Math.sin(a) * p.r * (1 + life));
-      p.s.scale.setScalar(0.25 + life * 0.45);
-      p.m.opacity = 0.55 * Math.sin(life * Math.PI);
-    }
+  g.userData.rig = shadowCreature({
+    root: g,
+    body,
+    J,
+    arm: { upper: (side) => V(side * 0.03, -0.28, -0.025), lower: (side) => V(-side * 0.005, -0.3, 0.055) },
+    leg: { upper: (side) => V(-side * 0.015, -0.23, 0.02), lower: (side) => V(side * 0.01, -0.23, -0.02) },
+    extra: (_dt, state, time, speed) => {
+      const t = time + ph;
+      // 髪：頭がどれだけ傾いても、だいたい真下へ垂れる（少しだけ頭の傾きにつられる）
+      hairJ.parent!.updateWorldMatrix(true, false);
+      g.getWorldQuaternion(qUp);
+      hairJ.parent!.getWorldQuaternion(qHead);
+      const back = state === 'chase' ? Math.min(1, speed / 1.5) * 0.25 : state === 'lunge' ? 0.45 : 0;
+      qSway.setFromEuler(sway.set(back + 0.06 * wave(t, 0.9), 0, 0.05 * wave(t, 0.7, 2)));
+      const target = qUp.clone().slerp(qHead, 0.45).multiply(qSway);
+      hairJ.quaternion.copy(qHead.invert().multiply(target));
+      // 目の光がゆらぐ
+      const gl = 0.06 + 0.015 * Math.sin(t * 9) + 0.01 * Math.sin(t * 23);
+      for (const s of glows) s.scale.setScalar(gl);
+      for (const p of smoke) {
+        const life = (t * 0.35 + p.o) % 1;
+        const a = p.a + t * 0.3;
+        p.s.position.set(Math.cos(a) * p.r * (1 + life), 0.05 + life * 0.55, Math.sin(a) * p.r * (1 + life));
+        p.s.scale.setScalar(0.25 + life * 0.45);
+        p.m.opacity = 0.55 * Math.sin(life * Math.PI);
+      }
+    },
   });
-  // 戦闘が始まる前（遠くにいるとき）にも、ゆらゆら動いている
+  // 戦闘が始まる前（遠くにいるとき）にも、立ったままこちらを見ている
   g.userData.rig.update(0.016, 'idle');
   return g;
-}
-
-/**
- * 影の子どもの姿勢。
- *   待つ：首をゆっくり回し、腕をぶらぶらさせ、ときどき片手で手招きする
- *   近づく：前かがみで顔だけ上げ、長い腕を交互に前へ伸ばして宙をかく（指はつかむように）
- *   身構え：のけぞって両腕を高く広げ、指を反らせて震わせる
- *   飛びかかり：腕を突き出し、指を鉤爪に曲げる
- *   隙・ひるみ：だらりと前に垂れ、腕が振り子のように揺れる
- */
-function shadowPose(c: RigContext, ph: number): { pose: Pose; rate: number } {
-  const t = c.t + ph;
-  const w = (f: number, s = 0) => wave(t, f, s + ph);
-  const P: Pose = {};
-  const both = (name: string, f: (side: -1 | 1) => [number, number, number]) => {
-    P[name + 'L'] = f(-1);
-    P[name + 'R'] = f(1);
-  };
-  const fingers = (curlL: number, curlR: number) => {
-    P.knL = [0, 0, curlL];
-    P.tipL = [0, 0, curlL * 1.2];
-    P.knR = [0, 0, -curlR];
-    P.tipR = [0, 0, -curlR * 1.2];
-  };
-  let rate = 4;
-  switch (c.state) {
-    case 'chase': {
-      const go = Math.min(1, c.speed / 1.5);
-      const s = Math.sin(t * 2.4);
-      P.torso = [0.5 * go + 0.1, 0.1 * w(0.6), 0.12 * Math.sin(t * 1.2)];
-      P.neck = [-0.45 * go, 0.2 * w(0.5), 0.45 + 0.25 * w(0.7)];
-      P.head = [-0.15, 0.15 * w(0.4, 1), 0.1 * w(0.6, 2)];
-      // 宙をかくように、左右の腕を交互に前へ
-      P.shL = [-1.2 - 0.45 * s * go, 0, -0.15];
-      P.shR = [-1.2 + 0.45 * s * go, 0, 0.15];
-      P.elL = [-0.3 - 0.3 * Math.max(0, s), 0, 0];
-      P.elR = [-0.3 - 0.3 * Math.max(0, -s), 0, 0];
-      both('wr', () => [-0.35, 0, 0]);
-      fingers(0.45 + 0.45 * Math.sin(t * 4.8), 0.45 + 0.45 * Math.sin(t * 4.8 + 1.7));
-      both('hip', (side) => [0.45 * go + 0.12 * w(1.2, side), 0, 0]);
-      both('knee', (side) => [0.6 + 0.25 * w(1.4, side), 0, 0]);
-      break;
-    }
-    case 'windup': {
-      const r = ease(c.inState / 0.45);
-      const tremble = 0.06 * Math.sin(t * 31) + 0.04 * Math.sin(t * 47);
-      P.torso = [-0.3 * r, 0, 0.05 * w(1)];
-      P.neck = [-0.75 * r, 0, 0.55];
-      P.head = [-0.2 * r, 0, 0];
-      both('sh', (side) => [-2.2 * r + tremble, 0, side * 0.75 * r]);
-      both('el', () => [-0.6 * r, 0, 0]);
-      both('wr', () => [0.55 * r + tremble, 0, 0]);
-      fingers(-0.4 * r + tremble * 3, -0.4 * r - tremble * 3);
-      both('hip', () => [-0.2 * r, 0, 0]);
-      both('knee', () => [0.45 * r, 0, 0]);
-      rate = 7;
-      break;
-    }
-    case 'lunge':
-      P.torso = [0.85, 0, 0];
-      P.neck = [-0.9, 0, 0.3];
-      both('sh', (side) => [-1.65, 0, side * 0.12]);
-      both('el', () => [-0.05, 0, 0]);
-      both('wr', () => [-0.3, 0, 0]);
-      fingers(1.15, 1.15);
-      both('hip', () => [0.8, 0, 0]);
-      both('knee', () => [0.9, 0, 0]);
-      rate = 14;
-      break;
-    case 'hurt':
-    case 'recover':
-    case 'stun': {
-      // 打たれた直後は大きくのけぞり、あとはだらりと垂れる
-      const recoil = c.state === 'hurt' ? 1 - ease(c.inState / 0.35) : 0;
-      P.torso = [0.8 + 0.06 * w(0.8) - 1.3 * recoil, 0, 0.1 * w(0.5)];
-      P.neck = [0.7 - 1.2 * recoil, 0, 0.3 + 0.15 * w(0.4)];
-      both('sh', (side) => [0.15 + 0.3 * Math.sin(t * 1.6 + side), 0, side * 0.05 + 0.6 * recoil * side]);
-      both('el', () => [-0.05, 0, 0]);
-      fingers(0.15, 0.2);
-      both('hip', () => [0.1, 0, 0]);
-      both('knee', () => [0.15, 0, 0]);
-      rate = c.state === 'hurt' ? 10 : 3;
-      break;
-    }
-    case 'dying':
-      P.torso = [-0.35, 0, 0];
-      P.neck = [-0.9, 0, 0.8];
-      both('sh', (side) => [-2.8, 0, side * 0.3]);
-      both('el', () => [-0.2, 0, 0]);
-      fingers(-0.4, -0.4);
-      rate = 3;
-      break;
-    default: {
-      // 待つ：ゆっくり首を回し、ときどき右手で手招きする
-      const cyc = (t % 11) / 11;
-      const beck = ease((cyc - 0.55) / 0.1) * (1 - ease((cyc - 0.88) / 0.08));
-      P.torso = [0.05 * w(0.6), 0.08 * w(0.25), 0.05 * w(0.35)];
-      P.neck = [0.12 + 0.15 * w(0.21), 0.1 * w(0.15), 0.42 + 0.3 * w(0.27)];
-      P.head = [0.05 * w(0.3), 0.25 * w(0.18), 0.1 * w(0.4)];
-      P.shL = [0.08 * w(0.7, 1), 0, -0.08 + 0.05 * w(0.5)];
-      P.shR = [0.08 * w(0.7, 2) - 1.05 * beck, 0, 0.08 + 0.05 * w(0.5, 3)];
-      P.elL = [-0.1 - 0.08 * w(0.6), 0, 0];
-      P.elR = [-0.1 - 0.65 * beck, 0, 0];
-      P.wrL = [0.1 * w(0.8), 0, 0];
-      P.wrR = [0.1 * w(0.8, 1) - 0.3 * beck, 0, 0];
-      fingers(0.35 + 0.3 * w(1.1), 0.35 + 0.3 * w(1.1, 2) + beck * (0.35 + 0.45 * Math.sin(t * 4.5)));
-      both('hip', (side) => [0.05 * w(0.5, side), 0, 0]);
-      both('knee', (side) => [0.1 + 0.05 * w(0.6, side), 0, 0]);
-    }
-  }
-  return { pose: P, rate };
 }
 
 /**

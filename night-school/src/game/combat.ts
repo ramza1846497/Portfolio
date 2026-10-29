@@ -77,6 +77,7 @@ export class Combat {
   private weapon: THREE.Group;
   /** ムービー中の見た目（敵 id → 様子） */
   private demo = new Map<string, { pose: DemoPose; flash: number }>();
+  private eye = new THREE.Vector3();
 
   constructor(private host: CombatHost) {
     for (const def of host.stage.enemies ?? []) {
@@ -222,14 +223,15 @@ export class Combat {
    */
   private animateRigs(dt: number): void {
     for (const e of this.enemies) {
-      const rig = e.root.userData.rig as { update(dt: number, state: string): void } | undefined;
+      const rig = e.root.userData.rig as { update(dt: number, state: string, target?: THREE.Vector3): void } | undefined;
       if (!rig || e.state === 'dead' || !this.visible(e.root)) continue;
       const demo = this.demo.get(e.def.id);
       let s: string = demo && demo.pose !== 'none' ? demo.pose : e.state;
       // 中ボスの構えは、突進か踏みつけかで姿勢が違う
       if (e.def.kind === 'ninomiya' && s === 'windup') s = demo || e.dir.lengthSq() > 0 ? 'windupCharge' : 'windupStomp';
       e.root.userData.rage = e.hp <= e.def.hp / 2;
-      rig.update(dt, s);
+      // 化け物はプレイヤーの目を見つめる
+      rig.update(dt, s, this.host.camera.getWorldPosition(this.eye));
     }
   }
 
@@ -399,8 +401,8 @@ export class Combat {
       default:
         e.state = 'chase';
     }
-    // ふわふわ浮く
-    e.root.position.y = 0.05 + Math.sin(performance.now() * 0.004 + e.home.x) * 0.05;
+    // ふわふわ浮く（関節のある敵は、手足で床を踏んで動く）
+    e.root.position.y = e.root.userData.rig ? 0 : 0.05 + Math.sin(performance.now() * 0.004 + e.home.x) * 0.05;
   }
 
   /** 中ボス：突進（壁に当たると気絶）・近くでは踏みつけ */
