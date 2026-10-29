@@ -3,6 +3,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import type { WorldBuilder } from '../../world/builder';
 import { muscleTexture } from '../../engine/textures';
 import { pbrMaterial } from '../../world/pbr';
+import { ease, makeRig, wave, type Pose, type RigContext } from './rig';
 
 /*
  * 人の形をした登場人物・敵。写真の質感（布・陶器のような肌・石）を組み合わせ、
@@ -333,6 +334,10 @@ function weather(root: THREE.Object3D, seed: number): void {
  * container の中の部品を、材質ごとに 1 つのメッシュにまとめる（描く回数と影の計算を減らす）。
  * keep に入れた物（別に動かす・表示を切り替える物）と、その中身はまとめない。
  */
+export function mergeParts(container: THREE.Object3D, keep: Set<THREE.Object3D> = new Set()): void {
+  mergeByMaterial(container, keep);
+}
+
 function mergeByMaterial(container: THREE.Object3D, keep: Set<THREE.Object3D> = new Set()): void {
   container.updateMatrixWorld(true);
   const inv = new THREE.Matrix4().copy(container.matrixWorld).invert();
@@ -396,13 +401,47 @@ function depthPrepass(container: THREE.Object3D): void {
   }
 }
 
+/**
+ * ghostFigure の部品を、置かれた場所で関節に振り分ける（体の座標は身長 1.25m のとき）。
+ *   頭（首より上）→ neck、腕と胸の前の手 → arms、股より下の脚 → hipL / hipR、残り → torso
+ */
+function splitJoints(g: THREE.Group, body: THREE.Group): void {
+  const make = (name: string, parent: THREE.Object3D, x: number, y: number, z: number) => {
+    const j = new THREE.Group();
+    j.name = name;
+    j.position.set(x, y, z);
+    parent.add(j);
+    return j;
+  };
+  const torso = make('torso', body, 0, 0.58, 0);
+  const J: Record<string, THREE.Group> = {
+    torso,
+    neck: make('neck', torso, 0, 0.35, 0),
+    arms: make('arms', torso, 0, 0.29, 0),
+    hipL: make('hipL', body, -0.055, 0.42, 0),
+    hipR: make('hipR', body, 0.055, 0.42, 0),
+  };
+  body.updateMatrixWorld(true);
+  const parts = body.children.filter((c): c is THREE.Mesh => c instanceof THREE.Mesh);
+  const box = new THREE.Box3();
+  const c = new THREE.Vector3();
+  for (const m of parts) {
+    box.setFromObject(m);
+    // 体の座標での中心
+    body.worldToLocal(box.getCenter(c));
+    let j = J.torso;
+    if (c.y > 0.92 && Math.abs(c.x) < 0.13) j = J.neck;
+    else if ((Math.abs(c.x) > 0.115 && c.y > 0.45 && c.y < 0.92) || (c.z > 0.12 && c.y > 0.6 && c.y < 0.92)) j = J.arms;
+    else if (c.y < 0.4) j = c.x < 0 ? J.hipL : J.hipR;
+    j.attach(m);
+  }
+  const all = Object.values(J);
+  for (const j of all) mergeByMaterial(j, new Set(all.filter((x) => x.parent === j)));
+  g.userData.joints = J;
+}
+
 /** 黒い穴のような目・口（光を返さない） */
 const voidMat = () => new THREE.MeshBasicMaterial({ color: 0x020101 });
-
-/** 毎フレーム呼ばれる動き（何度呼ばれても同じ結果になるよう、時刻だけで決める） */
-function animate(mesh: THREE.Mesh, fn: (t: number) => void): void {
-  mesh.onBeforeRender = () => fn(performance.now() / 1000);
-}
 
 /**
  * 人の姿（おかっぱの女の子・店員・母親・石像など）。原点が足元、正面は +z。
@@ -426,6 +465,11 @@ export function ghostFigure(opts: {
   stone?: boolean;
   /** 顔：うつろな黒い目（幽霊の既定）か、ふつうの目鼻（生身の既定） */
   face?: 'hollow' | 'plain';
+  /**
+   * 関節に分ける（動かす人物用）。g.userData.joints に torso・neck・arms（両腕と持ち物）・hipL・hipR が入る。
+   * 脚はひざで曲がらない（石像らしく、股から棒のように振る）
+   */
+  rig?: boolean;
 }): THREE.Group {
   const g = new THREE.Group();
   const height = opts.height ?? 1.25;
@@ -607,6 +651,10 @@ export function ghostFigure(opts: {
     weather(g, 9);
   }
   projectUVs(g, opts.stone ? 2.2 : 4);
+  if (opts.rig) {
+    splitJoints(g, body);
+    return g;
+  }
   mergeByMaterial(body);
   if (op < 1) depthPrepass(body);
   return g;
@@ -624,7 +672,6 @@ function mossOn(parent: THREE.Object3D, op: number, seed: number): void {
     [0.0, 0.62, -0.1],
     [0.06, 0.03, 0.06],
     [-0.07, 0.04, 0.03],
-    [0.15, 0.45, 0.05],
   ];
   for (const [x, y, z] of spots) {
     const m = new THREE.Mesh(new THREE.SphereGeometry(0.03 + rand() * 0.025, 8, 6), moss);
@@ -638,7 +685,8 @@ function mossOn(parent: THREE.Object3D, op: number, seed: number): void {
 /**
  * ザコ敵「影の子ども」：ぼろぼろの黒い服、灰色にくすんだ陶器のような肌、
  * 顔をおおう長い濡れた髪のすき間から、赤い目がのぞく。腕はひざまで届くほど長い。
- * 首を不自然にかしげ、ときどき首がかくっと跳ね、足もとから黒い煙が立つ。
+ * 首・肩・ひじ・手首・指・股・ひざに関節があり、状態に合わせてぬるりと動く（rig.ts）。
+ * 足もとからは黒い煙が立つ。
  */
 export function shadowChild(seed = 3): THREE.Group {
   const rand = rng(seed);
@@ -648,24 +696,32 @@ export function shadowChild(seed = 3): THREE.Group {
   g.add(body);
   const skin = tinted('porcelainSkin', 0x55585e, 0.84, { opacity: 1, repeat: 1, roughness: 1.4 });
   const rag = tinted('clothWhite', 0x0b0a0d, 0.82, { opacity: 1, side: THREE.DoubleSide });
-  const bone = (a: THREE.Vector3, b: THREE.Vector3, r1: number, r2: number, m: THREE.Material, parent: THREE.Object3D = body) => limb(parent, a, b, r1, r2, m);
+  const J: Record<string, THREE.Group> = {};
+  const joint = (name: string, parent: THREE.Object3D, x: number, y: number, z: number) => {
+    const j = new THREE.Group();
+    j.position.set(x, y, z);
+    parent.add(j);
+    J[name] = j;
+    return j;
+  };
+  const O = V(0, 0, 0);
 
-  // 裸足のやせた脚（少し内股）
-  for (const side of [-1, 1]) {
-    const x = side * 0.05;
-    bone(V(x, 0.5, 0), V(x * 0.7, 0.27, 0.02), 0.03, 0.024, skin);
-    bone(V(x * 0.7, 0.27, 0.02), V(x * 0.9, 0.04, 0), 0.024, 0.018, skin);
+  // 裸足のやせた脚（少し内股）。股とひざで曲がる
+  for (const side of [-1, 1] as const) {
+    const s = side < 0 ? 'L' : 'R';
+    const hip = joint('hip' + s, body, side * 0.05, 0.5, 0);
+    limb(hip, O, V(-side * 0.015, -0.23, 0.02), 0.03, 0.024, skin);
+    const knee = joint('knee' + s, hip, -side * 0.015, -0.23, 0.02);
+    limb(knee, O, V(side * 0.01, -0.23, -0.02), 0.024, 0.018, skin);
     const foot = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), skin);
     foot.scale.set(0.8, 0.45, 1.9);
-    foot.position.set(x * 0.9, 0.02, 0.03);
-    body.add(foot);
+    foot.position.set(side * 0.01, -0.25, 0.01);
+    knee.add(foot);
   }
 
   // 上半身は腰から前に傾ける
-  const torso = new THREE.Group();
-  torso.position.set(0, 0.55, 0);
+  const torso = joint('torso', body, 0, 0.55, 0);
   torso.rotation.x = 0.14;
-  body.add(torso);
   // ぼろぼろのワンピース：すそはぎざぎざに裂けて垂れる
   const dress = lathe([
     [0.18, -0.24],
@@ -702,29 +758,39 @@ export function shadowChild(seed = 3): THREE.Group {
     strip.rotation.set(rand() * 0.3, -a + Math.PI / 2, (rand() - 0.5) * 0.3);
     torso.add(strip);
   }
-  // 浮き出た鎖骨・やせた首
-  bone(V(0, 0.38, 0), V(0, 0.48, 0.01), 0.022, 0.02, skin, torso);
+  // やせた首
+  limb(torso, V(0, 0.38, 0), V(0, 0.48, 0.01), 0.022, 0.02, skin);
 
-  // 長すぎる腕（ひじが少し後ろに反っている）。指は長く、ときどきうごめく
-  const fingers: THREE.Group[] = [];
-  for (const side of [-1, 1]) {
-    const sh = V(side * 0.125, 0.36, 0);
-    const el = V(side * 0.155, 0.08, -0.025);
-    const wr = V(side * 0.15, -0.22, 0.03);
-    bone(sh, el, 0.024, 0.019, skin, torso);
-    bone(el, wr, 0.019, 0.013, skin, torso);
+  // 長すぎる腕：肩・ひじ・手首で曲がり、指は付け根と先の二か所で曲がる
+  const L = 0.085;
+  for (const side of [-1, 1] as const) {
+    const s = side < 0 ? 'L' : 'R';
+    const sh = joint('sh' + s, torso, side * 0.125, 0.36, 0);
+    const elAt = V(side * 0.03, -0.28, -0.025);
+    limb(sh, O, elAt, 0.024, 0.019, skin);
     // 破れた袖
-    const sleeve = bone(sh.clone().add(V(0, 0.01, 0)), sh.clone().lerp(el, 0.45), 0.04, 0.034, rag, torso);
-    sleeve.scale.set(1, 1, 1);
-    hand(torso, wr, side, skin, 0.085, fingers);
+    limb(sh, V(0, 0.01, 0), elAt.clone().multiplyScalar(0.45), 0.04, 0.034, rag);
+    const el = joint('el' + s, sh, elAt.x, elAt.y, elAt.z);
+    const wrAt = V(-side * 0.005, -0.3, 0.055);
+    limb(el, O, wrAt, 0.019, 0.013, skin);
+    const wr = joint('wr' + s, el, wrAt.x, wrAt.y, wrAt.z);
+    const palm = new THREE.Mesh(new THREE.SphereGeometry(0.03, 10, 8), skin);
+    palm.scale.set(0.55, 1.1, 0.9);
+    palm.position.set(0, -0.028, 0);
+    wr.add(palm);
+    limb(wr, V(-side * 0.005, -0.03, 0.02), V(-side * 0.004, -0.03 - L * 0.6, 0.032), 0.007, 0.004, skin);
+    const kn = joint('kn' + s, wr, side * 0.004, -0.058, 0);
+    const tip = joint('tip' + s, kn, 0, -L * 0.55, 0);
+    for (let i = 0; i < 4; i++) {
+      const z = -0.017 + i * 0.012;
+      limb(kn, V(0, 0, z), V(0, -L * 0.55, z + 0.002), 0.006, 0.0055, skin);
+      limb(tip, V(0, 0, z + 0.002), V(0, -L * 0.45, z + 0.006), 0.0055, 0.0035, skin);
+    }
   }
 
-  // 頭：首の上で横にかしげ、うつむく
-  const neck = new THREE.Group();
-  neck.position.set(0, 0.47, 0.01);
-  torso.add(neck);
-  const headGroup = new THREE.Group();
-  neck.add(headGroup);
+  // 頭：首の上で横にかしげる
+  const neck = joint('neck', torso, 0, 0.47, 0.01);
+  const headGroup = joint('head', neck, 0, 0, 0);
   const headC = V(0, 0.085, 0.005);
   const hS = V(0.9, 1.08, 0.96);
   const head = new THREE.Mesh(headGeometry(0.088, 0.16, 0.08), skin);
@@ -757,29 +823,34 @@ export function shadowChild(seed = 3): THREE.Group {
     headGroup.add(s);
     glows.push(s);
   }
-  // 顔の前まで垂れる、濡れた長い黒髪
+  // 顔の前まで垂れる、濡れた長い黒髪（頭のてっぺんを支点に、遅れて揺れる）
   const hairMat = new THREE.MeshStandardMaterial({ color: 0x050506, roughness: 0.5, metalness: 0, side: THREE.DoubleSide });
   const cap = new THREE.Mesh(new THREE.SphereGeometry(0.093, 24, 14, 0, Math.PI * 2, 0, 1.15), hairMat);
   cap.position.copy(headC);
   cap.scale.set(0.93, 1.06, 0.98);
   headGroup.add(cap);
-  const hair = new THREE.Mesh(
-    strandHair({
-      c: headC,
-      r: 0.094,
-      count: 320,
-      // 正面は目の少し下まで（すき間から目がのぞく）、横と後ろは胸まで
-      len: (th) => (Math.cos(th) > 0.55 ? 0.2 : 0.42),
-      width: 0.013,
-      messy: 0.12,
-      spread: 0.05,
-      seed: seed + 5,
-      // 片目だけがのぞく、正面から少しずれた分け目
-      part: [-0.62, 0.05],
-    }),
-    hairMat,
-  );
-  headGroup.add(hair);
+  // 後頭部は首の近くまで黒く（うつむいて髪が垂れても、地肌が見えないように）
+  const back = new THREE.Mesh(new THREE.SphereGeometry(0.092, 20, 12, Math.PI, Math.PI, 0, 2.2), hairMat);
+  back.position.copy(headC);
+  back.scale.set(0.93, 1.06, 0.98);
+  headGroup.add(back);
+  const pivot = headC.clone().add(V(0, 0.08, 0));
+  const hairJ = joint('hair', headGroup, pivot.x, pivot.y, pivot.z);
+  const hairGeo = strandHair({
+    c: headC,
+    r: 0.094,
+    count: 320,
+    // 正面は目の少し下まで（すき間から目がのぞく）、横と後ろは胸まで
+    len: (th) => (Math.cos(th) > 0.55 ? 0.2 : 0.42),
+    width: 0.013,
+    messy: 0.12,
+    spread: 0.05,
+    seed: seed + 5,
+    // 片目だけがのぞく、正面から少しずれた分け目
+    part: [-0.62, 0.05],
+  });
+  hairGeo.translate(-pivot.x, -pivot.y, -pivot.z);
+  hairJ.add(new THREE.Mesh(hairGeo, hairMat));
 
   // 足もとから立ちのぼる黒い煙
   const smokeMat = new THREE.SpriteMaterial({ map: softTexture(), color: 0x000000, transparent: true, opacity: 0.5, depthWrite: false });
@@ -791,45 +862,155 @@ export function shadowChild(seed = 3): THREE.Group {
     smoke.push({ s, m, a: rand() * Math.PI * 2, r: 0.08 + rand() * 0.15, o: i / 9 });
   }
 
-  const phase = rand() * 10;
-  const baseRz = 0.42;
-  // 指は軽く曲げた形で固める（部品をまとめるため、指そのものは動かさない）
-  fingers.forEach((f, i) => {
-    f.rotation.z = (i < 4 ? -1 : 1) * 0.05;
-    f.rotation.x = 0.25;
-    (f.userData.tip as THREE.Group).rotation.x = 0.55;
-  });
   projectUVs(g, 4);
-  // 体・胴・頭をそれぞれ材質ごとにまとめる（動かすのは胴と頭の入れ物だけ）
-  mergeByMaterial(headGroup);
-  mergeByMaterial(torso, new Set([neck]));
-  mergeByMaterial(body, new Set([torso]));
-  const headMesh = headGroup.children.find((c): c is THREE.Mesh => c instanceof THREE.Mesh)!;
-  animate(headMesh, (t) => {
-    const tt = t + phase;
-    // 首：かしげたまま小刻みに震え、ときどき別の角度へかくっと跳ねる
-    const seg = Math.floor(tt / 1.6);
-    const local = tt / 1.6 - seg;
-    const r2 = rng(seg * 7 + seed);
-    const jerkZ = (r2() - 0.5) * 0.5;
-    const jerkX = (r2() - 0.5) * 0.3;
-    const snap = local < 0.06 ? local / 0.06 : 1;
-    headGroup.rotation.z = baseRz + jerkZ * snap * Math.exp(-local * 1.5) + Math.sin(tt * 41) * 0.012;
-    headGroup.rotation.x = -0.12 + jerkX * snap * Math.exp(-local * 1.5);
+  // 関節ごとに、材質ごとにまとめる（子の関節はまとめずに残す）
+  const joints = Object.values(J);
+  for (const j of [body, ...joints]) mergeByMaterial(j, new Set(joints.filter((c) => c.parent === j)));
+
+  const ph = rand() * 10;
+  // 髪は関節の目標ではなく、重さで垂れるように別に動かす
+  const { hair: _hair, ...bodyJoints } = J;
+  const qUp = new THREE.Quaternion();
+  const qHead = new THREE.Quaternion();
+  const qSway = new THREE.Quaternion();
+  const sway = new THREE.Euler();
+  g.userData.rig = makeRig(g, bodyJoints, (c) => shadowPose(c, ph), (c) => {
+    const t = c.t + ph;
+    // 髪：頭がどれだけ傾いても、だいたい真下へ垂れる（少しだけ頭の傾きにつられる）
+    hairJ.parent!.updateWorldMatrix(true, false);
+    g.getWorldQuaternion(qUp);
+    hairJ.parent!.getWorldQuaternion(qHead);
+    const back = c.state === 'chase' ? Math.min(1, c.speed / 1.5) * 0.25 : c.state === 'lunge' ? 0.45 : 0;
+    qSway.setFromEuler(sway.set(back + 0.06 * wave(t, 0.9), 0, 0.05 * wave(t, 0.7, 2)));
+    const target = qUp.clone().slerp(qHead, 0.45).multiply(qSway);
+    hairJ.quaternion.copy(qHead.invert().multiply(target));
     // 浅い息
-    torso.scale.set(1, 1 + Math.sin(tt * 2.2) * 0.012, 1);
+    torso.scale.set(1, 1 + Math.sin(t * 2.2) * 0.012, 1);
     // 目の光がゆらぐ
-    const gl = 0.06 + 0.015 * Math.sin(tt * 9) + 0.01 * Math.sin(tt * 23);
+    const gl = 0.06 + 0.015 * Math.sin(t * 9) + 0.01 * Math.sin(t * 23);
     for (const s of glows) s.scale.setScalar(gl);
     for (const p of smoke) {
-      const life = (tt * 0.35 + p.o) % 1;
-      const a = p.a + tt * 0.3;
+      const life = (t * 0.35 + p.o) % 1;
+      const a = p.a + t * 0.3;
       p.s.position.set(Math.cos(a) * p.r * (1 + life), 0.05 + life * 0.55, Math.sin(a) * p.r * (1 + life));
       p.s.scale.setScalar(0.25 + life * 0.45);
       p.m.opacity = 0.55 * Math.sin(life * Math.PI);
     }
   });
+  // 戦闘が始まる前（遠くにいるとき）にも、ゆらゆら動いている
+  g.userData.rig.update(0.016, 'idle');
   return g;
+}
+
+/**
+ * 影の子どもの姿勢。
+ *   待つ：首をゆっくり回し、腕をぶらぶらさせ、ときどき片手で手招きする
+ *   近づく：前かがみで顔だけ上げ、長い腕を交互に前へ伸ばして宙をかく（指はつかむように）
+ *   身構え：のけぞって両腕を高く広げ、指を反らせて震わせる
+ *   飛びかかり：腕を突き出し、指を鉤爪に曲げる
+ *   隙・ひるみ：だらりと前に垂れ、腕が振り子のように揺れる
+ */
+function shadowPose(c: RigContext, ph: number): { pose: Pose; rate: number } {
+  const t = c.t + ph;
+  const w = (f: number, s = 0) => wave(t, f, s + ph);
+  const P: Pose = {};
+  const both = (name: string, f: (side: -1 | 1) => [number, number, number]) => {
+    P[name + 'L'] = f(-1);
+    P[name + 'R'] = f(1);
+  };
+  const fingers = (curlL: number, curlR: number) => {
+    P.knL = [0, 0, curlL];
+    P.tipL = [0, 0, curlL * 1.2];
+    P.knR = [0, 0, -curlR];
+    P.tipR = [0, 0, -curlR * 1.2];
+  };
+  let rate = 4;
+  switch (c.state) {
+    case 'chase': {
+      const go = Math.min(1, c.speed / 1.5);
+      const s = Math.sin(t * 2.4);
+      P.torso = [0.5 * go + 0.1, 0.1 * w(0.6), 0.12 * Math.sin(t * 1.2)];
+      P.neck = [-0.45 * go, 0.2 * w(0.5), 0.45 + 0.25 * w(0.7)];
+      P.head = [-0.15, 0.15 * w(0.4, 1), 0.1 * w(0.6, 2)];
+      // 宙をかくように、左右の腕を交互に前へ
+      P.shL = [-1.2 - 0.45 * s * go, 0, -0.15];
+      P.shR = [-1.2 + 0.45 * s * go, 0, 0.15];
+      P.elL = [-0.3 - 0.3 * Math.max(0, s), 0, 0];
+      P.elR = [-0.3 - 0.3 * Math.max(0, -s), 0, 0];
+      both('wr', () => [-0.35, 0, 0]);
+      fingers(0.45 + 0.45 * Math.sin(t * 4.8), 0.45 + 0.45 * Math.sin(t * 4.8 + 1.7));
+      both('hip', (side) => [0.45 * go + 0.12 * w(1.2, side), 0, 0]);
+      both('knee', (side) => [0.6 + 0.25 * w(1.4, side), 0, 0]);
+      break;
+    }
+    case 'windup': {
+      const r = ease(c.inState / 0.45);
+      const tremble = 0.06 * Math.sin(t * 31) + 0.04 * Math.sin(t * 47);
+      P.torso = [-0.3 * r, 0, 0.05 * w(1)];
+      P.neck = [-0.75 * r, 0, 0.55];
+      P.head = [-0.2 * r, 0, 0];
+      both('sh', (side) => [-2.2 * r + tremble, 0, side * 0.75 * r]);
+      both('el', () => [-0.6 * r, 0, 0]);
+      both('wr', () => [0.55 * r + tremble, 0, 0]);
+      fingers(-0.4 * r + tremble * 3, -0.4 * r - tremble * 3);
+      both('hip', () => [-0.2 * r, 0, 0]);
+      both('knee', () => [0.45 * r, 0, 0]);
+      rate = 7;
+      break;
+    }
+    case 'lunge':
+      P.torso = [0.85, 0, 0];
+      P.neck = [-0.9, 0, 0.3];
+      both('sh', (side) => [-1.65, 0, side * 0.12]);
+      both('el', () => [-0.05, 0, 0]);
+      both('wr', () => [-0.3, 0, 0]);
+      fingers(1.15, 1.15);
+      both('hip', () => [0.8, 0, 0]);
+      both('knee', () => [0.9, 0, 0]);
+      rate = 14;
+      break;
+    case 'hurt':
+    case 'recover':
+    case 'stun': {
+      // 打たれた直後は大きくのけぞり、あとはだらりと垂れる
+      const recoil = c.state === 'hurt' ? 1 - ease(c.inState / 0.35) : 0;
+      P.torso = [0.8 + 0.06 * w(0.8) - 1.3 * recoil, 0, 0.1 * w(0.5)];
+      P.neck = [0.7 - 1.2 * recoil, 0, 0.3 + 0.15 * w(0.4)];
+      both('sh', (side) => [0.15 + 0.3 * Math.sin(t * 1.6 + side), 0, side * 0.05 + 0.6 * recoil * side]);
+      both('el', () => [-0.05, 0, 0]);
+      fingers(0.15, 0.2);
+      both('hip', () => [0.1, 0, 0]);
+      both('knee', () => [0.15, 0, 0]);
+      rate = c.state === 'hurt' ? 10 : 3;
+      break;
+    }
+    case 'dying':
+      P.torso = [-0.35, 0, 0];
+      P.neck = [-0.9, 0, 0.8];
+      both('sh', (side) => [-2.8, 0, side * 0.3]);
+      both('el', () => [-0.2, 0, 0]);
+      fingers(-0.4, -0.4);
+      rate = 3;
+      break;
+    default: {
+      // 待つ：ゆっくり首を回し、ときどき右手で手招きする
+      const cyc = (t % 11) / 11;
+      const beck = ease((cyc - 0.55) / 0.1) * (1 - ease((cyc - 0.88) / 0.08));
+      P.torso = [0.05 * w(0.6), 0.08 * w(0.25), 0.05 * w(0.35)];
+      P.neck = [0.12 + 0.15 * w(0.21), 0.1 * w(0.15), 0.42 + 0.3 * w(0.27)];
+      P.head = [0.05 * w(0.3), 0.25 * w(0.18), 0.1 * w(0.4)];
+      P.shL = [0.08 * w(0.7, 1), 0, -0.08 + 0.05 * w(0.5)];
+      P.shR = [0.08 * w(0.7, 2) - 1.05 * beck, 0, 0.08 + 0.05 * w(0.5, 3)];
+      P.elL = [-0.1 - 0.08 * w(0.6), 0, 0];
+      P.elR = [-0.1 - 0.65 * beck, 0, 0];
+      P.wrL = [0.1 * w(0.8), 0, 0];
+      P.wrR = [0.1 * w(0.8, 1) - 0.3 * beck, 0, 0];
+      fingers(0.35 + 0.3 * w(1.1), 0.35 + 0.3 * w(1.1, 2) + beck * (0.35 + 0.45 * Math.sin(t * 4.5)));
+      both('hip', (side) => [0.05 * w(0.5, side), 0, 0]);
+      both('knee', (side) => [0.1 + 0.05 * w(0.6, side), 0, 0]);
+    }
+  }
+  return { pose: P, rate };
 }
 
 /**

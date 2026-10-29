@@ -199,7 +199,10 @@ export class Combat {
     this.iframe = Math.max(0, this.iframe - dt);
     this.updateWeapon(dt, paused);
     this.updateBossBar();
-    if (paused) return;
+    if (paused) {
+      this.animateRigs(dt);
+      return;
+    }
 
     if (this.dodgeT > 0) {
       this.dodgeT -= dt;
@@ -210,6 +213,24 @@ export class Combat {
       this.resolveHits();
     }
     for (const e of this.enemies) this.updateEnemy(e, dt);
+    this.animateRigs(dt);
+  }
+
+  /**
+   * 関節のある敵の体を動かす（ステージ側が root.userData.rig に入れておく）。
+   * 会話やムービーで止まっている間も、その場で不気味に動き続ける
+   */
+  private animateRigs(dt: number): void {
+    for (const e of this.enemies) {
+      const rig = e.root.userData.rig as { update(dt: number, state: string): void } | undefined;
+      if (!rig || e.state === 'dead' || !this.visible(e.root)) continue;
+      const demo = this.demo.get(e.def.id);
+      let s: string = demo && demo.pose !== 'none' ? demo.pose : e.state;
+      // 中ボスの構えは、突進か踏みつけかで姿勢が違う
+      if (e.def.kind === 'ninomiya' && s === 'windup') s = demo || e.dir.lengthSq() > 0 ? 'windupCharge' : 'windupStomp';
+      e.root.userData.rage = e.hp <= e.def.hp / 2;
+      rig.update(dt, s);
+    }
   }
 
   // ---------------- プレイヤーの攻撃 ----------------
@@ -471,8 +492,8 @@ export class Combat {
         }
         break;
       case 'stun':
-        // ぐらぐら揺れる
-        e.root.rotation.z = Math.sin(performance.now() * 0.02) * 0.08;
+        // ぐらぐら揺れる（関節のある敵は、体の動きで揺れる）
+        if (!e.root.userData.rig) e.root.rotation.z = Math.sin(performance.now() * 0.02) * 0.08;
         if (e.timer <= 0) {
           e.root.rotation.z = 0;
           e.state = 'chase';
@@ -569,7 +590,7 @@ export class Combat {
       d.flash = Math.max(0, d.flash - dt);
       e.mark.visible = d.pose === 'windup';
       if (e.mark.visible) e.mark.scale.setScalar(0.42 + 0.06 * Math.sin(now * 0.02));
-      e.root.rotation.z = d.pose === 'stun' ? Math.sin(now * 0.02) * 0.08 : 0;
+      e.root.rotation.z = d.pose === 'stun' && !e.root.userData.rig ? Math.sin(now * 0.02) * 0.08 : 0;
       if (d.flash > 0) this.setGlow(e, 0xffffff, 0.9);
       else if (d.pose === 'windup') this.setGlow(e, 0xff2010, 0.5 + 0.5 * Math.sin(now * 0.03));
       else if (d.pose === 'rage') this.setGlow(e, 0xff3010, 0.55 + 0.3 * Math.sin(now * 0.05));

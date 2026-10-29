@@ -3,6 +3,8 @@ import type { BuildContext } from '../../game/types';
 import { noticeTexture, signTexture } from '../../engine/textures';
 import { pbrMaterial } from '../../world/pbr';
 import { hedge, leafyTree } from './foliage';
+import { mergeParts } from './figures';
+import { ease, makeRig, wave, type Pose, type RigContext } from './rig';
 import { OZ } from './floor1';
 import { ghostFigure, moonPatch, notice, shadowChild, sign, slidingDoor, wallPlane } from './parts';
 
@@ -185,34 +187,138 @@ function buildGym({ builder: b, lights }: BuildContext): void {
  * 二宮金次郎像：薪を背負い、本を読みながら歩く石像。原点は足元、正面は +z。
  * 人の形は ghostFigure（丸みのある体）を石の色で作り、本と背負子・薪を足す。
  */
-function ninomiyaStatue(): THREE.Group {
+export function ninomiyaStatue(): THREE.Group {
   const stone = 0x7a7a72;
-  const g = ghostFigure({ hair: 0x6a6a62, top: stone, bottom: stone, opacity: 1, height: 1.95, skirt: true, hairStyle: 'short', arms: 'book', skin: stone, socks: stone, shoes: 0x6a6a62, stone: true });
+  const g = ghostFigure({ hair: 0x6a6a62, top: stone, bottom: stone, opacity: 1, height: 1.95, skirt: true, hairStyle: 'short', arms: 'book', skin: stone, socks: stone, shoes: 0x6a6a62, stone: true, rig: true });
+  const J = g.userData.joints as Record<string, THREE.Group>;
   const s = 1.95 / 1.25;
-  const mat = () => pbrMaterial('statueStone', { color: 0xc8c8c0 });
-  // 開いた本（両手で持って、のぞきこむ）
-  const book = new THREE.Mesh(new THREE.BoxGeometry(0.2 * s, 0.015 * s, 0.14 * s), mat());
+  const mat = pbrMaterial('statueStone', { color: 0xc8c8c0 });
+  g.updateMatrixWorld(true);
+  // 開いた本（両手で持って、のぞきこむ）：腕といっしょに動く
+  const book = new THREE.Mesh(new THREE.BoxGeometry(0.2 * s, 0.015 * s, 0.14 * s), mat);
   book.position.set(0, 0.75 * s, 0.2 * s);
   book.rotation.x = -0.6;
   g.add(book);
-  // 背負子と薪
+  J.arms.attach(book);
+  // 背負子と薪：背中（胴）といっしょに動く
   for (const x of [-0.1, 0.1]) {
-    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.012 * s, 0.012 * s, 0.75 * s, 6), mat());
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.012 * s, 0.012 * s, 0.75 * s, 6), mat);
     post.position.set(x * s, 0.82 * s, -0.16 * s);
     g.add(post);
+    J.torso.attach(post);
   }
   for (let i = 0; i < 7; i++) {
-    const log = new THREE.Mesh(new THREE.CylinderGeometry(0.03 * s, 0.032 * s, 0.34 * s, 8), mat());
+    const log = new THREE.Mesh(new THREE.CylinderGeometry(0.03 * s, 0.032 * s, 0.34 * s, 8), mat);
     log.rotation.z = Math.PI / 2 + (i % 2 ? 0.08 : -0.06);
     log.position.set(0, (0.78 + (i % 4) * 0.06) * s, (-0.2 - Math.floor(i / 4) * 0.06) * s);
     g.add(log);
+    J.torso.attach(log);
   }
-  // 目（暴れると赤く光る）
+  // 目（構えると・怒ると赤く光る）
   const eyes = new THREE.MeshBasicMaterial({ color: 0x401010 });
   for (const x of [-0.035, 0.035]) {
     const eye = new THREE.Mesh(new THREE.BoxGeometry(0.025 * s, 0.01 * s, 0.01), eyes);
     eye.position.set(x * s, 1.045 * s, 0.093 * s);
     g.add(eye);
+    J.neck.attach(eye);
   }
+  const keep = new Set<THREE.Object3D>([J.neck, J.arms]);
+  mergeParts(J.torso, keep);
+  mergeParts(J.arms, new Set());
+  const dim = new THREE.Color(0x401010);
+  const hot = new THREE.Color(0xff3020);
+  g.userData.rig = makeRig(g, J, (c) => statuePose(c, g.userData.rage === true), (c) => {
+    const k = c.state === 'windupCharge' || c.state === 'windupStomp' || c.state === 'rage' ? 1 : g.userData.rage ? 0.5 + 0.2 * Math.sin(c.t * 3) : 0;
+    eyes.color.copy(dim).lerp(hot, k);
+  });
+  g.userData.rig.update(0.016, 'idle');
   return g;
+}
+
+/**
+ * 二宮金次郎像の姿勢。石の重さで、ゆっくり・ずしりと動く。
+ *   待つ：本を読んでいる（首は下）。ときどき首だけがこちらへ回る
+ *   追う：脚を棒のように振って歩き、顔を本から上げてこちらをにらむ（怒ると首が横に傾く）
+ *   突進の構え：牛のように前かがみ、本を下げ、体が震える
+ *   踏みつけの構え：片脚を高く上げ、本を頭上にかかげる → 踏みつけ
+ *   気絶：上体がぐらり、ぐらりと揺れ、首が垂れる
+ */
+function statuePose(c: RigContext, rage: boolean): { pose: Pose; rate: number } {
+  const t = c.t;
+  const P: Pose = {};
+  let rate = 3;
+  const tilt = rage ? 0.45 + 0.08 * wave(t, 0.5) : 0.12 * wave(t, 0.3);
+  switch (c.state) {
+    case 'chase':
+    case 'backoff':
+    case 'recover': {
+      const ph = c.walked * 2.3 * (c.state === 'backoff' ? -1 : 1);
+      const go = Math.min(1, c.speed / 0.8);
+      P.hipL = [0.42 * Math.sin(ph) * go, 0, 0];
+      P.hipR = [-0.42 * Math.sin(ph) * go, 0, 0];
+      P.torso = [0.1, 0.12 * Math.sin(ph) * go, 0.06 * Math.sin(ph) * go];
+      P.arms = [0.08 * Math.sin(ph * 2) * go, 0, 0];
+      P.neck = [-0.1 + 0.08 * wave(t, 0.4), 0.15 * wave(t, 0.25), tilt];
+      rate = 5;
+      break;
+    }
+    case 'windupCharge':
+    case 'charge': {
+      const shake = c.state === 'windupCharge' ? 0.03 * Math.sin(t * 23) : 0;
+      const ph = c.walked * 2.8;
+      const run = c.state === 'charge' ? 0.6 : 0;
+      P.torso = [0.55, 0, shake];
+      P.arms = [0.95, 0, 0];
+      P.neck = [-0.6, 0, tilt];
+      P.hipL = [-0.3 + run * Math.sin(ph), 0, 0];
+      P.hipR = [0.35 - run * Math.sin(ph), 0, 0];
+      rate = c.state === 'charge' ? 9 : 4;
+      break;
+    }
+    case 'windupStomp': {
+      const r = ease(c.inState / 0.5);
+      P.hipR = [-1.15 * r, 0, 0];
+      P.hipL = [0.1 * r, 0, 0];
+      P.torso = [-0.18 * r, 0, -0.08 * r];
+      P.arms = [-0.85 * r, 0, 0];
+      P.neck = [-0.35, 0, tilt];
+      rate = 5;
+      break;
+    }
+    case 'slam':
+      P.hipR = [0.15, 0, 0];
+      P.torso = [0.4, 0, 0];
+      P.arms = [0.35, 0, 0];
+      P.neck = [0.1, 0, tilt];
+      rate = 20;
+      break;
+    case 'stun':
+      P.torso = [0.3, 0, 0.18 * Math.sin(t * 2.2)];
+      P.neck = [0.6, 0, 0.4 * Math.sin(t * 1.7 + 1)];
+      P.arms = [0.7, 0, 0];
+      P.hipL = [0.05 * Math.sin(t * 2.2), 0, 0];
+      rate = 3;
+      break;
+    case 'rage':
+      P.torso = [-0.1, 0, 0.03 * Math.sin(t * 19)];
+      P.neck = [-0.4, 0, 0.55];
+      P.arms = [-0.45, 0, 0];
+      rate = 3;
+      break;
+    case 'dying':
+      P.torso = [0.5, 0, 0];
+      P.neck = [0.8, 0, 0];
+      P.arms = [1.0, 0, 0];
+      rate = 2;
+      break;
+    default: {
+      // 本を読んでいる。十数秒に一度、首だけがゆっくりこちらへ向く
+      const cyc = (t % 14) / 14;
+      const look = ease((cyc - 0.6) / 0.12) * (1 - ease((cyc - 0.88) / 0.08));
+      P.neck = [0.4 - 0.5 * look, 0.08 * wave(t, 0.2), 0.3 * look];
+      P.arms = [0.04 * wave(t, 0.3), 0, 0];
+      P.torso = [0.03 * wave(t, 0.2), 0, 0];
+    }
+  }
+  return { pose: P, rate };
 }
