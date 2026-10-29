@@ -47,6 +47,8 @@ export class Game {
   readonly combat: Combat;
   readonly movie: Movie;
   private post: PostFX | null = null;
+  private nearRay = new THREE.Raycaster(undefined, undefined, 0, 6);
+  private nearFrame = 0;
   private atmosphere: Atmosphere;
   private actors = new Map<string, Actor>();
   /** 発火済みのトリガー */
@@ -530,6 +532,7 @@ export class Game {
     this.player.update(dt);
     // 歩いて移れる区域（1 階 ⇔ 渡り廊下・体育館）もあるので毎フレーム見る
     this.updateFloor();
+    if (++this.nearFrame % 3 === 0) this.measureNear();
     this.lights.update(dt, this.player.pos.x, this.player.pos.z);
     this.atmosphere.update(time / 1000);
     if (!this.cleared) this.updateMeter(dt);
@@ -611,6 +614,13 @@ export class Game {
   }
 
   /** 画面中央から 2.5m 以内の、調べられる物を探す */
+  /** 懐中電灯の先（画面の真ん中）の物までの距離を測って、明るさの調整に使う */
+  private measureNear(): void {
+    this.nearRay.setFromCamera(this.center, this.camera);
+    const hit = this.nearRay.intersectObjects(this.builder.occluders, false)[0];
+    this.lights.setNearDistance(hit ? hit.distance : 10);
+  }
+
   private updateTarget(): void {
     this.raycaster.setFromCamera(this.center, this.camera);
     const objs = [...this.builder.occluders, ...this.builder.pickables];

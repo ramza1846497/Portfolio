@@ -36,7 +36,7 @@ export class PostFX {
       this.bloomB = new THREE.WebGLRenderTarget(1, 1, small);
     }
     this.bright = new THREE.ShaderMaterial({
-      uniforms: { tScene: { value: null }, threshold: { value: 0.85 } },
+      uniforms: { tScene: { value: null }, threshold: { value: 1.15 } },
       vertexShader: VERT,
       fragmentShader: BRIGHT,
       depthTest: false,

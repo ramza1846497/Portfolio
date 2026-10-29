@@ -29,7 +29,7 @@
 
 ## 3D モデル（public/models）
 
-[Poly Haven](https://polyhaven.com/models) の CC0 モデルを、gltf-transform で軽量化（ポリゴン削減・テクスチャ縮小・meshopt 圧縮）して使っています。
+[Poly Haven](https://polyhaven.com/models) の CC0 モデルを、gltf-transform で軽量化（ポリゴン削減・テクスチャ縮小）して使っています。
 
 SchoolDesk_01, SchoolChair_01, metal_office_desk, old_bed_frame, wall_clock, steel_frame_shelves_01,
 drawer_cabinet, metal_trash_can, wheelchair_01, medical_box, cardboard_box_01, plastic_broom, dustpan

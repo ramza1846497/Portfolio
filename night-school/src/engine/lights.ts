@@ -39,6 +39,9 @@ export class LightRig {
   private flashFlicker = 0;
   private ambient: THREE.HemisphereLight;
   private ambientBase: number;
+  /** 懐中電灯が照らしている物までの距離（m）と、それに合わせた明るさの倍率 */
+  private nearDist = 10;
+  private nearScale = 1;
 
   constructor(
     private scene: THREE.Scene,
@@ -55,6 +58,11 @@ export class LightRig {
     camera.add(spot);
     camera.add(spot.target);
     this.flashlight = spot;
+  }
+
+  /** 懐中電灯が照らしている物までの距離を伝える（遠い・何もなければ大きな値） */
+  setNearDistance(d: number): void {
+    this.nearDist = d;
   }
 
   /** 天井の蛍光灯を 1 つ追加する */
@@ -147,7 +155,12 @@ export class LightRig {
     }
     if ((this.strobeLeft > 0 && anyDark) || (anyDark && Math.random() < 0.3)) flash = 0.1;
     if (this.blackout) flash = 0;
-    this.flashlight.intensity = FLASH_INTENSITY * flash;
+    // 照らしている物が近いほど、目が慣れたように光を弱める（近くの紙が真っ白に飛んで字が消えないように）。
+    // 距離による減り方とほぼ打ち消し合うので、照らした面の明るさは 1〜4m でだいたい同じになる
+    const t = Math.min(1, Math.max(0, (this.nearDist - 0.3) / 3.7));
+    const target = 0.06 + 0.94 * t * t;
+    this.nearScale += (target - this.nearScale) * Math.min(1, dt * 6);
+    this.flashlight.intensity = FLASH_INTENSITY * flash * this.nearScale;
     this.ambient.intensity = this.blackout ? 0.02 : this.ambientBase;
   }
 }
