@@ -326,8 +326,8 @@ export class WorldBuilder {
       const mesh = new THREE.Mesh(merged, material);
       mesh.matrixAutoUpdate = false;
       mesh.userData.static = true;
+      // 小さな飾りなので、視線や照準はさえぎらない
       this.root.add(mesh);
-      if (!material.transparent) this.occluders.push(mesh);
       for (const g of geos) g.dispose();
     }
     this.pendingMat.clear();
