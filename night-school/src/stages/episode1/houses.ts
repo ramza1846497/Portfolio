@@ -3,7 +3,7 @@ import type { BuildContext } from '../../game/types';
 import { calendarTexture, familyPhotoTexture, noticeTexture, paperTexture, signTexture, staticTexture } from '../../engine/textures';
 import { ghostFigure, slidingDoor, wallPlane } from './parts';
 import { blockWall, gableRoof, townHouse } from './town';
-import { chabudai, dialPhone, faucet, leggedTable, oldFridge, sofa, tansu, utilityPole } from './props';
+import { butsudan, chabudai, dialPhone, faucet, kitchenCounter, leggedTable, oldFridge, sofa, tansu, utilityPole } from './props';
 
 /**
  * コンビニの先：花子さんの家（z = ZH）と、自分の家（z = ZM）。
@@ -111,8 +111,7 @@ function buildHanakoHouse({ builder: b, lights }: BuildContext): void {
   lights.addFluorescent(29, HH - 0.05, ZH - 3.5, 'dim', 0, 2.2);
 
   // 仏間：仏壇と遺影
-  b.box([37.1, 0, ZH - 4.4], [37.9, 1.7, ZH - 2.4], 'lacquer', { collide: true });
-  b.box([37.08, 0.9, ZH - 4.2], [37.1, 1.6, ZH - 2.6], 'gold');
+  butsudan(b, 37.1, ZH - 4.4, ZH - 2.4);
   b.box([36.75, 0.7, ZH - 4.3], [37.1, 0.75, ZH - 2.5], 'lacquer');
   b.hitbox('butsudan', [36.7, 0.6, ZH - 4.4], [37.9, 1.7, ZH - 2.4]);
   const portrait = wallPlane(b, familyPhotoTexture('ihai', 1, -1), 0.3, 0.24, [37.05, 1.35, ZH - 3.4], -Math.PI / 2);
@@ -255,7 +254,7 @@ function buildHome({ builder: b, lights }: BuildContext): void {
   lights.addFluorescent(15, HH - 0.05, ZM - 3, 'dim', 0, 1.6);
 
   // 台所：流しに向かって立つ「母」
-  b.box([18.3, 0, zN + 0.15], [23.8, 0.9, zN + 0.75], 'counter', { collide: true });
+  kitchenCounter(b, 18.3, 23.8, zN + 0.15, zN + 0.75, 21);
   leggedTable(b, 20.0, 21.6, ZM - 2.9, ZM - 2.1, 0.72);
   const motherBack = ghostFigure({ hair: 0x1a1612, top: 0x8a6a5a, bottom: 0x4a4a5a, opacity: 1, height: 1.62 });
   motherBack.position.set(21, 0, zN + 1.05);

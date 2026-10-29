@@ -412,3 +412,67 @@ export function oldFridge(b: WorldBuilder, x1: number, x2: number, z1: number, z
   b.box([x2, h * 0.62, z1], [x2 + 0.004, h * 0.62 + 0.012, z2], 'dark');
   for (const y of [h * 0.68, h * 0.4]) b.box([x2, y, z2 - 0.1], [x2 + 0.03, y + 0.18, z2 - 0.07], 'metal');
 }
+
+/**
+ * 台所の流し台：扉つきの下台・ステンレスの天板・流し・コンロ・壁のタイル。
+ * z1 が壁側、正面は +z。流しは sinkX を中心に置く
+ */
+export function kitchenCounter(b: WorldBuilder, x1: number, x2: number, z1: number, z2: number, sinkX: number): void {
+  const top = 0.85;
+  b.box([x1, 0, z1], [x2, 0.1, z2 - 0.06], 'dark');
+  b.box([x1, 0.1, z1], [x2, top, z2 - 0.02], 'wood');
+  // 扉（すき間が見えるよう、少しずつ離して）と取っ手
+  for (let x = x1; x < x2 - 0.3; x += 0.6) {
+    const xe = Math.min(x + 0.6, x2);
+    b.box([x + 0.008, 0.12, z2 - 0.02], [xe - 0.008, top - 0.12, z2], 'counter');
+    b.box([x + 0.008, top - 0.11, z2 - 0.02], [xe - 0.008, top - 0.01, z2], 'counter');
+    b.box([x + 0.2, top - 0.075, z2], [xe - 0.2, top - 0.055, z2 + 0.02], 'metal');
+  }
+  b.box([x1 - 0.01, top, z1], [x2 + 0.01, top + 0.04, z2 + 0.02], 'metal');
+  // 流し（暗い凹み）と蛇口
+  b.box([sinkX - 0.38, top + 0.041, z1 + 0.14], [sinkX + 0.38, top + 0.043, z2 - 0.1], 'dark');
+  b.box([sinkX - 0.4, top + 0.04, z1 + 0.12], [sinkX + 0.4, top + 0.055, z1 + 0.14], 'metal');
+  b.box([sinkX - 0.4, top + 0.04, z2 - 0.1], [sinkX + 0.4, top + 0.055, z2 - 0.08], 'metal');
+  faucet(b, sinkX, top + 0.04, z1 + 0.07);
+  // ガスコンロ（流しから離れた端）
+  const sx = sinkX < (x1 + x2) / 2 ? x2 - 0.55 : x1 + 0.55;
+  b.box([sx - 0.32, top + 0.04, z1 + 0.1], [sx + 0.32, top + 0.07, z2 - 0.08], 'dark');
+  for (const dx of [-0.16, 0.16]) {
+    put(b, new THREE.TorusGeometry(0.07, 0.012, 6, 16), 'metal', [sx + dx, top + 0.08, (z1 + z2) / 2], [Math.PI / 2, 0, 0]);
+    put(b, cyl(0.03, 0.03, 0.02, 12), 'metal', [sx + dx, top + 0.08, (z1 + z2) / 2]);
+  }
+  // 壁のタイル
+  b.box([x1, top + 0.04, z1], [x2, top + 0.7, z1 + 0.012], 'tile');
+  b.collision.add(x1, z1, x2, z2);
+}
+
+/**
+ * 仏壇：黒塗りの箱に金の内陣、開いた扉、屋根の庇、下の引き出し。正面は -x（前面が x）
+ */
+export function butsudan(b: WorldBuilder, x: number, z1: number, z2: number): void {
+  const d = 0.8;
+  b.box([x, 0, z1], [x + d, 1.7, z2], 'lacquer', { collide: true });
+  // 内陣（金）と、左右の柱・上の欄間
+  b.box([x - 0.02, 0.9, z1 + 0.2], [x, 1.6, z2 - 0.2], 'gold');
+  for (const z of [z1 + 0.12, z2 - 0.2]) b.box([x - 0.04, 0.75, z], [x, 1.62, z + 0.08], 'lacquer');
+  b.box([x - 0.05, 1.52, z1 + 0.12], [x, 1.62, z2 - 0.12], 'lacquer');
+  b.box([x - 0.06, 1.5, z1 + 0.2], [x - 0.05, 1.52, z2 - 0.2], 'gold');
+  // 屋根の庇
+  b.box([x - 0.12, 1.7, z1 - 0.06], [x + d + 0.02, 1.78, z2 + 0.06], 'lacquer');
+  b.box([x - 0.13, 1.69, z1 - 0.07], [x - 0.11, 1.71, z2 + 0.07], 'gold');
+  // 開いた扉（蝶番は前面の左右の端）
+  const doorW = (z2 - z1) / 2 - 0.05;
+  for (const [hz, sgn] of [
+    [z1, -1],
+    [z2, 1],
+  ] as const) {
+    const geo = new THREE.BoxGeometry(0.025, 0.8, doorW);
+    geo.translate(0, 0, -sgn * doorW / 2);
+    put(b, geo, 'lacquer', [x - 0.02, 1.2, hz], [0, sgn * 1.9, 0]);
+  }
+  // 引き出しの継ぎ目と金具
+  for (const y of [0.15, 0.4]) {
+    b.box([x - 0.005, y, z1 + 0.05], [x, y + 0.015, z2 - 0.05], 'dark');
+    for (const z of [z1 + (z2 - z1) * 0.3, z1 + (z2 - z1) * 0.7]) b.box([x - 0.02, y + 0.09, z - 0.03], [x, y + 0.11, z + 0.03], 'gold');
+  }
+}
