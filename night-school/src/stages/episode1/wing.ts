@@ -4,7 +4,8 @@ import { noticeTexture, signTexture } from '../../engine/textures';
 import { pbrMaterial } from '../../world/pbr';
 import { hedge, leafyTree } from './foliage';
 import { mergeParts } from './figures';
-import { damp, statueCreature } from './creature';
+import { damp, solveIK, statueCreature } from './creature';
+import { hasHuman, type Human } from '../../world/human';
 import { OZ } from './floor1';
 import { ghostFigure, moonPatch, notice, shadowChild, sign, slidingDoor, wallPlane } from './parts';
 
@@ -188,6 +189,7 @@ function buildGym({ builder: b, lights }: BuildContext): void {
  * 人の形は ghostFigure（丸みのある体）を石の色で作り、本と背負子・薪を足す。
  */
 export function ninomiyaStatue(): THREE.Group {
+  if (hasHuman()) return ninomiyaHuman();
   const stone = 0x7a7a72;
   const g = ghostFigure({ hair: 0x6a6a62, top: stone, bottom: stone, opacity: 1, height: 1.95, skirt: true, hairStyle: 'short', arms: 'book', skin: stone, socks: stone, shoes: 0x6a6a62, stone: true, rig: true });
   const J = g.userData.joints as Record<string, THREE.Group>;
@@ -242,3 +244,67 @@ export function ninomiyaStatue(): THREE.Group {
   return g;
 }
 
+
+/**
+ * 二宮金次郎像（人体モデル版）：石でできた少年の像。両手で本を持ち、背中に薪を背負う。
+ * 本の位置に合わせて腕を曲げる（IK）。目は構えると赤く光る。動きは creature.ts の statueCreature
+ */
+function ninomiyaHuman(): THREE.Group {
+  const stoneCol = 0x7a7a72;
+  const g = ghostFigure({ hair: 0x6a6a62, top: stoneCol, bottom: stoneCol, opacity: 1, height: 1.95, skirt: true, hairStyle: 'short', skin: stoneCol, socks: stoneCol, shoes: 0x6a6a62, stone: true });
+  const h = g.userData.human as Human;
+  const mat = pbrMaterial('statueStone', { color: 0xc8c8c0 });
+  // 胸の前で本を持つ（本の入れ物を、胸の骨に付ける）
+  const chest = h.bones.chest;
+  const anchor = new THREE.Group();
+  anchor.position.set(0, -0.12, 0.2);
+  chest.add(anchor);
+  const book = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.015, 0.14), mat);
+  book.rotation.x = -0.7;
+  anchor.add(book);
+  // 背負子と薪
+  for (const x of [-0.1, 0.1]) {
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.75, 6), mat);
+    post.position.set(x, 0.0, -0.13);
+    chest.add(post);
+  }
+  for (let i = 0; i < 7; i++) {
+    const log = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.032, 0.34, 8), mat);
+    log.rotation.z = Math.PI / 2 + (i % 2 ? 0.08 : -0.06);
+    log.position.set(0, -0.06 + (i % 4) * 0.06, -0.17 - Math.floor(i / 4) * 0.06);
+    chest.add(log);
+  }
+  // 目（構えると・怒ると赤く光る）
+  const eyes = new THREE.MeshBasicMaterial({ color: 0x401010 });
+  for (const e of h.eyes) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.009, 8, 6), eyes);
+    eye.position.copy(e).add(new THREE.Vector3(0, 0, 0.004));
+    h.bones.head.add(eye);
+  }
+  const J = { torso: h.bones.spine, neck: h.bones.neck, arms: anchor, hipL: h.bones.upperleg_R, hipR: h.bones.upperleg_L };
+  const dim = new THREE.Color(0x401010);
+  const hot = new THREE.Color(0xff3020);
+  let glow = 0;
+  const grip = new THREE.Vector3();
+  const pole = new THREE.Vector3();
+  g.userData.rig = statueCreature({
+    root: g,
+    body: h.root,
+    J,
+    extra: (dt, state, t) => {
+      const want = state === 'windupCharge' || state === 'windupStomp' || state === 'rage' || state === 'charge' ? 1 : g.userData.rage ? 0.5 + 0.2 * Math.sin(t * 3) : 0;
+      glow = damp(glow, want, 4, dt);
+      eyes.color.copy(dim).lerp(hot, glow);
+      // 両手で本の左右の端を持つ
+      for (const s of ['L', 'R'] as const) {
+        anchor.updateWorldMatrix(true, false);
+        grip.set(s === 'L' ? 0.1 : -0.1, -0.01, -0.02);
+        anchor.localToWorld(grip);
+        pole.set(s === 'L' ? 0.4 : -0.4, -1, -0.6).applyQuaternion(g.getWorldQuaternion(new THREE.Quaternion()));
+        solveIK(h.bones[`upperarm_${s}`], h.bones[`lowerarm_${s}`], h.rest(`upperarm_${s}`), h.rest(`lowerarm_${s}`), grip, pole);
+      }
+    },
+  });
+  g.userData.rig.update(0.016, 'idle');
+  return g;
+}

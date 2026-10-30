@@ -22,6 +22,8 @@ export class ModelLibrary {
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const gltf = await loader.parseAsync(toGlb(await res.json()), './models/');
           gltf.scene.updateMatrixWorld(true);
+          // 作ったときに入れておいた補足（人体の骨の先の位置など）
+          gltf.scene.userData.extras = (gltf.asset as { extras?: unknown }).extras ?? null;
           // 透過（ガラス）の材質は、画面全体をもう一度描くので重い。うすい半透明に置き換える
           gltf.scene.traverse((o) => {
             if (!(o instanceof THREE.Mesh) || !(o.material instanceof THREE.MeshPhysicalMaterial) || o.material.transmission <= 0) return;
@@ -95,6 +97,8 @@ export const MODEL_NAMES = [
   'vintage_grandfather_clock_01',
   'painted_wooden_bench',
   'football',
+  // 人の体（MakeHuman の基本メッシュと骨、CC0）。敵や人物はこれを変形して作る
+  'human',
 ];
 
 /** base64 で埋め込んだ buffer を取り出し、1 つの BIN にまとめた GLB を作る */

@@ -147,6 +147,10 @@ export interface ShadowParts {
   /** 腕・脚の骨の向き（各関節の座標） */
   arm: { upper: (side: -1 | 1) => THREE.Vector3; lower: (side: -1 | 1) => THREE.Vector3 };
   leg: { upper: (side: -1 | 1) => THREE.Vector3; lower: (side: -1 | 1) => THREE.Vector3 };
+  /** 手：休みの姿勢での指の向きと手のひらの向き（手首の座標）。無ければ指は真下、手のひらは体の内側 */
+  hand?: { finger: (side: -1 | 1) => THREE.Vector3; palm: (side: -1 | 1) => THREE.Vector3 };
+  /** 足首から先（床に平らに置く）。無ければそのまま */
+  feet?: Record<'L' | 'R', THREE.Object3D>;
   /** 毎フレームの追加の動き（髪・目の光・煙など） */
   extra?: (dt: number, state: string, t: number, speed: number) => void;
 }
@@ -279,8 +283,9 @@ export function shadowCreature(p: ShadowParts): CreatureRig {
         const f1 = fwd.clone().add(new THREE.Vector3(side * 0.3, 0, 0)).normalize().transformDirection(inv);
         const n1 = new THREE.Vector3(0, -1, 0).transformDirection(inv);
         n1.sub(f1.clone().multiplyScalar(n1.dot(f1))).normalize();
-        const f0 = new THREE.Vector3(0, -1, 0);
-        const n0 = new THREE.Vector3(-side, 0, 0);
+        const f0 = p.hand ? p.hand.finger(side).clone().normalize() : new THREE.Vector3(0, -1, 0);
+        const n0 = p.hand ? p.hand.palm(side).clone() : new THREE.Vector3(-side, 0, 0);
+        n0.sub(f0.clone().multiplyScalar(n0.dot(f0))).normalize();
         const m0 = new THREE.Matrix4().makeBasis(f0, n0, f0.clone().cross(n0));
         const m1 = new THREE.Matrix4().makeBasis(f1, n1, f1.clone().cross(n1));
         const qFlat = new THREE.Quaternion().setFromRotationMatrix(m1.multiply(m0.transpose()));
@@ -293,8 +298,27 @@ export function shadowCreature(p: ShadowParts): CreatureRig {
         cv = cv * (1 - reach) + 1.1 * reach;
         cv = cv * (1 - crouch * 0.6) - 0.35 * crouch * (1 - flat);
         cv = cv * (1 - rear) - 0.4 * rear;
-        J['kn' + k].rotation.set(0, 0, -side * cv);
-        J['tip' + k].rotation.set(0, 0, -side * cv * 1.2);
+        if (p.hand) {
+          // 指を手のひらの方へ曲げる軸（指の向き × 手のひらの向き）
+          const f = p.hand.finger(side).clone().normalize();
+          const axis = f.clone().cross(p.hand.palm(side)).normalize();
+          J['kn' + k].quaternion.setFromAxisAngle(axis, cv);
+          J['tip' + k].quaternion.setFromAxisAngle(axis, cv * 1.2);
+        } else {
+          J['kn' + k].rotation.set(0, 0, -side * cv);
+          J['tip' + k].rotation.set(0, 0, -side * cv * 1.2);
+        }
+      }
+      // 足：床に平らに（這うときはつま先を立てる）
+      if (p.feet) {
+        const rq = root.getWorldQuaternion(new THREE.Quaternion());
+        for (const k of ['L', 'R'] as const) {
+          const f = p.feet[k];
+          f.parent!.updateWorldMatrix(true, false);
+          const pq = f.parent!.getWorldQuaternion(new THREE.Quaternion()).invert();
+          const want = rq.clone().multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0.9 * crawl - 0.6 * reach, 0, 0)));
+          f.quaternion.copy(pq.multiply(want));
+        }
       }
       // 溜めの間だけ、体がこまかく震える
       if (crouch > 0.05) torso.rotation.z += crouch * 0.025 * Math.sin(t * 37);

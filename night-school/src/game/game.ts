@@ -1,3 +1,4 @@
+import { setHumanSource } from '../world/human';
 import * as THREE from 'three';
 import { AudioEngine } from '../engine/audio';
 import { CollisionWorld } from '../engine/collision';
@@ -100,6 +101,8 @@ export class Game {
 
     this.builder = new WorldBuilder(this.scene, this.collision, createMaterials());
     this.builder.models = models;
+    // 人物・敵の体（読み込めていれば、作り直した体を使う）
+    setHumanSource(models?.get('human') ?? null);
     stage.build({ builder: this.builder, lights: this.lights });
     this.builder.finalize();
     for (const d of stage.interactables) this.defs.set(d.id, d);
