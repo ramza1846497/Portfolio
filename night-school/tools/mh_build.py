@@ -16,6 +16,9 @@ from collections import defaultdict
 
 import numpy as np
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from mh_common import cloth_uv_maker, face_uvs  # noqa: E402
+
 DATA, OUT = sys.argv[1], sys.argv[2]
 SCALE = 0.1  # MakeHuman の 1 = 1dm
 
@@ -141,12 +144,18 @@ def region_of(face):
             return r
     return 'torso'
 
+cloth_rect, cloth_uv = cloth_uv_maker(joint_pos, mhb)
 prims = defaultdict(list)
 for f in groups['body']:
     prims['body_' + region_of(f)].append(f)
+tights_names = []
 for f in groups['helper-tights']:
     r = region_of(f)
-    prims['tights_' + {'head': 'torso', 'hand': 'forearm'}.get(r, r)].append(f)
+    name = 'tights_' + {'head': 'torso', 'hand': 'forearm'}.get(r, r)
+    prims[name].append(f)
+    tights_names.append(name)
+# 服の面がどの部位か（mh_paint.py が同じ区画に絵を焼くため）
+json.dump(tights_names, open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tights_prims.json'), 'w'))
 prims['skirt'] = groups['helper-skirt']
 prims['eyes'] = groups['helper-l-eye'] + groups['helper-r-eye']
 prims['teeth'] = groups['helper-upper-teeth'] + groups['helper-lower-teeth']
@@ -196,22 +205,28 @@ for name, faces in prims.items():
     N = N_cloth if cloth else N_body
     remap = {}
     pos, nor, uv, jnt, wts, idx = [], [], [], [], [], []
-    def vid(c):
-        if c not in remap:
+    def vid(c, cuv=None):
+        key = (c[0], round(cuv[0], 5), round(cuv[1], 5)) if cuv is not None else c
+        if key not in remap:
             vi, ti = c
-            remap[c] = len(pos)
+            remap[key] = len(pos)
             p = V[vi].copy()
             if cloth:
                 # 服は肌から少し浮かせる（肌が透けて見えないように）
                 p += N[vi] * 0.004
             pos.append(p)
             nor.append(N[vi])
-            uv.append([VT[ti][0], 1 - VT[ti][1]] if ti >= 0 else [0, 0])
+            uv.append(cuv if cuv is not None else ([VT[ti][0], 1 - VT[ti][1]] if ti >= 0 else [0, 0]))
             jnt.append(top[vi])
             wts.append(topw[vi])
-        return remap[c]
+        return remap[key]
     for f in faces:
-        ids = [vid(c) for c in f]
+        if cloth:
+            # 服は、汚れや破れを描ける大きさの UV に付け直す（mh_common.py）
+            cuvs = face_uvs(name, f, V, cloth_rect, cloth_uv)
+            ids = [vid(c, q) for c, q in zip(f, cuvs)]
+        else:
+            ids = [vid(c) for c in f]
         for k in range(1, len(ids) - 1):
             idx += [ids[0], ids[k], ids[k + 1]]
     pos = np.array(pos, np.float32)

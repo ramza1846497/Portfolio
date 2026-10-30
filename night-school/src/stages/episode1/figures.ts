@@ -1050,27 +1050,59 @@ export function anatomyModel(b: WorldBuilder): { root: THREE.Group; heart: THREE
   return { root, heart, keyInHand };
 }
 
-let humanTex: { d: THREE.Texture; n: THREE.Texture } | null = null;
+const humanTex = new Map<string, THREE.Texture>();
+
+/** 人体モデル用の絵（tools/mh_paint.py で焼いた物）。体の UV は上下が glTF の向き（上が 0） */
+function humanTexture(name: string, srgb: boolean): THREE.Texture {
+  let t = humanTex.get(name);
+  if (!t) {
+    t = new THREE.TextureLoader().load(`./textures/${name}.webp`);
+    t.flipY = false;
+    t.anisotropy = 4;
+    if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+    humanTex.set(name, t);
+  }
+  return t;
+}
 
 /**
- * 人体モデルの肌：体の UV に合わせて焼いた絵（まだらな血色・うっすら透ける血管・唇・目のくま・爪・毛穴・肋骨）。
- * color で肌の色合い（灰色の化け物・青白い幽霊・生身の人）を変える
+ * 人体モデルの肌。style：living（生身）・ghost（花子さん：青白い肌・あざ・血の涙）・
+ * creature（影の子ども：死人の肌・死斑・ひび割れ・裂けた傷・黒い血管・血の涙・泥）
  */
-function humanSkin(color: number, o: { opacity?: number; roughness?: number } = {}): THREE.MeshStandardMaterial {
-  if (!humanTex) {
-    const load = (name: string, srgb: boolean) => {
-      const t = new THREE.TextureLoader().load(`./textures/${name}.webp`);
-      // 体の UV は上下が glTF の向き（上が 0）
-      t.flipY = false;
-      t.anisotropy = 4;
-      if (srgb) t.colorSpace = THREE.SRGBColorSpace;
-      return t;
-    };
-    humanTex = { d: load('human_d', true), n: load('human_n', false) };
-  }
+function humanSkin(style: 'living' | 'ghost' | 'creature', color = 0xffffff, o: { opacity?: number } = {}): THREE.MeshStandardMaterial {
   const op = o.opacity ?? 1;
-  const m = new THREE.MeshStandardMaterial({ map: humanTex.d, normalMap: humanTex.n, color, roughness: o.roughness ?? 0.55, metalness: 0, transparent: op < 1, opacity: op });
-  // 法線の絵は v が上向きで焼いてあるので、上下を反転して使う
+  const m = new THREE.MeshStandardMaterial({
+    map: humanTexture(`skin_${style}_d`, true),
+    normalMap: humanTexture(`skin_${style}_n`, false),
+    roughnessMap: humanTexture(`skin_${style}_r`, false),
+    color,
+    roughness: 1,
+    metalness: 0,
+    transparent: op < 1,
+    opacity: op,
+  });
+  // 法線の絵は画像の上向きを +y として焼いてあるので、glTF の UV では上下を反転して使う
+  m.normalScale.set(1, -1);
+  return m;
+}
+
+/**
+ * 人体モデルの服（体に沿うタイツ・スカートの形に貼る）。透明の所は穴・ほつれ。
+ * style：rag（ぼろぼろの黒い服）・blouse（黄ばんだ血のしみのブラウス）・skirt（赤い吊りスカート）・plain（汚れた服。色は color）
+ */
+function humanCloth(style: 'rag' | 'blouse' | 'skirt' | 'plain', color = 0xffffff, o: { opacity?: number } = {}): THREE.MeshStandardMaterial {
+  const op = o.opacity ?? 1;
+  const m = new THREE.MeshStandardMaterial({
+    map: humanTexture(`cloth_${style}_d`, true),
+    normalMap: humanTexture(`cloth_${style}_n`, false),
+    color,
+    roughness: 0.92,
+    metalness: 0,
+    side: THREE.DoubleSide,
+    alphaTest: 0.5,
+    transparent: op < 1,
+    opacity: op,
+  });
   m.normalScale.set(1, -1);
   return m;
 }
@@ -1119,14 +1151,15 @@ function attachHair(h: Human, mat: THREE.Material, o: { len: (th: number) => num
 function shadowChildHuman(seed: number): THREE.Group {
   const rand = rng(seed);
   const g = new THREE.Group();
-  const skin = humanSkin(0x8a8c94, { roughness: 0.6 });
-  const rag = tinted('clothWhite', 0x0d0c10, 0.82, { opacity: 1, side: THREE.DoubleSide, repeat: 6 });
-  const hairMat = new THREE.MeshStandardMaterial({ color: 0x050506, roughness: 0.5, metalness: 0, side: THREE.DoubleSide });
+  const skin = humanSkin('creature');
+  const rag = humanCloth('rag');
+  const hairMat = new THREE.MeshStandardMaterial({ color: 0x030304, roughness: 0.7, metalness: 0, side: THREE.DoubleSide });
   // 服の裾：すねの途中で、ぎざぎざに裂けている
   const hem = (p: THREE.Vector3) => p.y > 0.42 + 0.08 * Math.abs(Math.sin(p.x * 61 + p.z * 37) * Math.sin(p.x * 23 - p.z * 11));
   const h = makeHuman('creature', {
     parts: [
-      { material: skin, prims: ['body_head', 'body_upperarm', 'body_forearm', 'body_hand', 'body_thigh', 'body_shin', 'body_foot'] },
+      // 破れた服の穴から、やせた胴の肌がのぞく
+      { material: skin, prims: ['body_head', 'body_torso', 'body_upperarm', 'body_forearm', 'body_hand', 'body_thigh', 'body_shin', 'body_foot'] },
       { material: rag, prims: ['tights_torso', 'skirt'], cut: hem },
       { material: voidMat(), prims: ['eyes'] },
     ],
@@ -1147,7 +1180,8 @@ function shadowChildHuman(seed: number): THREE.Group {
     count: 340,
     len: (th) => (Math.cos(th) > 0.55 ? 0.22 : 0.46),
     seed: seed + 5,
-    part: [-0.62, 0.05],
+    // 分け目を広めに：ひび割れた顔と黒い血管がのぞく
+    part: [-0.75, 0.3],
   });
   // 足もとから立ちのぼる黒い煙
   const smokeMat = new THREE.SpriteMaterial({ map: softTexture(), color: 0x000000, transparent: true, opacity: 0.5, depthWrite: false });
@@ -1210,10 +1244,15 @@ function humanGhost(opts: GhostOpts): THREE.Group {
   const child = height <= 1.4;
   const skirt = opts.skirt ?? child;
   const build = child ? 'child' : 'adult';
-  const cloth = (color: number, side?: THREE.Side) => (opts.stone ? stone(color, side) : tinted('clothWhite', color, 0.82, { opacity: op, side, repeat: 6 }));
+  // 服：花子さんは黄ばんだブラウスと赤い吊りスカート、ほかは汚れた服に色を付ける
+  const hanakoLook = child && opts.bottom === 0x8a1010;
+  const cloth = (color: number, side?: THREE.Side, kind?: 'top' | 'bottom') =>
+    opts.stone ? stone(color, side) : hanakoLook && kind === 'top' ? humanCloth('blouse', 0xffffff, { opacity: op }) : hanakoLook && kind === 'bottom' ? humanCloth('skirt', 0xffffff, { opacity: op }) : humanCloth('plain', color, { opacity: op });
   const stone = (color: number, side?: THREE.Side) => tinted('statueStone', color, 0.5, { opacity: op, side, repeat: 3 });
-  const skin = opts.stone ? stone(opts.skin ?? 0x7a7a72) : humanSkin(opts.skin ?? (op < 1 ? 0xf0e8e8 : 0xffffff), { opacity: op });
   const face = opts.face ?? (op < 1 ? 'hollow' : 'plain');
+  // 肌：幽霊は青白く傷んだ肌、振り向いた「母」のような化け物は死人の肌、生身の人はふつうの肌
+  const skinStyle = op < 1 || child ? 'ghost' : face === 'hollow' ? 'creature' : 'living';
+  const skin = opts.stone ? stone(opts.skin ?? 0x7a7a72) : humanSkin(skinStyle, 0xffffff, { opacity: op });
   const eyeMat = opts.stone ? stone(0x6a6a62) : face === 'hollow' ? voidMat() : new THREE.MeshStandardMaterial({ color: 0x140e0c, roughness: 0.08, transparent: op < 1, opacity: op });
   const hairMat = opts.stone ? stone(opts.hair) : new THREE.MeshStandardMaterial({ color: opts.hair, roughness: 0.55, metalness: 0, side: THREE.DoubleSide, transparent: op < 1, opacity: op, depthWrite: op >= 1 });
   // 体の座標（体つきごとの高さ）での腰の高さ
@@ -1236,9 +1275,9 @@ function humanGhost(opts: GhostOpts): THREE.Group {
     parts.push({ material: cloth(opts.bottom, THREE.DoubleSide), prims: ['skirt'], shape: skirtShape(0.9, 0.25) });
   } else if (skirt) {
     skinPrims.push('body_forearm', 'body_thigh');
-    parts.push({ material: cloth(opts.top), prims: ['tights_torso', 'tights_upperarm'], cut: (p) => p.y > waist - 0.04 });
-    parts.push({ material: cloth(opts.bottom, THREE.DoubleSide), prims: ['skirt'], shape: skirtShape(child ? 0.42 : 0.85, child ? 0.9 : 0.2) });
-    parts.push({ material: cloth(opts.bottom), prims: ['tights_torso'], cut: (p) => p.y <= waist - 0.04 });
+    parts.push({ material: cloth(opts.top, undefined, 'top'), prims: ['tights_torso', 'tights_upperarm'], cut: (p) => p.y > waist - 0.04 });
+    parts.push({ material: cloth(opts.bottom, THREE.DoubleSide, 'bottom'), prims: ['skirt'], shape: skirtShape(child ? 0.42 : 0.85, child ? 0.9 : 0.2) });
+    parts.push({ material: cloth(opts.bottom, undefined, 'bottom'), prims: ['tights_torso'], cut: (p) => p.y <= waist - 0.04 });
     parts.push({ material: cloth(opts.socks ?? 0xe8e6de), prims: ['tights_shin'] });
     parts.push({ material: shoes(), prims: ['tights_foot'] });
   } else {
@@ -1248,7 +1287,7 @@ function humanGhost(opts: GhostOpts): THREE.Group {
   }
   if (!opts.stone) parts.unshift({ material: skin, prims: skinPrims });
   parts.push({ material: eyeMat, prims: ['eyes'] });
-  const key = ['ghost', opts.stone ? 'stone' : '', skirt ? 'skirt' : 'pants'].join('-');
+  const key = ['ghost', opts.stone ? 'stone' : '', skirt ? 'skirt' : 'pants', child ? 'child' : 'adult'].join('-');
   const h = makeHuman(build, { parts }, key);
   h.root.scale.setScalar(height / h.height);
   const g = new THREE.Group();

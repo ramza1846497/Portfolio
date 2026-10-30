@@ -52,7 +52,7 @@ water_manhole_cover, alarm_clock_01, vintage_grandfather_clock_01, painted_woode
 [MakeHuman](http://www.makehumancommunity.org/) の基本メッシュ（hm08）と標準の骨・ウェイト（default.mhskel / default_weights.mhw）を、
 ゲーム用に変換して使っています（どちらも CC0、[makehumancommunity/makehuman](https://github.com/makehumancommunity/makehuman)）。
 骨は 163 本を 25 本にまとめ、体つき（子ども・大人・やせ細った化け物）はゲームの中で骨ごとに伸び縮みさせて作っています。
-肌の絵（human_d・human_n）は、この体の UV に合わせてコードで焼いた自作の絵です。
+肌と服の絵（skin_*・cloth_*）は、この体の UV に合わせてコード（tools/mh_paint.py）で焼いた自作の絵です。生身の人・幽霊・化け物（死斑・ひび割れ・傷・血の涙）の肌と、破れや血のしみのある服を描いています。
 
 花子さん・影の子ども・母親・店員・二宮金次郎像はこの体で作り、服・石の質感に上の写真テクスチャを使っています。
 人体模型、木の葉、コンビニの商品の包装は、コードで組んだ形・描いた絵です。
