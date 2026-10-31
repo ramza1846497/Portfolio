@@ -5,6 +5,7 @@ import { muscleTexture } from '../../engine/textures';
 import { pbrMaterial } from '../../world/pbr';
 import { wave } from './rig';
 import { shadowCreature } from './creature';
+import { attachCardHair, hairMaterial, type HairStyle } from './hair';
 import { hasHuman, makeHuman, relaxArms, type Human } from '../../world/human';
 
 /*
@@ -1126,22 +1127,15 @@ function creatureJoints(h: Human): Record<string, THREE.Object3D> {
   return J;
 }
 
-/** 頭の骨に、一本ずつの房の髪を付ける（重さで垂れるよう、髪の付け根を支点にした入れ物に入れる） */
-function attachHair(h: Human, mat: THREE.Material, o: { len: (th: number) => number; cut?: (th: number) => number; count: number; part?: [number, number]; seed: number; messy?: number; width?: number }): THREE.Group {
-  const c = h.skull.center;
-  const r = h.skull.radius * 1.02;
-  const pivot = c.clone().add(V(0, r * 0.85, 0));
-  const hairJ = new THREE.Group();
-  hairJ.position.copy(pivot);
-  h.bones.head.add(hairJ);
-  // 地肌が見えないよう、頭頂を髪の色の帽子で覆う
-  const cap = new THREE.Mesh(new THREE.SphereGeometry(r * 0.99, 24, 14, 0, Math.PI * 2, 0, 1.25), mat);
-  cap.position.copy(c);
+/**
+ * 頭の骨に髪を付ける：頭頂を髪色の帽子で覆い（地肌が見えないように）、その上にヘアカードの髪（hair.ts）
+ */
+function attachHair(h: Human, figure: THREE.Object3D, color: number, style: HairStyle, opacity = 1): THREE.Mesh {
+  const capMat = new THREE.MeshStandardMaterial({ color, roughness: 0.8, metalness: 0, transparent: opacity < 1, opacity });
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(h.skull.radius * 1.0, 24, 14, 0, Math.PI * 2, 0, 1.3), capMat);
+  cap.position.copy(h.skull.center);
   h.bones.head.add(cap);
-  const geo = strandHair({ c, r, count: o.count, len: o.len, cut: o.cut, width: o.width ?? 0.013, messy: o.messy ?? 0.12, spread: 0.05, seed: o.seed, part: o.part });
-  geo.translate(-pivot.x, -pivot.y, -pivot.z);
-  hairJ.add(new THREE.Mesh(geo, mat));
-  return hairJ;
+  return attachCardHair(h, figure, hairMaterial(color, opacity), style);
 }
 
 /**
@@ -1153,7 +1147,6 @@ function shadowChildHuman(seed: number): THREE.Group {
   const g = new THREE.Group();
   const skin = humanSkin('creature');
   const rag = humanCloth('rag');
-  const hairMat = new THREE.MeshStandardMaterial({ color: 0x030304, roughness: 0.7, metalness: 0, side: THREE.DoubleSide });
   // 服の裾：すねの途中で、ぎざぎざに裂けている
   const hem = (p: THREE.Vector3) => p.y > 0.42 + 0.08 * Math.abs(Math.sin(p.x * 61 + p.z * 37) * Math.sin(p.x * 23 - p.z * 11));
   const h = makeHuman('creature', {
@@ -1175,13 +1168,14 @@ function shadowChildHuman(seed: number): THREE.Group {
     h.bones.head.add(s);
     glows.push(s);
   }
-  // 顔の前まで垂れる、濡れた長い黒髪（片目だけがのぞく分け目）
-  const hairJ = attachHair(h, hairMat, {
-    count: 340,
-    len: (th) => (Math.cos(th) > 0.55 ? 0.22 : 0.46),
-    seed: seed + 5,
-    // 分け目を広めに：ひび割れた顔と黒い血管がのぞく
+  // 顔の前まで垂れる、濡れた長い黒髪（分け目から、ひび割れた顔と赤い目がのぞく）。重さで垂れ、体にはめり込まない
+  attachHair(h, g, 0x0a0a0c, {
+    cards: 72,
+    width: 0.05,
+    len: (th) => (Math.cos(th) > 0.55 ? 0.24 : 0.48),
     part: [-0.75, 0.3],
+    stiff: 1.2,
+    seed: seed + 5,
   });
   // 足もとから立ちのぼる黒い煙
   const smokeMat = new THREE.SpriteMaterial({ map: softTexture(), color: 0x000000, transparent: true, opacity: 0.5, depthWrite: false });
@@ -1195,10 +1189,6 @@ function shadowChildHuman(seed: number): THREE.Group {
   relaxArms(h, 0.08, 0.1, 0.3);
   const J = creatureJoints(h);
   const ph = rand() * 10;
-  const qUp = new THREE.Quaternion();
-  const qHead = new THREE.Quaternion();
-  const qSway = new THREE.Quaternion();
-  const sway = new THREE.Euler();
   const side = (s: -1 | 1) => (s < 0 ? 'R' : 'L');
   g.userData.rig = shadowCreature({
     root: g,
@@ -1208,15 +1198,8 @@ function shadowChildHuman(seed: number): THREE.Group {
     leg: { upper: (s) => h.rest(`upperleg_${side(s)}`), lower: (s) => h.rest(`lowerleg_${side(s)}`) },
     hand: { finger: (s) => h.rest(`hand_${side(s)}`), palm: (s) => V(-s, 0, 0) },
     feet: { L: h.bones.foot_R, R: h.bones.foot_L },
-    extra: (_dt, state, time, speed) => {
+    extra: (_dt, _state, time) => {
       const t = time + ph;
-      hairJ.parent!.updateWorldMatrix(true, false);
-      g.getWorldQuaternion(qUp);
-      hairJ.parent!.getWorldQuaternion(qHead);
-      const back = state === 'chase' ? Math.min(1, speed / 1.5) * 0.25 : state === 'lunge' ? 0.45 : 0;
-      qSway.setFromEuler(sway.set(back + 0.06 * wave(t, 0.9), 0, 0.05 * wave(t, 0.7, 2)));
-      const target = qUp.clone().slerp(qHead, 0.45).multiply(qSway);
-      hairJ.quaternion.copy(qHead.invert().multiply(target));
       const gl = 0.045 + 0.012 * Math.sin(t * 9) + 0.008 * Math.sin(t * 23);
       for (const s of glows) s.scale.setScalar(gl);
       for (const p of smoke) {
@@ -1275,7 +1258,13 @@ function humanGhost(opts: GhostOpts): THREE.Group {
     parts.push({ material: cloth(opts.bottom, THREE.DoubleSide), prims: ['skirt'], shape: skirtShape(0.9, 0.25) });
   } else if (skirt) {
     skinPrims.push('body_forearm', 'body_thigh');
-    parts.push({ material: cloth(opts.top, undefined, 'top'), prims: ['tights_torso', 'tights_upperarm'], cut: (p) => p.y > waist - 0.04 });
+    // ブラウスは体にぴったり張りつかないよう、少しふくらませる（背骨や肩甲骨の形が浮かないように）
+    const loose = (p: THREE.Vector3) => {
+      const f = 1.07;
+      p.x *= f;
+      p.z = 0.01 + (p.z - 0.01) * f;
+    };
+    parts.push({ material: cloth(opts.top, undefined, 'top'), prims: ['tights_torso', 'tights_upperarm'], cut: (p) => p.y > waist - 0.04, shape: loose });
     parts.push({ material: cloth(opts.bottom, THREE.DoubleSide, 'bottom'), prims: ['skirt'], shape: skirtShape(child ? 0.42 : 0.85, child ? 0.9 : 0.2) });
     parts.push({ material: cloth(opts.bottom, undefined, 'bottom'), prims: ['tights_torso'], cut: (p) => p.y <= waist - 0.04 });
     parts.push({ material: cloth(opts.socks ?? 0xe8e6de), prims: ['tights_shin'] });
@@ -1302,20 +1291,20 @@ function humanGhost(opts: GhostOpts): THREE.Group {
     const r = h.skull.radius;
     const c = h.skull.center;
     const bob = (opts.hairStyle ?? 'bob') === 'bob';
-    attachHair(h, hairMat, bob
+    attachHair(h, g, opts.hair, bob
       ? {
-          count: 300,
+          cards: 80,
+          width: 0.042,
           len: () => 0.3,
           // 前髪は眉の上、横と後ろはあごの線で切りそろえる
           cut: (th) => {
             const t = THREE.MathUtils.smoothstep(Math.cos(th), 0.2, 0.75);
-            return c.y - 0.85 * r + (1.12 * r) * t;
+            return c.y - 0.85 * r + 1.12 * r * t;
           },
+          stiff: 14,
           seed: 11,
-          messy: 0.03,
-          width: 0.018,
         }
-      : { count: 220, len: (th) => (Math.cos(th) > 0.55 ? 0.05 : 0.08), cut: (th) => (Math.cos(th) > 0.55 ? c.y + 0.4 * r : c.y - 0.2 * r), seed: 12, messy: 0.15, width: 0.016 });
+      : { cards: 60, width: 0.04, len: (th) => (Math.cos(th) > 0.55 ? 0.06 : 0.09), cut: (th) => (Math.cos(th) > 0.55 ? c.y + 0.4 * r : c.y - 0.2 * r), stiff: 20, seed: 12 }, op);
   }
   if (op < 1) skinnedDepthPrepass(h.root);
   g.userData.human = h;
