@@ -95,12 +95,16 @@ export interface HairStyle {
   part?: [number, number];
   /** 分け目の中に、顔の前へ垂れる細い毛束を何本足すか */
   faceStrands?: number;
-  /** 長い髪：根もとより先は、頭の向きに関係なく真下へ垂れる形へ戻る（0〜1、毛先ほど強く） */
-  hang?: number;
+  /** 根もとの何点を髪型どおりに保つか（大きいほど髪型が崩れない。長い黒髪は 2、おかっぱは 4 くらい） */
+  rootHold?: number;
+  /** 頭の動きをどれだけ髪に残すか（0〜1。1 で完全に取り残される、0 で頭といっしょに動く） */
+  inertia?: number;
   /** 動かさない（短い髪・おかっぱ）：頭に固定した形で一度だけ作る。計算がいらず軽い */
   fixed?: boolean;
-  /** 休みの形へ戻る強さ（大きいほど髪型が崩れない） */
+  /** 髪型へ戻るばねの強さ（根もとの値、1/秒）。毛先へ行くほど弱くなる */
   stiff: number;
+  /** ばねの弱まり方（大きいほど毛先が自由に揺れる。おかっぱ 0.7、長い髪 3） */
+  falloff?: number;
   seed: number;
 }
 
@@ -228,101 +232,139 @@ export function attachCardHair(h: Human, figure: THREE.Object3D, mat: THREE.Mate
   const tmp = new THREE.Vector3();
   const A = new THREE.Vector3();
   const B = new THREE.Vector3();
+  const C = new THREE.Vector3();
+  const D = new THREE.Vector3();
   const skullW = new THREE.Vector3();
   const inv = new THREE.Matrix4();
   let last = -1;
   const scaleW = new THREE.Vector3();
   const lastRoot = new THREE.Vector3(1e9, 0, 0);
 
-  const hang = style.hang ?? 0;
-  const down = new THREE.Vector3();
-  /** n 番目の点の戻る先（ワールド）。根もとは髪型どおり、先へ行くほど一つ前の点の真下へ */
-  const target = (card: Card, n: number, out: THREE.Vector3, s: number): THREE.Vector3 => {
-    out.copy(card.rest[n]).applyMatrix4(head.matrixWorld);
-    if (n === 0 || hang <= 0) return out;
-    // 頭の丸みをこえる最初の 2 点は髪型どおり、その先を垂らす
-    const w = hang * Math.min(1, Math.max(0, (n - 1) / (NODES - 2)));
-    down.copy(card.pos[n - 1]);
-    down.y -= card.seg * s;
-    return out.lerp(down, w);
+  const hold = Math.max(1, style.rootHold ?? 2);
+  const inertia = style.inertia ?? 0.7;
+  // 曲がりにくさ：一つおきの点の間の、休みの形での距離（これより縮むと曲がりすぎ）
+  const bend = cards.map((card) => card.rest.map((v, n) => (n >= 2 ? v.distanceTo(card.rest[n - 2]) : 0)));
+  // 区間ごとの長さ（切りそろえた毛先は短い）
+  const segs = cards.map((card) => card.rest.map((v, n) => (n >= 1 ? Math.max(v.distanceTo(card.rest[n - 1]), 0.001) : 0)));
+  // 髪型へ戻るばね：点ごとの強さ（1 コマあたりの割合）
+  const falloff = style.falloff ?? 1;
+  const pull = Array.from({ length: NODES }, (_, n) => 1 - Math.exp(-style.stiff * Math.pow(1 - n / NODES, falloff) * (1 / 60)));
+  // 毛束ごとの、空気のゆらぎの位相
+  const phase = cards.map(() => rand() * 100);
+  const STEP = 1 / 60;
+  let acc = 0;
+  let time = 0;
+
+  /** 1 コマ（1/60 秒）ぶん進める */
+  const substep = (s: number, move: THREE.Vector3) => {
+    const dt = STEP;
+    time += dt;
+    const gravity = 9.8 * dt * dt;
+    // 頭の移動の一部は髪ごと動かす（残りは慣性として、髪が遅れて付いてくる）
+    tmp.copy(move).multiplyScalar(1 - inertia);
+    cards.forEach((card, ci) => {
+      // 根もと側は頭皮に付いたまま、髪型どおりに（毛先へ行くほど自由）
+      for (let n = 0; n < hold; n++) {
+        card.pos[n].copy(card.rest[n]).applyMatrix4(head.matrixWorld);
+        card.prev[n].copy(card.pos[n]);
+      }
+      const sway = 0.00004 * Math.sin(time * 1.3 + phase[ci]);
+      for (let n = hold; n < NODES; n++) {
+        const p = card.pos[n];
+        const pv = card.prev[n];
+        p.add(tmp);
+        pv.add(tmp);
+        // 慣性（空気の抵抗で少しずつ弱まる）と重さ
+        A.copy(p).sub(pv).multiplyScalar(0.982);
+        pv.copy(p);
+        p.add(A);
+        p.y -= gravity;
+        p.x += sway * n;
+        // 髪型（頭の向きに付いてくる形）へ、ばねで戻す
+        if (pull[n] > 1e-4) p.lerp(B.copy(card.rest[n]).applyMatrix4(head.matrixWorld), pull[n]);
+      }
+    });
+    for (let it = 0; it < 3; it++) {
+      for (let ci = 0; ci < cards.length; ci++) {
+        const card = cards[ci];
+        for (let n = hold; n < NODES; n++) {
+          const a = card.pos[n - 1];
+          const p = card.pos[n];
+          // 長さを保つ（根もと側は動かさず、先の点を引き寄せる）
+          B.copy(p).sub(a);
+          const d = B.length() || 1e-6;
+          p.copy(a).addScaledVector(B, (segs[ci][n] * s) / d);
+          // 曲がりにくさ：二つ前の点から近づきすぎたら離す（毛束がまっすぐ流れる）
+          if (n >= 2) {
+            const a2 = card.pos[n - 2];
+            B.copy(p).sub(a2);
+            const d2 = B.length() || 1e-6;
+            const want = bend[ci][n] * s * 0.92;
+            if (d2 < want) p.addScaledVector(B, ((want - d2) / d2) * 0.5);
+          }
+          // 頭からはみ出させる
+          B.copy(p).sub(skullW);
+          const rr = r * 1.04 * s;
+          const dh = B.length();
+          if (dh < rr) p.copy(skullW).addScaledVector(B.divideScalar(dh || 1), rr);
+          // 体のカプセルから押し出し、表面ですべらせる（肩にかかって流れる）
+          for (let k = 0; k < caps.length; k++) {
+            A.copy(capA[k]);
+            B.copy(capB[k]).sub(A);
+            const t = Math.min(1, Math.max(0, C.copy(p).sub(A).dot(B) / Math.max(B.lengthSq(), 1e-9)));
+            A.addScaledVector(B, t);
+            C.copy(p).sub(A);
+            const R = caps[k][2] * s + 0.012;
+            const dd = C.length();
+            if (dd < R) {
+              p.copy(A).addScaledVector(dd > 1e-6 ? C.divideScalar(dd) : C.set(0, 0, 1), R);
+              // 摩擦：当たっている間は、動きを少し止める
+              card.prev[n].lerp(p, 0.3);
+            }
+          }
+        }
+      }
+    }
+  };
+
+  const reset = () => {
+    // 髪型の形から、重さで垂れた形まで落ち着かせる
+    for (const card of cards) {
+      for (let n = 0; n < NODES; n++) {
+        card.pos[n].copy(card.rest[n]).applyMatrix4(head.matrixWorld);
+        card.prev[n].copy(card.pos[n]);
+      }
+    }
+    const zero = new THREE.Vector3();
+    for (let i = 0; i < 40; i++) substep(scaleW.x, zero);
   };
 
   const update = () => {
     const now = performance.now() / 1000;
-    // 長く止まっていた（画面の外・遠く）後は、髪型の形から始め直す（絡まって見えないように）
-    const stale = last < 0 || now - last > 0.25;
-    const dt = last < 0 ? 0 : Math.min(now - last, 0.05);
+    // 長く止まっていた（画面の外・遠く）後は、落ち着いた形から始め直す
+    const stale = last < 0 || now - last > 0.3;
+    const dt = stale ? 0 : now - last;
     last = now;
     figure.updateWorldMatrix(true, true);
     head.getWorldScale(scaleW);
     const s = scaleW.x;
     skullW.copy(c).applyMatrix4(head.matrixWorld);
-    // 人物が別の場所へ置き直されたら、髪も休みの形から始め直す
-    if (stale || skullW.distanceTo(lastRoot) > 0.5) {
-      for (const card of cards) {
-        for (let n = 0; n < NODES; n++) {
-          target(card, n, card.pos[n], s);
-          card.prev[n].copy(card.pos[n]);
-        }
-      }
-    } else {
-      // 頭の移動ぶんは髪ごと動かす（走っても髪が後ろへ取り残されない）。揺れは頭との相対の動きだけ
-      const move = A.copy(skullW).sub(lastRoot);
-      for (const card of cards) {
-        for (let n = 1; n < NODES; n++) {
-          card.pos[n].add(move);
-          card.prev[n].add(move);
-        }
-      }
-    }
-    lastRoot.copy(skullW);
-    const gravity = 9.8 * dt * dt;
-    // 当たり判定のカプセル（骨の位置はフレームに 1 回だけ求める）
     for (let i = 0; i < caps.length; i++) {
       h.bones[caps[i][0]].getWorldPosition(capA[i]);
       h.bones[caps[i][1]].getWorldPosition(capB[i]);
     }
-    for (const card of cards) {
-      // 根もとは頭皮に固定
-      card.pos[0].copy(card.rest[0]).applyMatrix4(head.matrixWorld);
-      card.prev[0].copy(card.pos[0]);
-      for (let n = 1; n < NODES; n++) {
-        const p = card.pos[n];
-        const pv = card.prev[n];
-        tmp.copy(p);
-        // 慣性（少し減衰）と重さ
-        p.addScaledVector(tmp.clone().sub(pv), 0.9);
-        p.y -= gravity;
-        pv.copy(tmp);
-        // 髪型（長い髪は、真下へ垂れた形）へ引き戻す
-        p.lerp(target(card, n, B, s), Math.min(1, style.stiff * dt));
-      }
-      for (let it = 0; it < 2; it++) {
-        for (let n = 1; n < NODES; n++) {
-          // 長さを保つ
-          const a = card.pos[n - 1];
-          const p = card.pos[n];
-          tmp.copy(p).sub(a);
-          const d = tmp.length() || 1e-6;
-          p.copy(a).addScaledVector(tmp, (card.seg * s) / d);
-          // 頭からはみ出させる
-          tmp.copy(p).sub(skullW);
-          const rr = r * 1.04 * s;
-          if (tmp.length() < rr) p.copy(skullW).addScaledVector(tmp.normalize(), rr);
-          // 体のカプセルから押し出す
-          for (let ci = 0; ci < caps.length; ci++) {
-            const rad = caps[ci][2];
-            A.copy(capA[ci]);
-            const ab = B.copy(capB[ci]).sub(A);
-            const t = Math.min(1, Math.max(0, tmp.copy(p).sub(A).dot(ab) / Math.max(ab.lengthSq(), 1e-9)));
-            const closest = A.addScaledVector(ab, t);
-            tmp.copy(p).sub(closest);
-            const R = rad * s + 0.01;
-            const dd = tmp.length();
-            if (dd < R) p.copy(closest).addScaledVector(dd > 1e-6 ? tmp.divideScalar(dd) : tmp.set(0, 0, 1), R);
-          }
-        }
-      }
+    if (stale || skullW.distanceTo(lastRoot) > 0.6) {
+      lastRoot.copy(skullW);
+      reset();
+      acc = 0;
+    } else {
+      // 決まった刻み（1/60 秒）で進める。頭の移動は刻みの数で割って渡す
+      acc = Math.min(acc + dt, STEP * 4);
+      const n = Math.floor(acc / STEP);
+      const move = D.copy(skullW).sub(lastRoot).divideScalar(Math.max(n, 1));
+      for (let i = 0; i < n; i++) substep(s, move);
+      acc -= n * STEP;
+      if (n > 0) lastRoot.copy(skullW);
     }
     // 板の形を作る（入れ物の座標で）
     inv.copy(figure.matrixWorld).invert();
@@ -335,7 +377,7 @@ export function attachCardHair(h: Human, figure: THREE.Object3D, mat: THREE.Mate
         const p = card.pos[n];
         along.copy(card.pos[Math.min(n + 1, NODES - 1)]).sub(card.pos[Math.max(n - 1, 0)]).normalize();
         out.copy(p).sub(skullW);
-        out.y = 0;
+        out.y *= 0.3;
         out.normalize();
         side.copy(along).cross(out).normalize();
         const w = card.width * s * (1 - 0.35 * (n / (NODES - 1)));
@@ -345,7 +387,7 @@ export function attachCardHair(h: Human, figure: THREE.Object3D, mat: THREE.Mate
           position[vi * 3 + 1] = tmp.y;
           position[vi * 3 + 2] = tmp.z;
           normal[vi * 3] = out.x;
-          normal[vi * 3 + 1] = 0.3;
+          normal[vi * 3 + 1] = out.y + 0.2;
           normal[vi * 3 + 2] = out.z;
           vi++;
         }
@@ -354,10 +396,10 @@ export function attachCardHair(h: Human, figure: THREE.Object3D, mat: THREE.Mate
     geo.attributes.position.needsUpdate = true;
     geo.attributes.normal.needsUpdate = true;
   };
-  // 描く直前に動かす。1 秒に 30 回まで、遠い（10m 以上）ときは止めておく
+  // 描く直前に動かす（1 コマに 1 回）。遠い（10m 以上）ときは止めておく
   const camPos = new THREE.Vector3();
   mesh.onBeforeRender = (_r, _s, camera) => {
-    if (performance.now() / 1000 - last < 0.033) return;
+    if (performance.now() / 1000 - last < 0.004) return;
     camera.getWorldPosition(camPos);
     if (camPos.distanceTo(skullW) > 10 && last > 0) {
       last = performance.now() / 1000;
@@ -366,9 +408,6 @@ export function attachCardHair(h: Human, figure: THREE.Object3D, mat: THREE.Mate
     update();
   };
   // 最初の形
-  for (let i = 0; i < 30; i++) {
-    last = performance.now() / 1000 - 0.016;
-    update();
-  }
+  update();
   return mesh;
 }

@@ -1251,8 +1251,10 @@ function shadowChildHuman(seed: number): THREE.Group {
     part: [-0.95, 0.5],
     // 分け目からも、細い毛束が数本だけ顔の前に垂れる
     faceStrands: 9,
-    hang: 0.85,
-    stiff: 2.5,
+    rootHold: 2,
+    inertia: 0.8,
+    stiff: 3,
+    falloff: 3,
     seed: seed + 5,
   });
   // 足もとから立ちのぼる黒い煙
@@ -1380,8 +1382,10 @@ function humanGhost(opts: GhostOpts): THREE.Group {
             const t = THREE.MathUtils.smoothstep(Math.cos(th), 0.2, 0.75);
             return c.y - 0.85 * r + 1.12 * r * t;
           },
-          fixed: true,
-          stiff: 14,
+          rootHold: 2,
+          inertia: 0.7,
+          stiff: 22,
+          falloff: 0.7,
           seed: 11,
         }
       : { cards: 60, width: 0.04, len: (th) => (Math.cos(th) > 0.55 ? 0.06 : 0.09), cut: (th) => (Math.cos(th) > 0.55 ? c.y + 0.4 * r : c.y - 0.2 * r), fixed: true, stiff: 20, seed: 12 }, op);
