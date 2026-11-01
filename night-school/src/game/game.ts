@@ -530,7 +530,7 @@ export class Game {
         if (p === this.builder.root) inStage = true;
       }
       // 壁・床は影を落とさない（懐中電灯は目の位置なので、壁の影はほとんど見えず、描く量だけ倍になる）
-      o.castShadow = shadows && lit && inStage && !held && !o.userData.static;
+      o.castShadow = shadows && lit && inStage && !held && !o.userData.static && !o.userData.noGlow;
       o.receiveShadow = shadows && lit && mats.every((m) => !m.transparent);
       for (const m of mats) {
         m.needsUpdate = true;

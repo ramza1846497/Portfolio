@@ -1261,7 +1261,7 @@ function shadowChildHuman(seed: number): THREE.Group {
     stiff: 3,
     falloff: 3,
     seed: seed + 5,
-  }, 1, { guides: 220, strands: 7000, clump: 0.55, widthPx: 1.4 });
+  }, 1, { guides: 220, strands: 7000, clump: 0.55, widthPx: 1.8 });
   // 足もとから立ちのぼる黒い煙
   const smokeMat = new THREE.SpriteMaterial({ map: softTexture(), color: 0x000000, transparent: true, opacity: 0.5, depthWrite: false });
   const smoke: { s: THREE.Sprite; m: THREE.SpriteMaterial; a: number; r: number; o: number }[] = [];
@@ -1393,7 +1393,7 @@ function humanGhost(opts: GhostOpts): THREE.Group {
           falloff: 0.7,
           seed: 11,
         }
-      : { cards: 60, width: 0.04, len: (th) => (Math.cos(th) > 0.55 ? 0.06 : 0.09), cut: (th) => (Math.cos(th) > 0.55 ? c.y + 0.4 * r : c.y - 0.2 * r), fixed: true, stiff: 20, seed: 12 }, op, bob ? { guides: 200, strands: 6000, clump: 0.25, widthPx: 1.3, scatter: 0.003 } : undefined);
+      : { cards: 60, width: 0.04, len: (th) => (Math.cos(th) > 0.55 ? 0.06 : 0.09), cut: (th) => (Math.cos(th) > 0.55 ? c.y + 0.4 * r : c.y - 0.2 * r), fixed: true, stiff: 20, seed: 12 }, op, bob ? { guides: 200, strands: 6000, clump: 0.25, widthPx: 1.6, scatter: 0.003 } : undefined);
   }
   if (op < 1) skinnedDepthPrepass(h.root);
   g.userData.human = h;

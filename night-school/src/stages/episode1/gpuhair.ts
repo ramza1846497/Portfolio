@@ -50,7 +50,7 @@ interface Entry {
   style: HairStyle;
   rest: THREE.DataTexture;
   uniforms: Record<string, THREE.IUniform>;
-  material: THREE.MeshStandardMaterial;
+  material: THREE.MeshPhysicalMaterial;
   strands: number;
 }
 
@@ -289,8 +289,9 @@ function strandGeometry(guides: { rest: THREE.Vector3[][]; theta: number[]; face
 }
 
 /** 毛を描く材質：形は計算結果の画像から、光は MeshStandard の仕組みに任せ、髪の艶を足す */
-function strandMaterial(color: number, uniforms: Record<string, THREE.IUniform>): THREE.MeshStandardMaterial {
-  const m = new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0, side: THREE.DoubleSide });
+function strandMaterial(color: number, uniforms: Record<string, THREE.IUniform>): THREE.MeshPhysicalMaterial {
+  // ふつうの鏡面反射は弱く（近くで懐中電灯を当てると、黒髪が白くちらつくので）。艶は下の髪の計算で足す
+  const m = new THREE.MeshPhysicalMaterial({ color, roughness: 0.8, metalness: 0, side: THREE.DoubleSide, specularIntensity: 0.12 });
   m.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = shader.vertexShader
@@ -332,13 +333,18 @@ function strandMaterial(color: number, uniforms: Record<string, THREE.IUniform>)
         `vec3 hairP = strandPos(seg);
         vec3 hairN2 = strandPos(min(seg + 1.0, simRes.x - 1.0));
         vec3 hairNp = strandPos(max(seg - 1.0, 0.0));
-        vec3 hairTan = normalize(hairN2 - hairNp + vec3(0.0, -1e-5, 0.0));
+        vec3 hairD = hairN2 - hairNp + vec3(0.0, -1e-5, 0.0);
+        vec3 hairTan = hairD / max(length(hairD), 1e-6);
         // 毛ごとに少しずらして、ふくらみを出す（根もとは小さく）
-        vec3 s1 = normalize(cross(hairTan, vec3(0.0, 0.0, 1.0)) + vec3(1e-4));
+        vec3 s1 = cross(hairTan, vec3(0.0, 0.0, 1.0)) + vec3(1e-4, 2e-4, 0.0);
+        s1 /= max(length(s1), 1e-6);
         vec3 s2 = cross(hairTan, s1);
         float tt = seg / (simRes.x - 1.0);
         hairP += (cos(params.z) * s1 + sin(params.z) * s2) * params.w * (0.3 + tt);
-        vec3 objectNormal = normalize(mix(normalize(hairP - skullL), -s2, 0.3));
+        vec3 hairOut = hairP - skullL;
+        hairOut /= max(length(hairOut), 1e-6);
+        vec3 objectNormal = mix(hairOut, -s2, 0.3);
+        objectNormal /= max(length(objectNormal), 1e-6);
         vHairT = normalize((modelViewMatrix * vec4(hairTan, 0.0)).xyz);
         vHairT01 = tt;
         vHairShade = 0.75 + 0.5 * fract(params.z * 7.31);`,
@@ -351,7 +357,8 @@ function strandMaterial(color: number, uniforms: Record<string, THREE.IUniform>)
         vec4 clipB = projectionMatrix * modelViewMatrix * vec4(transformed + hairTan * 0.01, 1.0);
         vec2 sa = clipA.xy / clipA.w * viewport;
         vec2 sb = clipB.xy / clipB.w * viewport;
-        vec2 dir = normalize(sb - sa + vec2(1e-6));
+        vec2 sd = sb - sa;
+        vec2 dir = length(sd) > 1e-6 ? sd / length(sd) : vec2(0.0, 1.0);
         vec2 nrm = vec2(-dir.y, dir.x);
         float w = widthPx * (1.0 - 0.55 * tt);
         clipA.xy += nrm * side * w / viewport * clipA.w;
@@ -375,11 +382,16 @@ function strandMaterial(color: number, uniforms: Record<string, THREE.IUniform>)
         '#include <opaque_fragment>',
         `{
           // 髪の艶（Kajiya-Kay）：懐中電灯は目の位置にあるので、視線と毛の向きだけで決まる
-          vec3 V = normalize(vViewPosition);
-          float tv = dot(normalize(vHairT), V);
-          float spec = pow(max(0.0, 1.0 - tv * tv), 48.0);
-          float spec2 = pow(max(0.0, 1.0 - tv * tv), 8.0);
-          outgoingLight += outgoingLight * (spec * 2.2 + spec2 * 0.25);
+          // 長さ 0 の向きを正規化すると NaN になり、後処理のぼかしで黒い塊に広がるので守る
+          vec3 V = vViewPosition / max(length(vViewPosition), 1e-5);
+          vec3 T = vHairT / max(length(vHairT), 1e-5);
+          float tv = clamp(dot(T, V), -1.0, 1.0);
+          float s2 = clamp(1.0 - tv * tv, 0.0, 1.0);
+          float spec = pow(s2, 48.0);
+          float spec2 = pow(s2, 8.0);
+          outgoingLight += outgoingLight * (spec * 0.5 + spec2 * 0.15);
+          outgoingLight = clamp(outgoingLight, 0.0, 4.0);
+          if (outgoingLight != outgoingLight) outgoingLight = vec3(0.0);
         }
         #include <opaque_fragment>`,
       );
@@ -421,6 +433,8 @@ export function attachGpuHair(h: Human, figure: THREE.Object3D, card: THREE.Obje
   const mesh = new THREE.Mesh(geo, material);
   mesh.visible = false;
   mesh.castShadow = false;
+  // 戦闘の「光らせる」ための材質の複製をさせない（複製すると、髪を描く仕組みが外れる）
+  mesh.userData.noGlow = true;
   // 位置は画像から決まるので、境界は人物全体を覆う大きさにする
   geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 1, 0), 1.6);
   figure.add(mesh);

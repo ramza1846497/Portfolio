@@ -87,6 +87,8 @@ export class Combat {
       root.rotation.order = 'YXZ';
       const mats: (THREE.MeshLambertMaterial | THREE.MeshStandardMaterial)[] = [];
       root.traverse((o) => {
+        // 特別な描き方をする部品（GPU の髪など）は複製すると描けなくなるので、光らせない
+        if (o.userData.noGlow) return;
         if (o instanceof THREE.Mesh && (o.material instanceof THREE.MeshLambertMaterial || o.material instanceof THREE.MeshStandardMaterial)) {
           // 光らせる演出のため、敵ごとに材質を複製する
           o.material = o.material.clone();
