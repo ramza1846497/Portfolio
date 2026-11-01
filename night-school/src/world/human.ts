@@ -209,8 +209,9 @@ export interface Human {
   rest: (bone: string) => THREE.Vector3;
   /** 頭の骨から見た、頭蓋の中心と半径（髪を付けるため） */
   skull: { center: THREE.Vector3; radius: number };
-  /** 目の位置（頭の骨から見た） */
+  /** 目の位置（頭の骨から見た）と、目玉の半径 */
   eyes: THREE.Vector3[];
+  eyeRadius: number;
   height: number;
 }
 
@@ -260,8 +261,8 @@ export function makeHuman(build: string, outfit: Outfit, cacheKey: string): Huma
     }
     const mesh = new THREE.SkinnedMesh(geo, part.material);
     mesh.bind(skeleton, new THREE.Matrix4());
-    // 体の外へ動いても消えないように（骨で動くと、元の形の境界からはみ出す）
-    mesh.frustumCulled = false;
+    // 画面の外なら描かない。骨で手足を伸ばしても欠けないよう、境界の球は大きめに取る
+    mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, BUILDS[build].height * 0.5, 0), BUILDS[build].height * 1.1);
     root.add(mesh);
   });
   // 頭蓋：頭の骨に付いた頂点の範囲から
@@ -280,6 +281,7 @@ export function makeHuman(build: string, outfit: Outfit, cacheKey: string): Huma
   center.y = box.max.y - radius;
   const eyesGeo = v.prims.get('eyes');
   const eyes: THREE.Vector3[] = [];
+  let eyeRadius = 0.012;
   if (eyesGeo) {
     const ep = eyesGeo.getAttribute('position');
     const l = new THREE.Vector3();
@@ -297,6 +299,16 @@ export function makeHuman(build: string, outfit: Outfit, cacheKey: string): Huma
       }
     }
     eyes.push(r.divideScalar(Math.max(nr, 1)).sub(headTop), l.divideScalar(Math.max(nl, 1)).sub(headTop));
+    let minX = Infinity;
+    let maxX = -Infinity;
+    for (let i = 0; i < ep.count; i++) {
+      const x = ep.getX(i);
+      if (x > 0) {
+        minX = Math.min(minX, x);
+        maxX = Math.max(maxX, x);
+      }
+    }
+    eyeRadius = (maxX - minX) / 2;
   }
   return {
     root,
@@ -307,6 +319,7 @@ export function makeHuman(build: string, outfit: Outfit, cacheKey: string): Huma
     },
     skull: { center: center.sub(headTop), radius },
     eyes,
+    eyeRadius,
     height: BUILDS[build].height,
   };
 }

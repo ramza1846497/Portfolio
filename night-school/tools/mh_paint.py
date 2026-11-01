@@ -348,48 +348,41 @@ def skin(style):
         wound = 0
         rough = rough + 0.1 - 0.35 * wet + 0.25 * scab
     else:
-        # 影の子ども：死人の灰青色。紫の死斑、ひび割れ、裂けた傷、黒い血管、血の涙、泥
-        col[:] = np.array([150, 156, 160]) / 255
-        col = mix(col, (128, 142, 128), 0.45 * np.clip(fbm(p * 6 + 9) * 2 + 0.5, 0, 1))
-        livor = np.clip(fbm(p * 10 + 5) * 2.2 + 0.2, 0, 1) * np.clip(0.5 - n[:, 2] * 0.5 + (0.6 - p[:, 1]) * 0.6, 0, 1)
-        col = mix(col, (95, 55, 80), 0.55 * livor)
-        col *= (1 + 0.07 * fine)[:, None]
-        # 黒い血管：目・口・胸・首から広がる
-        spread = np.clip(sum(near(e, 0.09) for e in eyes) * 1.4 + near(mouth, 0.07) * 1.4 + chest * 0.9 + neck + arms * 0.6 + 0.15, 0, 1)
-        vein = np.clip((ridge - 0.8) / 0.2, 0, 1) * spread
-        vein2 = np.clip((1 - np.abs(fbm(p * 32 + 1, 3) * 2) - 0.86) / 0.14, 0, 1) * spread
-        col = mix(col, (25, 20, 28), 0.75 * np.clip(vein + vein2 * 0.7, 0, 1))
-        col = mix(col, (30, 22, 30), 0.85 * socket)
-        col = mix(col, (40, 25, 35), 0.8 * lips)
-        col = mix(col, (35, 28, 40), 0.75 * np.clip(tips + toes, 0, 1))
-        col = mix(col, (20, 18, 18), 0.9 * nails)
-        # ひび割れ：顔・腕・胸に、乾いた皮膚の裂け目
-        cmask = np.clip(face * 0.8 + arms * 0.9 + chest + 0.25, 0, 1) * np.clip(fbm(p * 7 + 2) * 2 + 0.6, 0, 1)
-        ce = worley_edge(p * 70)
-        crack = np.clip(1 - ce / 0.07, 0, 1) * cmask
-        col = mix(col, (40, 20, 20), 0.8 * crack)
-        # 裂けた傷
-        W = wounds([
-            (front_of('lowerarm01.L', 'wrist.L', 0.5, 0.028, np.array([0.3, 0, 1.0])), (0.6, 1, 0.2), 0.09, 0.008),
-            (front_of('lowerarm01.R', 'wrist.R', 0.35, 0.028, np.array([-0.3, 0, 1.0])), (-0.5, 1, 0), 0.06, 0.006),
-            (front_of('upperleg01.R', 'lowerleg01.R', 0.55, 0.06), (0.4, 1, 0), 0.1, 0.01),
-            (head('spine03') + np.array([0.09, 0.0, 0.06]), (0.2, 1, 0.1), 0.08, 0.007),
-            (head('head') + np.array([0.055, 0.075, 0.075]), (0.3, 1, 0), 0.035, 0.004),
-        ])
-        rim = np.clip(W * 3, 0, 1) - W
-        col = mix(col, (120, 60, 60), 0.6 * rim)
-        col = mix(col, (45, 6, 8), 0.95 * np.clip(W * 2.5, 0, 1))
-        sc = scratches(front_of('lowerarm01.R', 'wrist.R', 0.6, 0.03), (0.3, 1, 0), 0.07) + scratches(head('spine02') + np.array([-0.06, -0.03, 0.09]), (0.6, -1, 0), 0.09)
-        col = mix(col, (90, 25, 25), 0.8 * np.clip(sc, 0, 1))
-        t2 = tears(0.008, 0.11)
+        # 影の子ども：白くなめらかな死人の肌。目のまわりは黒くにじみ、唇は血で赤く、目から血の涙
+        col[:] = np.array([232, 228, 224]) / 255
+        col = mix(col, (200, 204, 214), 0.35 * blot)
+        col = mix(col, (214, 206, 206), 0.2 * np.clip(fbm(p * 5 + 4) * 2 + 0.3, 0, 1))
+        col *= (1 + 0.025 * fine)[:, None]
+        # 目のまわり：黒くくぼみ、下へ黒い筋がにじむ
+        big = np.clip(sum(near(e + np.array([0, -0.004, 0.0]), 0.045) for e in eyes) * 1.3, 0, 1)
+        smear = 0
+        for k in (0, 1):
+            e = eyes[k]
+            below = e[1] - p[:, 1]
+            dx = np.abs(p[:, 0] - e[0] - 0.004 * np.sin(p[:, 1] * 160 + k))
+            smear = smear + np.clip(1 - dx / 0.012, 0, 1) * np.clip(1 - below / 0.06, 0, 1) * (below > 0) * (n[:, 2] > 0.2)
+        col = mix(col, (60, 40, 50), 0.75 * big)
+        col = mix(col, (14, 6, 10), 0.95 * np.clip(socket * 1.6 + smear * 0.6, 0, 1))
+        # 目のまわりの細い血管（こめかみ・目尻）
+        vein = np.clip((ridge - 0.9) / 0.1, 0, 1) * np.clip(sum(near(e, 0.08) for e in eyes), 0, 1)
+        col = mix(col, (110, 60, 80), 0.4 * vein)
+        # 血で赤い唇と、口の端から垂れた血
+        col = mix(col, (130, 18, 22), 0.85 * lips)
         mb = mouth_blood()
-        col = mix(col, (55, 6, 6), 0.9 * np.clip(t2 + mb, 0, 1))
-        # 泥：手・足・ひざ
-        dirt = np.clip(hands * 0.9 + feet + knees, 0, 1) * np.clip(fbm(p * 30 + 7) * 1.5 + 0.6, 0, 1)
-        col = mix(col, (45, 38, 30), 0.75 * dirt)
-        wound = W
-        wet = np.clip(W * 2 + t2 + mb * 0.7 + socket * 0.5, 0, 1)
-        rough = 0.72 - 0.55 * wet + 0.15 * dirt + 0.1 * crack
+        col = mix(col, (95, 8, 10), 0.75 * mb)
+        t2 = tears(0.006, 0.1)
+        col = mix(col, (110, 8, 10), 0.85 * t2)
+        # 爪と指先の黒ずみ、足の汚れ
+        col = mix(col, (60, 50, 55), 0.6 * nails + 0.25 * tips)
+        dirt = np.clip(feet + hands * 0.4, 0, 1) * np.clip(fbm(p * 30 + 7) * 1.5 + 0.5, 0, 1)
+        col = mix(col, (90, 82, 76), 0.5 * dirt)
+        # 腕のひっかき傷（少しだけ）
+        sc = scratches(front_of('lowerarm01.R', 'wrist.R', 0.6, 0.03), (0.3, 1, 0), 0.07)
+        col = mix(col, (130, 30, 30), 0.7 * np.clip(sc, 0, 1))
+        wound = 0
+        crack = 0
+        wet = np.clip(t2 + mb + lips * 0.8 + socket * 0.6, 0, 1)
+        rough = 0.5 - 0.3 * wet + 0.2 * dirt
     rough = np.clip(rough, 0.08, 1)
 
     def height(q):
@@ -397,26 +390,17 @@ def skin(style):
         h += 0.08 * fbm(q * 300, 2)
         if style != 'living':
             vr = (1 - np.abs(fbm(q * 14, 3) * 2))
-            h += 0.3 * np.clip((vr - 0.86) / 0.14, 0, 1) * np.clip(vmask + (0.5 if style == 'creature' else 0), 0, 1)
+            h += 0.2 * np.clip((vr - 0.86) / 0.14, 0, 1) * np.clip(vmask, 0, 1)
         side = np.clip((np.abs(q[:, 0]) - 0.03) / 0.05, 0, 1)
         ch = seg_near(head('spine03'), head('spine01'), 0.14, q)
-        ribs = 0.25 if style == 'living' else 0.6
+        ribs = 0.25 if style == 'living' else 0.45
         h += ribs * ch * side * (0.5 + 0.5 * np.sin(q[:, 1] * 2 * np.pi / 0.026))
-        if style == 'creature':
-            ce = worley_edge(q * 70)
-            cm = np.clip(np.clip(face * 0.8 + arms * 0.9 + chest + 0.25, 0, 1), 0, 1)
-            h -= 0.9 * np.clip(1 - ce / 0.07, 0, 1) * cm
-            h -= 1.2 * wounds_h(q)
         return h
 
     def wounds_h(q):
         return 0  # 傷の凹みは色の粗さで表す（形は下で足す）
 
     nm = to_normal(R, height, 0.0011 if style == 'living' else 0.0016)
-    if style == 'creature':
-        # 傷口は深くえぐれ、縁が盛り上がる
-        dz = -0.5 * wound + 0.3 * (np.clip(wound * 3, 0, 1) - wound)
-        nm[:, 2] = np.clip(nm[:, 2] + dz * 0.1, 0, 1)
     sizes = save(f'skin_{style}_d', col, R['filled']) + save(f'skin_{style}_n', nm, R['filled'], quality=90)
     small = np.zeros((S, S, 3))
     small[R['filled']] = rough[:, None]
@@ -425,7 +409,7 @@ def skin(style):
     print('skin', style, sizes)
 
 
-for st in ('living', 'ghost', 'creature'):
+for st in ('creature',) if os.environ.get('ONLY') == 'creature' else ('living', 'ghost', 'creature'):
     skin(st)
 
 # ---------------------------------------------------------------- 服
@@ -488,6 +472,19 @@ def cloth(style):
         alpha = (holes < 0.44).astype(float)
         edge = np.clip(1 - np.abs(holes - 0.44) / 0.06, 0, 1)
         col = mix(col, (10, 9, 10), 0.6 * edge)
+    elif style == 'shroud':
+        # 白い死に装束：灰色にくすみ、裾は泥、胸に血のしみと垂れ跡
+        col = np.tile(np.array([168, 162, 150]) / 255, (len(p), 1))
+        col = mix(col, (120, 116, 108), 0.55 * np.clip(fbm(p * 8 + 2) * 2 + 0.2, 0, 1))
+        # 布のしわの陰
+        col *= (1 - 0.25 * np.clip(np.abs(fbm(p * np.array([30, 5, 30]) + 2, 3)) * 3, 0, 1))[:, None]
+        col = mix(col, (95, 85, 72), 0.8 * low * np.clip(fbm(p * 25) + 0.6, 0, 1))
+        blood = splatter(head('spine02') + np.array([0.04, 0.02, 0.1]), 0.1, 0.5) + drips(head('neck01')[1] - 0.05, [-0.02, 0.03], 0.3, 0.008)
+        col = mix(col, (100, 12, 12), 0.85 * np.clip(blood, 0, 1))
+        holes = fbm(p * 22 + 4) + 0.35 * fbm(p * 70, 2)
+        alpha = (holes < 0.5).astype(float)
+        edge = np.clip(1 - np.abs(holes - 0.5) / 0.05, 0, 1)
+        col = mix(col, (120, 110, 100), 0.6 * edge)
     elif style == 'blouse':
         col = np.tile(np.array([232, 228, 214]) / 255, (len(p), 1))
         col = mix(col, (205, 190, 140), 0.45 * np.clip(fbm(p * 7 + 2) * 2 + 0.3, 0, 1))
@@ -537,5 +534,5 @@ def cloth(style):
     print('cloth', style, sizes)
 
 
-for st in ('rag', 'blouse', 'skirt', 'plain'):
+for st in ('rag', 'shroud', 'blouse', 'skirt', 'plain'):
     cloth(st)

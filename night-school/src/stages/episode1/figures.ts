@@ -1091,7 +1091,7 @@ function humanSkin(style: 'living' | 'ghost' | 'creature', color = 0xffffff, o: 
  * 人体モデルの服（体に沿うタイツ・スカートの形に貼る）。透明の所は穴・ほつれ。
  * style：rag（ぼろぼろの黒い服）・blouse（黄ばんだ血のしみのブラウス）・skirt（赤い吊りスカート）・plain（汚れた服。色は color）
  */
-function humanCloth(style: 'rag' | 'blouse' | 'skirt' | 'plain', color = 0xffffff, o: { opacity?: number } = {}): THREE.MeshStandardMaterial {
+function humanCloth(style: 'rag' | 'shroud' | 'blouse' | 'skirt' | 'plain', color = 0xffffff, o: { opacity?: number } = {}): THREE.MeshStandardMaterial {
   const op = o.opacity ?? 1;
   const m = new THREE.MeshStandardMaterial({
     map: humanTexture(`cloth_${style}_d`, true),
@@ -1106,6 +1106,81 @@ function humanCloth(style: 'rag' | 'blouse' | 'skirt' | 'plain', color = 0xfffff
   });
   m.normalScale.set(1, -1);
   return m;
+}
+
+let redEyeTex: { map: THREE.Texture; glow: THREE.Texture } | null = null;
+
+/** 赤い目の絵：充血した白目、黒い縁どりの赤い瞳、小さな黒い瞳孔（球の +z が瞳の中心） */
+function redEyeTextures(): { map: THREE.Texture; glow: THREE.Texture } {
+  if (redEyeTex) return redEyeTex;
+  const W = 256;
+  const H = 128;
+  const draw = (glowOnly: boolean) => {
+    const c = document.createElement('canvas');
+    c.width = W;
+    c.height = H;
+    const ctx = c.getContext('2d')!;
+    ctx.fillStyle = glowOnly ? '#000' : '#d8c4c0';
+    ctx.fillRect(0, 0, W, H);
+    const cx = W * 0.25;
+    const cy = H * 0.5;
+    if (!glowOnly) {
+      // 充血：瞳へ向かう細い赤い血管
+      const rand = rng(5);
+      ctx.strokeStyle = 'rgba(150,20,20,0.6)';
+      for (let i = 0; i < 60; i++) {
+        const a = rand() * Math.PI * 2;
+        let x = cx + Math.cos(a) * W * 0.24;
+        let y = cy + Math.sin(a) * H * 0.45;
+        ctx.lineWidth = 0.6 + rand();
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        for (let k = 0; k < 6; k++) {
+          x += (cx - x) * 0.15 + (rand() - 0.5) * 6;
+          y += (cy - y) * 0.15 + (rand() - 0.5) * 6;
+          ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+    }
+    // 瞳：黒い縁、赤い虹彩、黒い瞳孔
+    const rx = W * 0.095;
+    const ry = H * 0.19;
+    ctx.fillStyle = glowOnly ? '#000' : '#100406';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx * 1.15, ry * 1.15, 0, 0, Math.PI * 2);
+    ctx.fill();
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rx);
+    g.addColorStop(0, glowOnly ? '#ff5030' : '#ff3a20');
+    g.addColorStop(0.6, glowOnly ? '#c01808' : '#c01410');
+    g.addColorStop(1, glowOnly ? '#300000' : '#500406');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx * 0.3, ry * 0.3, 0, 0, Math.PI * 2);
+    ctx.fill();
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  };
+  redEyeTex = { map: draw(false), glow: draw(true) };
+  return redEyeTex;
+}
+
+/** 頭の骨に、赤く光る目玉を入れる（元の目の位置と大きさで） */
+function addRedEyes(h: Human): void {
+  const { map, glow } = redEyeTextures();
+  const mat = new THREE.MeshStandardMaterial({ map, emissiveMap: glow, emissive: 0xffffff, emissiveIntensity: 0.9, roughness: 0.12, metalness: 0 });
+  for (const e of h.eyes) {
+    const ball = new THREE.Mesh(new THREE.SphereGeometry(h.eyeRadius * 0.98, 20, 14), mat);
+    ball.position.copy(e);
+    // 少し上目づかいに、こちらを見上げる
+    ball.rotation.x = -0.15;
+    h.bones.head.add(ball);
+  }
 }
 
 /** 人体の骨を、化け物の動き（creature.ts）の関節名に対応させる。L は体の右（-x 側）＝ MakeHuman の _R */
@@ -1146,7 +1221,7 @@ function shadowChildHuman(seed: number): THREE.Group {
   const rand = rng(seed);
   const g = new THREE.Group();
   const skin = humanSkin('creature');
-  const rag = humanCloth('rag');
+  const rag = humanCloth('shroud');
   // 服の裾：すねの途中で、ぎざぎざに裂けている
   const hem = (p: THREE.Vector3) => p.y > 0.42 + 0.08 * Math.abs(Math.sin(p.x * 61 + p.z * 37) * Math.sin(p.x * 23 - p.z * 11));
   const h = makeHuman('creature', {
@@ -1154,9 +1229,9 @@ function shadowChildHuman(seed: number): THREE.Group {
       // 破れた服の穴から、やせた胴の肌がのぞく
       { material: skin, prims: ['body_head', 'body_torso', 'body_upperarm', 'body_forearm', 'body_hand', 'body_thigh', 'body_shin', 'body_foot'] },
       { material: rag, prims: ['tights_torso', 'skirt'], cut: hem },
-      { material: voidMat(), prims: ['eyes'] },
     ],
   }, 'shadow');
+  addRedEyes(h);
   g.add(h.root);
   // 落ちくぼんだ黒い目の奥で、赤い光
   const glow = new THREE.SpriteMaterial({ map: softTexture(), color: 0xff2a14, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
@@ -1173,8 +1248,11 @@ function shadowChildHuman(seed: number): THREE.Group {
     cards: 72,
     width: 0.05,
     len: (th) => (Math.cos(th) > 0.55 ? 0.24 : 0.48),
-    part: [-0.75, 0.3],
-    stiff: 1.2,
+    part: [-0.95, 0.5],
+    // 分け目からも、細い毛束が数本だけ顔の前に垂れる
+    faceStrands: 9,
+    hang: 0.85,
+    stiff: 2.5,
     seed: seed + 5,
   });
   // 足もとから立ちのぼる黒い煙
@@ -1200,7 +1278,8 @@ function shadowChildHuman(seed: number): THREE.Group {
     feet: { L: h.bones.foot_R, R: h.bones.foot_L },
     extra: (_dt, _state, time) => {
       const t = time + ph;
-      const gl = 0.045 + 0.012 * Math.sin(t * 9) + 0.008 * Math.sin(t * 23);
+      // 赤い目のまわりの、かすかなにじみ（瞳が見えるよう小さく）
+      const gl = 0.022 + 0.005 * Math.sin(t * 9) + 0.003 * Math.sin(t * 23);
       for (const s of glows) s.scale.setScalar(gl);
       for (const p of smoke) {
         const life = (t * 0.35 + p.o) % 1;
@@ -1301,10 +1380,11 @@ function humanGhost(opts: GhostOpts): THREE.Group {
             const t = THREE.MathUtils.smoothstep(Math.cos(th), 0.2, 0.75);
             return c.y - 0.85 * r + 1.12 * r * t;
           },
+          fixed: true,
           stiff: 14,
           seed: 11,
         }
-      : { cards: 60, width: 0.04, len: (th) => (Math.cos(th) > 0.55 ? 0.06 : 0.09), cut: (th) => (Math.cos(th) > 0.55 ? c.y + 0.4 * r : c.y - 0.2 * r), stiff: 20, seed: 12 }, op);
+      : { cards: 60, width: 0.04, len: (th) => (Math.cos(th) > 0.55 ? 0.06 : 0.09), cut: (th) => (Math.cos(th) > 0.55 ? c.y + 0.4 * r : c.y - 0.2 * r), fixed: true, stiff: 20, seed: 12 }, op);
   }
   if (op < 1) skinnedDepthPrepass(h.root);
   g.userData.human = h;
@@ -1318,7 +1398,7 @@ function skinnedDepthPrepass(root: THREE.Object3D): void {
     if (!(c instanceof THREE.SkinnedMesh)) continue;
     const d = new THREE.SkinnedMesh(c.geometry, depthOnly);
     d.bind(c.skeleton, c.bindMatrix);
-    d.frustumCulled = false;
+    d.boundingSphere = c.boundingSphere;
     d.renderOrder = -1;
     root.add(d);
     const m = c.material as THREE.Material;
