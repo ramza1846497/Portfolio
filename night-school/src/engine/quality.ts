@@ -16,6 +16,9 @@ export interface QualitySettings {
   film: boolean;
   /** 隅や物の接地面の陰（アンビエントオクルージョン）。'half' は半分の解像度で計算 */
   ao: 'full' | 'half' | 'off';
+  /** GPU で 1 本ずつ動かす髪にする人物の数（近い順）と、毛の本数の割合 */
+  gpuHair: number;
+  hairDensity: number;
 }
 
 export const QUALITY_LABELS: Record<Quality, string> = { high: '高', normal: '標準', low: '低' };
@@ -23,11 +26,11 @@ export const QUALITY_LABELS: Record<Quality, string> = { high: '高', normal: '�
 export function qualitySettings(q: Quality): QualitySettings {
   switch (q) {
     case 'high':
-      return { pixelRatio: 1.75, shadowSize: 1024, bloomScale: 0.5, film: true, ao: 'full' };
+      return { pixelRatio: 1.75, shadowSize: 1024, bloomScale: 0.5, film: true, ao: 'full', gpuHair: 2, hairDensity: 1 };
     case 'normal':
-      return { pixelRatio: 1.5, shadowSize: 512, bloomScale: 0.25, film: true, ao: 'half' };
+      return { pixelRatio: 1.5, shadowSize: 512, bloomScale: 0.25, film: true, ao: 'half', gpuHair: 1, hairDensity: 0.5 };
     case 'low':
-      return { pixelRatio: 1, shadowSize: 0, bloomScale: 0, film: false, ao: 'off' };
+      return { pixelRatio: 1, shadowSize: 0, bloomScale: 0, film: false, ao: 'off', gpuHair: 0, hairDensity: 0 };
   }
 }
 

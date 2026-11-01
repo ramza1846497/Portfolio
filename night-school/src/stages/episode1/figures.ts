@@ -6,6 +6,7 @@ import { pbrMaterial } from '../../world/pbr';
 import { wave } from './rig';
 import { shadowCreature } from './creature';
 import { attachCardHair, hairMaterial, type HairStyle } from './hair';
+import { attachGpuHair, type GpuHairOptions } from './gpuhair';
 import { hasHuman, makeHuman, relaxArms, type Human } from '../../world/human';
 
 /*
@@ -1205,12 +1206,15 @@ function creatureJoints(h: Human): Record<string, THREE.Object3D> {
 /**
  * 頭の骨に髪を付ける：頭頂を髪色の帽子で覆い（地肌が見えないように）、その上にヘアカードの髪（hair.ts）
  */
-function attachHair(h: Human, figure: THREE.Object3D, color: number, style: HairStyle, opacity = 1): THREE.Mesh {
+function attachHair(h: Human, figure: THREE.Object3D, color: number, style: HairStyle, opacity = 1, gpu?: GpuHairOptions): THREE.Mesh {
   const capMat = new THREE.MeshStandardMaterial({ color, roughness: 0.8, metalness: 0, transparent: opacity < 1, opacity });
   const cap = new THREE.Mesh(new THREE.SphereGeometry(h.skull.radius * 1.0, 24, 14, 0, Math.PI * 2, 0, 1.3), capMat);
   cap.position.copy(h.skull.center);
   h.bones.head.add(cap);
-  return attachCardHair(h, figure, hairMaterial(color, opacity), style);
+  const card = attachCardHair(h, figure, hairMaterial(color, opacity), style);
+  // 近くに来たときは、GPU で 1 本ずつ動かす細い髪に切り替える（半透明の人物はのぞく）
+  if (gpu && opacity >= 1) attachGpuHair(h, figure, card, color, style, gpu);
+  return card;
 }
 
 /**
@@ -1256,7 +1260,7 @@ function shadowChildHuman(seed: number): THREE.Group {
     stiff: 3,
     falloff: 3,
     seed: seed + 5,
-  });
+  }, 1, { guides: 220, strands: 7000, clump: 0.55, widthPx: 1.4 });
   // 足もとから立ちのぼる黒い煙
   const smokeMat = new THREE.SpriteMaterial({ map: softTexture(), color: 0x000000, transparent: true, opacity: 0.5, depthWrite: false });
   const smoke: { s: THREE.Sprite; m: THREE.SpriteMaterial; a: number; r: number; o: number }[] = [];
@@ -1388,7 +1392,7 @@ function humanGhost(opts: GhostOpts): THREE.Group {
           falloff: 0.7,
           seed: 11,
         }
-      : { cards: 60, width: 0.04, len: (th) => (Math.cos(th) > 0.55 ? 0.06 : 0.09), cut: (th) => (Math.cos(th) > 0.55 ? c.y + 0.4 * r : c.y - 0.2 * r), fixed: true, stiff: 20, seed: 12 }, op);
+      : { cards: 60, width: 0.04, len: (th) => (Math.cos(th) > 0.55 ? 0.06 : 0.09), cut: (th) => (Math.cos(th) > 0.55 ? c.y + 0.4 * r : c.y - 0.2 * r), fixed: true, stiff: 20, seed: 12 }, op, bob ? { guides: 200, strands: 6000, clump: 0.25, widthPx: 1.3, scatter: 0.003 } : undefined);
   }
   if (op < 1) skinnedDepthPrepass(h.root);
   g.userData.human = h;

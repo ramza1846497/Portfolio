@@ -1,4 +1,5 @@
 import { setHumanSource } from '../world/human';
+import { stepGpuHair } from '../stages/episode1/gpuhair';
 import * as THREE from 'three';
 import { AudioEngine } from '../engine/audio';
 import { CollisionWorld } from '../engine/collision';
@@ -73,6 +74,7 @@ export class Game {
   private fpsTime = 0;
   /** 解像度の自動調整：重いときは描く画素を減らし、余裕が出たら戻す */
   private lastFrameAt = 0;
+  private quality: Quality = 'normal';
   private res = { max: 1, min: 1, cur: 1, time: 0, frames: 0, fast: 0, slow: 0, warned: false, settle: 3, level: 0, raisedFrom: 0 };
 
   constructor(
@@ -495,6 +497,7 @@ export class Game {
 
   /** 画質：解像度・懐中電灯の影・後処理 */
   private applyQuality(quality: Quality): void {
+    this.quality = quality;
     const q = qualitySettings(quality);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, q.pixelRatio));
     this.atmosphere.setPixelRatio(this.renderer.getPixelRatio());
@@ -570,6 +573,9 @@ export class Game {
       this.target = null;
       this.hud.setTarget(null);
     }
+    // 近くの人物の髪を GPU で動かす（重いときは自動調整で減らす）
+    const hq = qualitySettings(this.quality);
+    stepGpuHair(this.renderer, this.camera, dt, this.res.level >= 3 ? Math.min(1, hq.gpuHair) : hq.gpuHair, this.res.level >= 1 ? hq.hairDensity * 0.6 : hq.hairDensity);
     // 後処理は何回にも分けて描くので、描画回数は 1 フレーム分まとめて数える
     this.renderer.info.reset();
     if (this.post) this.post.render(this.scene, this.camera, time);
