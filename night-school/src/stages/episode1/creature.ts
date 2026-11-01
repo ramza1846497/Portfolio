@@ -456,3 +456,119 @@ export function statueCreature(p: StatueParts): CreatureRig {
   };
 }
 
+
+export interface MocapShadowParts {
+  root: THREE.Object3D;
+  h: import('../../world/human').Human;
+  player: import('../../world/mocap').MocapPlayer;
+  /** 指を曲げる骨と、曲げる軸（指の付け根・先、それぞれの骨の座標で） */
+  fingers: { bone: THREE.Object3D; axis: THREE.Vector3; k: number }[];
+  extra?: (dt: number, state: string, t: number, speed: number) => void;
+}
+
+/**
+ * 影の子ども（モーションキャプチャ版）：体の動きは本物の人の動き（CMU のモーションキャプチャ）。
+ *   待つ：前かがみに身を潜めて、こちらをうかがう
+ *   追う：両腕を前へ突き出した、ゾンビのような足取り（進む速さに合わせて再生）
+ *   身構え：膝を深く曲げて沈む → 飛びかかり：跳ぶ → 着地
+ *   ひるみ：よろめく  断末魔：顔から倒れる
+ * その上に、首でこちらを追う・首の傾き・指の鉤爪を重ねる
+ */
+export function mocapShadow(p: MocapShadowParts): CreatureRig {
+  const { root, h, player } = p;
+  let t = Math.random() * 50;
+  let state = '';
+  let since = 0;
+  let speed = 0;
+  const last = new THREE.Vector3().copy(root.position);
+  const tilt = new Drift(-0.35, 0.55, 2.5, 6, 0.9);
+  const look = new THREE.Quaternion();
+  const tmpQ = new THREE.Quaternion();
+  const wq = new THREE.Quaternion();
+  const pq = new THREE.Quaternion();
+  const headPos = new THREE.Vector3();
+  const fwd = new THREE.Vector3();
+  let lookW = 0;
+  let claw = 0.4;
+
+  const choose = (s: string): void => {
+    switch (s) {
+      case 'chase': {
+        // 進む速さに合わせて、足を運ぶ速さを変える（足が滑らないように）
+        const sp = THREE.MathUtils.clamp(speed / player.clipSpeed('zombie_walk'), 0.6, 2.4);
+        player.play('zombie_walk', { fade: 0.35, speed: sp });
+        player.setSpeed(sp);
+        break;
+      }
+      case 'windup':
+        player.play('jump_crouch', { fade: 0.2, speed: 0.9 });
+        break;
+      case 'lunge':
+        player.play('jump_leap', { fade: 0.08, speed: 1.8 });
+        break;
+      case 'recover':
+        if (player.current === 'jump_leap' || player.current === 'jump_land') player.play('jump_land', { fade: 0.15 });
+        if (player.current === 'jump_land' && player.finished()) player.play('hunch_idle', { fade: 0.5 });
+        break;
+      case 'hurt':
+      case 'stun':
+        player.play('stumble', { fade: 0.1, speed: 1.2 });
+        break;
+      case 'dying':
+        player.play('fall_face', { fade: 0.15, speed: 1.6 });
+        break;
+      default:
+        player.play('hunch_idle', { fade: 0.6, speed: 0.8 });
+    }
+  };
+
+  return {
+    update(dt, s, target) {
+      dt = Math.min(dt, 0.05);
+      t += dt;
+      if (s !== state) {
+        state = s;
+        since = 0;
+      } else since += dt;
+      const moved = Math.hypot(root.position.x - last.x, root.position.z - last.z);
+      last.copy(root.position);
+      speed = damp(speed, dt > 0 ? moved / dt : 0, 6, dt);
+      choose(state);
+      player.update(dt);
+
+      // 首でこちらを追う（体の動きの上に重ねる）。跳んでいる間・倒れる間は弱く
+      const wantLook = state === 'dying' ? 0 : state === 'lunge' || state === 'hurt' ? 0.3 : 0.85;
+      lookW = damp(lookW, wantLook, 3, dt);
+      const head = h.bones.head;
+      const neck = h.bones.neck;
+      if (target && lookW > 0.01) {
+        root.updateWorldMatrix(true, true);
+        head.getWorldPosition(headPos);
+        head.getWorldQuaternion(wq);
+        fwd.set(0, 0, 1).applyQuaternion(wq);
+        const want = target.clone().sub(headPos).normalize();
+        look.setFromUnitVectors(fwd, want);
+        // 曲げすぎない（首が折れたように見えるので、首と頭で分けて曲げる）
+        const ang = 2 * Math.acos(Math.min(1, Math.abs(look.w)));
+        const lim = Math.min(1, 1.3 / Math.max(ang, 1e-3));
+        tmpQ.identity().slerp(look, lookW * lim * 0.5);
+        for (const b of [neck, head]) {
+          b.parent!.getWorldQuaternion(pq);
+          b.getWorldQuaternion(wq);
+          wq.premultiply(tmpQ);
+          b.quaternion.copy(pq.invert().multiply(wq));
+          b.updateMatrixWorld(true);
+        }
+      }
+      // 首の傾き：ゆっくり別の角度へ移る
+      const roll = tilt.update(dt) * (state === 'chase' || state === 'idle' || state === 'none' ? 1 : 0.4);
+      head.quaternion.multiply(tmpQ.setFromAxisAngle(new THREE.Vector3(0, 0, 1), roll));
+      // 指：鉤爪のように曲げ、ゆっくり握ったり開いたり。跳ぶときは大きく開く
+      const wantClaw = state === 'lunge' ? -0.2 : state === 'windup' ? 0.9 : 0.45 + 0.25 * Math.sin(t * 1.3);
+      claw = damp(claw, wantClaw, 4, dt);
+      for (const f of p.fingers) f.bone.quaternion.setFromAxisAngle(f.axis, claw * f.k);
+      p.extra?.(dt, state, t, speed);
+      void since;
+    },
+  };
+}

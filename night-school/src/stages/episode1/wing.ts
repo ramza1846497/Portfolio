@@ -6,6 +6,7 @@ import { hedge, leafyTree } from './foliage';
 import { mergeParts } from './figures';
 import { damp, solveIK, statueCreature } from './creature';
 import { hasHuman, type Human } from '../../world/human';
+import { hasMocap, MocapPlayer } from '../../world/mocap';
 import { OZ } from './floor1';
 import { ghostFigure, moonPatch, notice, shadowChild, sign, slidingDoor, wallPlane } from './parts';
 
@@ -285,6 +286,11 @@ function ninomiyaHuman(): THREE.Group {
   const dim = new THREE.Color(0x401010);
   const hot = new THREE.Color(0xff3020);
   let glow = 0;
+  const WALK_BONES = ['hips', 'spine', 'upperleg_L', 'upperleg_R', 'lowerleg_L', 'lowerleg_R', 'foot_L', 'foot_R'];
+  const walk = hasMocap() ? new MocapPlayer(h, WALK_BONES) : null;
+  const lastPos = g.position.clone();
+  let walkSpeed = 0;
+  let walkW = 0;
   const grip = new THREE.Vector3();
   const pole = new THREE.Vector3();
   g.userData.rig = statueCreature({
@@ -295,6 +301,23 @@ function ninomiyaHuman(): THREE.Group {
       const want = state === 'windupCharge' || state === 'windupStomp' || state === 'rage' || state === 'charge' ? 1 : g.userData.rage ? 0.5 + 0.2 * Math.sin(t * 3) : 0;
       glow = damp(glow, want, 4, dt);
       eyes.color.copy(dim).lerp(hot, glow);
+      // 歩くときは、脚と胴を本物の人の動き（こわばった歩き方のモーションキャプチャ）にする
+      if (walk) {
+        const moved = Math.hypot(g.position.x - lastPos.x, g.position.z - lastPos.z);
+        lastPos.copy(g.position);
+        walkSpeed = damp(walkSpeed, dt > 0 ? moved / dt : 0, 6, dt);
+        const walking = state === 'chase' || state === 'backoff' || state === 'recover';
+        walkW = damp(walkW, walking && walkSpeed > 0.15 ? 1 : 0, 4, dt);
+        if (walkW > 0.01) {
+          const saved = WALK_BONES.map((b) => h.bones[b].quaternion.clone());
+          const hp = h.bones.hips.position.clone();
+          walk.play('stiff_walk', { speed: THREE.MathUtils.clamp(walkSpeed / walk.clipSpeed('stiff_walk'), 0.5, 2.5) });
+          walk.setSpeed(THREE.MathUtils.clamp(walkSpeed / walk.clipSpeed('stiff_walk'), 0.5, 2.5) * (state === 'backoff' ? -1 : 1));
+          walk.update(dt);
+          WALK_BONES.forEach((b, i) => h.bones[b].quaternion.copy(saved[i].slerp(h.bones[b].quaternion, walkW)));
+          h.bones.hips.position.lerpVectors(hp, h.bones.hips.position, walkW);
+        }
+      }
       // 両手で本の左右の端を持つ
       for (const s of ['L', 'R'] as const) {
         anchor.updateWorldMatrix(true, false);

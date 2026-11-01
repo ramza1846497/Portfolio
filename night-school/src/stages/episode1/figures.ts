@@ -4,7 +4,8 @@ import type { WorldBuilder } from '../../world/builder';
 import { muscleTexture } from '../../engine/textures';
 import { pbrMaterial } from '../../world/pbr';
 import { wave } from './rig';
-import { shadowCreature } from './creature';
+import { mocapShadow, shadowCreature } from './creature';
+import { hasMocap, MocapPlayer } from '../../world/mocap';
 import { attachCardHair, hairMaterial, type HairStyle } from './hair';
 import { attachGpuHair, type GpuHairOptions } from './gpuhair';
 import { hasHuman, makeHuman, relaxArms, type Human } from '../../world/human';
@@ -1275,28 +1276,41 @@ function shadowChildHuman(seed: number): THREE.Group {
   const J = creatureJoints(h);
   const ph = rand() * 10;
   const side = (s: -1 | 1) => (s < 0 ? 'R' : 'L');
-  g.userData.rig = shadowCreature({
-    root: g,
-    body: h.root,
-    J,
-    arm: { upper: (s) => h.rest(`upperarm_${side(s)}`), lower: (s) => h.rest(`lowerarm_${side(s)}`) },
-    leg: { upper: (s) => h.rest(`upperleg_${side(s)}`), lower: (s) => h.rest(`lowerleg_${side(s)}`) },
-    hand: { finger: (s) => h.rest(`hand_${side(s)}`), palm: (s) => V(-s, 0, 0) },
-    feet: { L: h.bones.foot_R, R: h.bones.foot_L },
-    extra: (_dt, _state, time) => {
-      const t = time + ph;
-      // 赤い目のまわりの、かすかなにじみ（瞳が見えるよう小さく）
-      const gl = 0.022 + 0.005 * Math.sin(t * 9) + 0.003 * Math.sin(t * 23);
-      for (const s of glows) s.scale.setScalar(gl);
-      for (const p of smoke) {
-        const life = (t * 0.35 + p.o) % 1;
-        const a = p.a + t * 0.3;
-        p.s.position.set(Math.cos(a) * p.r * (1 + life), 0.05 + life * 0.55, Math.sin(a) * p.r * (1 + life));
-        p.s.scale.setScalar(0.25 + life * 0.45);
-        p.m.opacity = 0.55 * Math.sin(life * Math.PI);
-      }
-    },
-  });
+  const extra = (_dt: number, _state: string, time: number) => {
+    const t = time + ph;
+    // 赤い目のまわりの、かすかなにじみ（瞳が見えるよう小さく）
+    const gl = 0.022 + 0.005 * Math.sin(t * 9) + 0.003 * Math.sin(t * 23);
+    for (const s of glows) s.scale.setScalar(gl);
+    for (const p of smoke) {
+      const life = (t * 0.35 + p.o) % 1;
+      const a = p.a + t * 0.3;
+      p.s.position.set(Math.cos(a) * p.r * (1 + life), 0.05 + life * 0.55, Math.sin(a) * p.r * (1 + life));
+      p.s.scale.setScalar(0.25 + life * 0.45);
+      p.m.opacity = 0.55 * Math.sin(life * Math.PI);
+    }
+  };
+  if (hasMocap()) {
+    // 本物の人の動き（モーションキャプチャ）で動かす
+    const fingers: { bone: THREE.Object3D; axis: THREE.Vector3; k: number }[] = [];
+    for (const sd of ['L', 'R'] as const) {
+      const dir = h.rest(`fingers_${sd}`).normalize();
+      const palm = V(sd === 'L' ? -1 : 1, 0, 0);
+      const axis = dir.clone().cross(palm).normalize();
+      fingers.push({ bone: h.bones[`fingers_${sd}`], axis, k: 1 }, { bone: h.bones[`fingertips_${sd}`], axis, k: 1.3 });
+    }
+    g.userData.rig = mocapShadow({ root: g, h, player: new MocapPlayer(h), fingers, extra });
+  } else {
+    g.userData.rig = shadowCreature({
+      root: g,
+      body: h.root,
+      J,
+      arm: { upper: (s) => h.rest(`upperarm_${side(s)}`), lower: (s) => h.rest(`lowerarm_${side(s)}`) },
+      leg: { upper: (s) => h.rest(`upperleg_${side(s)}`), lower: (s) => h.rest(`lowerleg_${side(s)}`) },
+      hand: { finger: (s) => h.rest(`hand_${side(s)}`), palm: (s) => V(-s, 0, 0) },
+      feet: { L: h.bones.foot_R, R: h.bones.foot_L },
+      extra,
+    });
+  }
   g.userData.rig.update(0.016, 'idle');
   return g;
 }

@@ -3,6 +3,7 @@ import { Game } from './game/game';
 import { stages } from './stages';
 import { QUALITY_LABELS, loadQuality, saveQuality, type Quality } from './engine/quality';
 import { MODEL_NAMES, ModelLibrary } from './engine/models';
+import { loadMocap } from './world/mocap';
 
 const stage = stages[0];
 let game: Game | null = null;
@@ -59,8 +60,7 @@ title.addEventListener(
 // 3D モデルを読み込んでから校舎を組み立てる（読み込めなかった物は箱で作る）
 const tap = title.querySelector('.tap')!;
 const models = new ModelLibrary();
-void models
-  .load(MODEL_NAMES, (done, total) => (tap.textContent = `読み込み中… ${Math.round((done / total) * 100)}%`))
+void Promise.all([models.load(MODEL_NAMES, (done, total) => (tap.textContent = `読み込み中… ${Math.round((done / total) * 100)}%`)), loadMocap()])
   .then(() => {
     game = new Game(document.getElementById('app')!, stage, models);
     tap.textContent = 'タップしてはじめる';

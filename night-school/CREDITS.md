@@ -56,3 +56,19 @@ water_manhole_cover, alarm_clock_01, vintage_grandfather_clock_01, painted_woode
 
 花子さん・影の子ども・母親・店員・二宮金次郎像はこの体で作り、服・石の質感に上の写真テクスチャを使っています。
 人体模型、木の葉、コンビニの商品の包装は、コードで組んだ形・描いた絵です。
+
+## 動き（public/anim/mocap.json）
+
+[CMU Graphics Lab Motion Capture Database](http://mocap.cs.cmu.edu/)（この資料は NSF EIA-0196217 の助成で作られた。自由に利用できる）の、
+Bruce Hahne による BVH 版（[una-dinosauria/cmu-mocap](https://github.com/una-dinosauria/cmu-mocap)）を、
+tools/mocap_bake.py で人体モデルの骨へ移して使っています。
+
+| ゲームの中の動き | 元の動き |
+|---|---|
+| 影の子ども：待つ | 91_26 HurtStomachWalk（はじめの立ち姿） |
+| 影の子ども：追う | 104_41 ZombieWalk |
+| 影の子ども：身構え・飛びかかり・着地 | 16_05 forward jump |
+| 影の子ども：ひるむ | 22_12 A stumbles into B |
+| 影の子ども：倒れる | 90_16 fall on face |
+| 二宮金次郎像：歩く | 104_03 Frankenstein male walk |
+| （予備）忍び足 | 77_29 creeping walk |
