@@ -45,6 +45,10 @@ export const NOTE_FREQ: Record<string, number> = {
   高いド: 523.25,
 };
 
+/** 録音を加工した声（public/audio、tools/voice_bake.py で作った物） */
+export const VOICE_NAMES = ['croak', 'croak_long', 'strike', 'whimper', 'death', 'giggle', 'whisper0', 'whisper1', 'whisper2', 'whisper3', 'whisper4', 'whisper5'] as const;
+export type VoiceName = (typeof VOICE_NAMES)[number];
+
 export interface PlayOptions {
   /** 音量の倍率 */
   gain?: number;
@@ -63,6 +67,7 @@ export class AudioEngine {
   private stepToggle = false;
   private playGain = 1;
   private playPan = 0;
+  private voices = new Map<string, AudioBuffer>();
 
   unlock(): void {
     if (this.ctx) {
@@ -91,6 +96,42 @@ export class AudioEngine {
 
     this.startAmbience();
     void ctx.resume();
+    this.loadVoices();
+  }
+
+  /** 声の録音を読み込む（読み込めなかった声は鳴らさない） */
+  private loadVoices(): void {
+    const ctx = this.ctx!;
+    for (const name of VOICE_NAMES) {
+      void fetch(`./audio/${name}.mp3`)
+        .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(`HTTP ${r.status}`))))
+        .then((b) => ctx.decodeAudioData(b))
+        .then((buf) => this.voices.set(name, buf))
+        .catch((e) => console.warn(`[audio] could not load voice ${name}`, e));
+    }
+  }
+
+  /**
+   * 声を鳴らす。pan は左右、gain は大きさ（遠いほど小さく）、rate は再生の速さ（少し変えて、毎回同じに聞こえないように）。
+   * 残響を多めにかけて、校舎の中で響く声にする
+   */
+  voice(name: VoiceName, o: PlayOptions & { rate?: number; wet?: number } = {}): void {
+    const ctx = this.ctx;
+    const buf = this.voices.get(name);
+    if (!ctx || !buf) return;
+    this.playGain = o.gain ?? 1;
+    this.playPan = o.pan ?? 0;
+    try {
+      const out = this.out(o.wet ?? 0.9);
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.playbackRate.value = o.rate ?? 1;
+      src.connect(out);
+      src.start(ctx.currentTime + 0.01);
+    } finally {
+      this.playGain = 1;
+      this.playPan = 0;
+    }
   }
 
   get ready(): boolean {

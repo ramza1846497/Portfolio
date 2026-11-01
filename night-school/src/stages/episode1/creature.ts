@@ -461,6 +461,8 @@ export interface MocapShadowParts {
   root: THREE.Object3D;
   h: import('../../world/human').Human;
   player: import('../../world/mocap').MocapPlayer;
+  /** 腕だけを動かす再生（歩くとき、脚はふつうの歩き・腕は前へ突き出したゾンビの腕） */
+  arms?: import('../../world/mocap').MocapPlayer;
   /** 指を曲げる骨と、曲げる軸（指の付け根・先、それぞれの骨の座標で） */
   fingers: { bone: THREE.Object3D; axis: THREE.Vector3; k: number }[];
   extra?: (dt: number, state: string, t: number, speed: number) => void;
@@ -474,6 +476,8 @@ export interface MocapShadowParts {
  *   ひるみ：よろめく  断末魔：顔から倒れる
  * その上に、首でこちらを追う・首の傾き・指の鉤爪を重ねる
  */
+const ARM_BONES = ['clavicle_L', 'clavicle_R', 'upperarm_L', 'upperarm_R', 'lowerarm_L', 'lowerarm_R', 'hand_L', 'hand_R'];
+
 export function mocapShadow(p: MocapShadowParts): CreatureRig {
   const { root, h, player } = p;
   let t = Math.random() * 50;
@@ -490,14 +494,16 @@ export function mocapShadow(p: MocapShadowParts): CreatureRig {
   const fwd = new THREE.Vector3();
   let lookW = 0;
   let claw = 0.4;
+  let armW = 0;
 
   const choose = (s: string): void => {
     switch (s) {
       case 'chase': {
-        // 進む速さに合わせて、足を運ぶ速さを変える（足が滑らないように）
-        const sp = THREE.MathUtils.clamp(speed / player.clipSpeed('zombie_walk'), 0.6, 2.4);
-        player.play('zombie_walk', { fade: 0.35, speed: sp });
+        // 脚はふつうの歩き（歩幅と進む速さを合わせ、足が滑らないように）。腕は前へ突き出す（下で重ねる）
+        const sp = THREE.MathUtils.clamp(speed / player.clipSpeed('walk'), 0.3, 1.8);
+        player.play('walk', { fade: 0.35, speed: sp });
         player.setSpeed(sp);
+        p.arms?.play('zombie_walk', { speed: sp * 0.8 });
         break;
       }
       case 'windup':
@@ -536,6 +542,15 @@ export function mocapShadow(p: MocapShadowParts): CreatureRig {
       speed = damp(speed, dt > 0 ? moved / dt : 0, 6, dt);
       choose(state);
       player.update(dt);
+      // 歩くときだけ、腕を前へ突き出した形を重ねる（ほかの動きへは、なめらかに戻す）
+      if (p.arms) {
+        armW = damp(armW, state === 'chase' ? 1 : 0, state === 'chase' ? 3 : 6, dt);
+        if (armW > 0.01) {
+          const saved = ARM_BONES.map((b) => h.bones[b].quaternion.clone());
+          p.arms.update(dt);
+          ARM_BONES.forEach((b, i) => h.bones[b].quaternion.copy(saved[i].slerp(h.bones[b].quaternion, armW)));
+        }
+      }
 
       // 首でこちらを追う（体の動きの上に重ねる）。跳んでいる間・倒れる間は弱く
       const wantLook = state === 'dying' ? 0 : state === 'lunge' || state === 'hurt' ? 0.3 : 0.85;

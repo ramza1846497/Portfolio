@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { AudioEngine, SfxName } from '../engine/audio';
+import type { AudioEngine, SfxName, VoiceName } from '../engine/audio';
 import type { Player } from '../engine/player';
 import type { Combat, DemoPose } from './combat';
 
@@ -34,6 +34,8 @@ export interface MovieApi {
   wait(seconds: number): Promise<void>;
   tween(seconds: number, fn: (k: number) => void): Promise<void>;
   sfx(name: SfxName): void;
+  /** 録音した声を鳴らす */
+  voice(name: VoiceName): void;
   shake(power?: number): void;
   /** プレイヤーの立ち位置 */
   readonly player: { x: number; z: number };
@@ -203,6 +205,9 @@ export class Movie {
       tween: (s, fn) => self.tween(s, fn),
       sfx(name) {
         if (!self.skipping) audio.play(name);
+      },
+      voice(name) {
+        if (!self.skipping) audio.voice(name);
       },
       shake(power = 1) {
         if (!self.skipping) self.shakePower = Math.max(self.shakePower, power);

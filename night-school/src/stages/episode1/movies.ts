@@ -7,38 +7,44 @@ import { OZ } from './floor1';
  * 敵は動き終わった場所から、そのまま戦闘に入る。
  */
 
-/** 影：身構える → 目の前まで飛びかかってくる → 着地して前のめりに崩れる（隙） */
+/** 影：両腕を伸ばして詰め寄る → 振りかぶって溜める → 目の前で振り下ろす（届かない） → 体勢を崩す（隙） */
 const shadow: MovieScript = async (m) => {
   const e = m.enemy('shadow1');
   const p = m.player;
   e.face(p.x, p.z);
   m.look(e, 0.85, 4);
   void m.zoom(52, 1.0);
+  m.voice('whisper0');
   await m.wait(0.9);
 
-  // 予兆
-  m.sfx('growl');
-  e.pose('windup');
-  await m.wait(0.75);
-
-  // 飛びかかり：目の前で止まる
-  e.pose('none');
+  // 詰め寄る：手前で止まる（振り下ろしが届かない距離）
   const r = e.root.position;
   const dx = p.x - r.x;
   const dz = p.z - r.z;
   const d = Math.max(Math.hypot(dx, dz), 1e-3);
-  const stop = Math.max(0, d - 2.1);
-  m.sfx('dodge');
-  m.look(e, 0.85, 9);
-  void m.zoom(64, 0.3);
-  await e.move(r.x + (dx / d) * stop, r.z + (dz / d) * stop, 0.3, 'in');
-  m.shake(0.5);
+  const stop = Math.max(0, d - 2.3);
+  e.pose('chase');
+  await e.move(r.x + (dx / d) * stop * 0.7, r.z + (dz / d) * stop * 0.7, 1.4, 'inOut');
 
-  // 着地の隙：前のめりに崩れて、しばらく動かない
-  await m.tween(0.2, (k) => (e.root.rotation.x = 0.4 * k));
-  await m.wait(1.0);
-  m.sfx('growl');
-  await m.tween(0.35, (k) => (e.root.rotation.x = 0.4 * (1 - k)));
+  // 予兆：両腕を振りかぶって溜める
+  m.voice('croak');
+  e.pose('windup');
+  await m.wait(0.75);
+
+  // 振り下ろし：半歩踏み込む。目の前の空を切る
+  e.pose('lunge');
+  m.voice('strike');
+  m.look(e, 0.85, 9);
+  void m.zoom(62, 0.3);
+  const r2 = e.root.position;
+  await e.move(r2.x + (dx / d) * stop * 0.3, r2.z + (dz / d) * stop * 0.3, 0.38, 'in');
+  m.shake(0.4);
+
+  // 振り下ろしたあとの隙：腕を下ろしたまま、しばらく動けない
+  e.pose('recover');
+  await m.wait(1.1);
+  m.voice('croak_long');
+  e.pose('none');
   void m.zoom(70, 0.6);
   await m.wait(0.4);
 };

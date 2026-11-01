@@ -66,10 +66,19 @@ tools/mocap_bake.py で人体モデルの骨へ移して使っています。
 | ゲームの中の動き | 元の動き |
 |---|---|
 | 影の子ども：待つ | 91_26 HurtStomachWalk（はじめの立ち姿） |
-| 影の子ども：追う（両腕を前へ） | 104_41 ZombieWalk |
+| 影の子ども：追う（脚は 35_01 walk、両腕を前へは 104_41 ZombieWalk） | 35_01, 104_41 |
 | 影の子ども：振りかぶる・振り下ろす | 79_01 chopping wood |
 | （予備）跳ぶ | 16_05 forward jump |
 | 影の子ども：ひるむ | 22_12 A stumbles into B |
 | 影の子ども：倒れる | 90_16 fall on face |
 | 二宮金次郎像：歩く | 104_03 Frankenstein male walk |
 | （予備）忍び足 | 77_29 creeping walk |
+
+## 声（public/audio）
+
+影の子どもの声は、Open JTalk の HTS 音声「mei」
+（[MMDAgent](http://www.mmdagent.jp/)、Copyright (c) 2009-2013 Nagoya Institute of Technology、
+[CC BY 3.0](https://creativecommons.org/licenses/by/3.0/)）で言葉を読ませ、
+tools/voice_bake.py でささやき声・喉を鳴らす声などに加工して使っています。
+
+普通に歩く動き（影の子どもが歩くときの脚）は CMU の 35_01 walk です。

@@ -1301,7 +1301,7 @@ function shadowChildHuman(seed: number): THREE.Group {
       const axis = dir.clone().cross(palm).normalize();
       fingers.push({ bone: h.bones[`fingers_${sd}`], axis, k: 1 }, { bone: h.bones[`fingertips_${sd}`], axis, k: 1.3 });
     }
-    g.userData.rig = mocapShadow({ root: g, h, player: new MocapPlayer(h), fingers, extra });
+    g.userData.rig = mocapShadow({ root: g, h, player: new MocapPlayer(h), arms: new MocapPlayer(h, ['clavicle_L', 'clavicle_R', 'upperarm_L', 'upperarm_R', 'lowerarm_L', 'lowerarm_R', 'hand_L', 'hand_R']), fingers, extra });
   } else {
     g.userData.rig = shadowCreature({
       root: g,

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { AudioEngine } from '../engine/audio';
+import type { AudioEngine , VoiceName } from '../engine/audio';
 import type { Box2, CollisionWorld } from '../engine/collision';
 import type { Player } from '../engine/player';
 import type { Hud } from '../ui/hud';
@@ -41,10 +41,12 @@ interface Enemy {
   mark: THREE.Sprite;
   /** 振り下ろしの当たりを、もう調べたか */
   halfStruck?: boolean;
+  /** 次にささやくまでの秒数 */
+  talk?: number;
 }
 
 /** ムービーで見せる敵の様子 */
-export type DemoPose = 'none' | 'windup' | 'stun' | 'rage';
+export type DemoPose = 'none' | 'chase' | 'windup' | 'lunge' | 'recover' | 'stun' | 'rage';
 
 export interface CombatHost {
   state: GameState;
@@ -278,6 +280,7 @@ export class Combat {
       if (e.state !== 'windup' && e.state !== 'lunge') {
         e.knock.set(nx * 3.5, nz * 3.5);
         e.state = 'hurt';
+        this.voice(e, 'whimper');
         e.timer = 0.3;
       }
     } else if (e.state !== 'stun') {
@@ -289,6 +292,7 @@ export class Combat {
     }
     if (e.hp <= 0) {
       e.state = 'dying';
+      if (e.def.kind === 'shadow') this.voice(e, 'death');
       e.timer = 0.7;
       e.body.enabled = false;
       this.host.audio.play('vanish');
@@ -365,14 +369,20 @@ export class Combat {
         if (d < 12) e.state = 'chase';
         break;
       case 'chase':
-        // 両腕を前へ伸ばして、ゆっくり詰めてくる
+        // 両腕を前へ伸ばして、ゆっくり詰めてくる。ときどき、ささやく
         this.face(e, dx, dz);
-        if (d > 1.35) this.moveEnemy(e, (dx / d) * 1.5 * dt, (dz / d) * 1.5 * dt);
+        e.talk = (e.talk ?? 1.5) - dt;
+        if (e.talk <= 0) {
+          e.talk = 3 + Math.random() * 4;
+          const lines = ['whisper0', 'whisper1', 'whisper2', 'whisper3', 'whisper4', 'whisper5', 'giggle', 'croak_long'] as const;
+          this.voice(e, lines[Math.floor(Math.random() * lines.length)]);
+        }
+        if (d > 1.35) this.moveEnemy(e, (dx / d) * 1.15 * dt, (dz / d) * 1.15 * dt);
         if (d < 1.8 && e.cooldown <= 0) {
           // 溜め：両腕を高く振りかぶる（「！」も説明も出さない。動きで見せる）
           e.state = 'windup';
           e.timer = 0.75;
-          this.host.audio.play('growl');
+          this.voice(e, 'croak');
         }
         break;
       case 'windup':
@@ -382,6 +392,7 @@ export class Combat {
           e.state = 'lunge';
           e.timer = 0.38;
           e.halfStruck = false;
+          this.voice(e, 'strike');
           e.dir.set(dx / Math.max(d, 1e-3), dz / Math.max(d, 1e-3));
         }
         break;
@@ -527,6 +538,18 @@ export class Combat {
       default:
         e.state = 'chase';
     }
+  }
+
+  /** 敵の声：向きで左右に振り分け、遠いほど小さく。毎回少しだけ高さを変える */
+  private voice(e: Enemy, name: VoiceName): void {
+    const p = this.host.player.pos;
+    const dx = e.root.position.x - p.x;
+    const dz = e.root.position.z - p.z;
+    const d = Math.hypot(dx, dz);
+    const yaw = this.host.player.yaw;
+    // 右手方向（画面の右）を +1 に
+    const right = (dx * Math.cos(yaw) - dz * Math.sin(yaw)) / Math.max(d, 1e-3);
+    this.host.audio.voice(name, { pan: right * 0.7, gain: Math.min(1.2, 2.2 / Math.max(d, 1)), rate: 0.94 + Math.random() * 0.12 });
   }
 
   private hurtPlayer(amount: number, nx: number, nz: number): void {
