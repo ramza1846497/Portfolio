@@ -1224,7 +1224,8 @@ function attachHair(h: Human, figure: THREE.Object3D, color: number, style: Hair
 function shadowChildHuman(seed: number): THREE.Group {
   const rand = rng(seed);
   const g = new THREE.Group();
-  const skin = humanSkin('creature');
+  // 白い肌は懐中電灯で白く飛びやすいので、少し落とす
+  const skin = humanSkin('creature', 0xa4a4ac);
   const rag = humanCloth('shroud');
   // 服の裾：すねの途中で、ぎざぎざに裂けている
   const hem = (p: THREE.Vector3) => p.y > 0.42 + 0.08 * Math.abs(Math.sin(p.x * 61 + p.z * 37) * Math.sin(p.x * 23 - p.z * 11));
