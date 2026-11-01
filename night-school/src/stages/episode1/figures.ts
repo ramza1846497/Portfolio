@@ -385,49 +385,6 @@ function mergeByMaterial(container: THREE.Object3D, keep: Set<THREE.Object3D> = 
 }
 
 /**
- * 影の材質：ほとんど黒く、少しだけ光を返す（体の丸みの陰影が見える程度）。
- * 面を斜めから見る所（輪郭）ほど薄くして、縁をぼかす
- */
-function shadowMaterial(): THREE.MeshLambertMaterial {
-  // つや（鏡のような反射）のない材質で、明るさは体の丸みの陰影だけにする
-  const m = new THREE.MeshLambertMaterial({ color: 0x0c0c10, transparent: true, side: THREE.FrontSide });
-  m.onBeforeCompile = (shader) => {
-    shader.fragmentShader = shader.fragmentShader.replace(
-      '#include <opaque_fragment>',
-      `{
-        vec3 Vv = normalize(vViewPosition);
-        float facing = abs(dot(normalize(normal), Vv));
-        // 輪郭（横から見る面）ほど透ける
-        diffuseColor.a *= smoothstep(0.0, 0.55, facing) * 0.92;
-      }
-      #include <opaque_fragment>`,
-    );
-  };
-  m.customProgramCacheKey = () => 'shadowfade';
-  // 戦闘で光らせるために材質が複製されても、縁のぼかしが外れないように
-  const base = m.clone.bind(m);
-  m.clone = () => {
-    const c = base();
-    c.onBeforeCompile = m.onBeforeCompile;
-    c.customProgramCacheKey = m.customProgramCacheKey;
-    c.clone = m.clone;
-    return c;
-  };
-  return m;
-}
-
-/** 影の少女のスカート：腰から下をひざ上の丈に詰め、すそを広げる */
-function shadowSkirt(p: THREE.Vector3): void {
-  const waist = 1.25 * 0.58;
-  if (p.y >= waist) return;
-  const d = waist - p.y;
-  p.y = waist - d * 0.42;
-  const f = 1 + d * 0.9;
-  p.x *= f;
-  p.z *= f;
-}
-
-/**
  * 半透明の人物を、いちばん手前の面だけ透けて見えるようにする。
  * 先に奥行きだけを書く（色は書かない）複製を描いておくと、体の奥の部品（後ろ髪・背中の肩ひもなど）が
  * 顔や服ごしに透けて見えなくなる。
@@ -1153,6 +1110,81 @@ function humanCloth(style: 'rag' | 'shroud' | 'blouse' | 'skirt' | 'plain', colo
   return m;
 }
 
+let redEyeTex: { map: THREE.Texture; glow: THREE.Texture } | null = null;
+
+/** 赤い目の絵：充血した白目、黒い縁どりの赤い瞳、小さな黒い瞳孔（球の +z が瞳の中心） */
+function redEyeTextures(): { map: THREE.Texture; glow: THREE.Texture } {
+  if (redEyeTex) return redEyeTex;
+  const W = 256;
+  const H = 128;
+  const draw = (glowOnly: boolean) => {
+    const c = document.createElement('canvas');
+    c.width = W;
+    c.height = H;
+    const ctx = c.getContext('2d')!;
+    ctx.fillStyle = glowOnly ? '#000' : '#d8c4c0';
+    ctx.fillRect(0, 0, W, H);
+    const cx = W * 0.25;
+    const cy = H * 0.5;
+    if (!glowOnly) {
+      // 充血：瞳へ向かう細い赤い血管
+      const rand = rng(5);
+      ctx.strokeStyle = 'rgba(150,20,20,0.6)';
+      for (let i = 0; i < 60; i++) {
+        const a = rand() * Math.PI * 2;
+        let x = cx + Math.cos(a) * W * 0.24;
+        let y = cy + Math.sin(a) * H * 0.45;
+        ctx.lineWidth = 0.6 + rand();
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        for (let k = 0; k < 6; k++) {
+          x += (cx - x) * 0.15 + (rand() - 0.5) * 6;
+          y += (cy - y) * 0.15 + (rand() - 0.5) * 6;
+          ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+    }
+    // 瞳：黒い縁、赤い虹彩、黒い瞳孔
+    const rx = W * 0.095;
+    const ry = H * 0.19;
+    ctx.fillStyle = glowOnly ? '#000' : '#100406';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx * 1.15, ry * 1.15, 0, 0, Math.PI * 2);
+    ctx.fill();
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rx);
+    g.addColorStop(0, glowOnly ? '#ff5030' : '#ff3a20');
+    g.addColorStop(0.6, glowOnly ? '#c01808' : '#c01410');
+    g.addColorStop(1, glowOnly ? '#300000' : '#500406');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx * 0.3, ry * 0.3, 0, 0, Math.PI * 2);
+    ctx.fill();
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  };
+  redEyeTex = { map: draw(false), glow: draw(true) };
+  return redEyeTex;
+}
+
+/** 頭の骨に、赤く光る目玉を入れる（元の目の位置と大きさで） */
+function addRedEyes(h: Human): void {
+  const { map, glow } = redEyeTextures();
+  const mat = new THREE.MeshStandardMaterial({ map, emissiveMap: glow, emissive: 0xffffff, emissiveIntensity: 0.9, roughness: 0.12, metalness: 0 });
+  for (const e of h.eyes) {
+    const ball = new THREE.Mesh(new THREE.SphereGeometry(h.eyeRadius * 0.98, 20, 14), mat);
+    ball.position.copy(e);
+    // 少し上目づかいに、こちらを見上げる
+    ball.rotation.x = -0.15;
+    h.bones.head.add(ball);
+  }
+}
+
 /** 人体の骨を、化け物の動き（creature.ts）の関節名に対応させる。L は体の右（-x 側）＝ MakeHuman の _R */
 function creatureJoints(h: Human): Record<string, THREE.Object3D> {
   const b = h.bones;
@@ -1196,60 +1228,44 @@ function attachHair(h: Human, figure: THREE.Object3D, color: number, style: Hair
 function shadowChildHuman(seed: number): THREE.Group {
   const rand = rng(seed);
   const g = new THREE.Group();
-  // 全身が影でできた少女：ほとんど黒く、輪郭へ行くほど薄れてぼやける。体の丸みの陰影だけがかすかに見える
-  const shade = shadowMaterial();
-  const h = makeHuman('child', {
+  // 白い肌は懐中電灯で白く飛びやすいので、少し落とす
+  const skin = humanSkin('creature', 0xa4a4ac);
+  const rag = humanCloth('shroud');
+  // 服の裾：すねの途中で、ぎざぎざに裂けている
+  const hem = (p: THREE.Vector3) => p.y > 0.42 + 0.08 * Math.abs(Math.sin(p.x * 61 + p.z * 37) * Math.sin(p.x * 23 - p.z * 11));
+  const h = makeHuman('creature', {
     parts: [
-      { material: shade, prims: ['body_head', 'body_upperarm', 'body_forearm', 'body_hand', 'body_thigh', 'body_shin', 'body_foot'] },
-      // 服の形（上着とスカート）で、少女の輪郭にする
-      { material: shade, prims: ['tights_torso', 'tights_upperarm'] },
-      { material: shade, prims: ['skirt'], shape: shadowSkirt },
+      // 破れた服の穴から、やせた胴の肌がのぞく
+      { material: skin, prims: ['body_head', 'body_torso', 'body_upperarm', 'body_forearm', 'body_hand', 'body_thigh', 'body_shin', 'body_foot'] },
+      { material: rag, prims: ['tights_torso', 'skirt'], cut: hem },
     ],
-  }, 'shadowGirl');
-  skinnedDepthPrepass(h.root);
+  }, 'shadow');
+  addRedEyes(h);
   g.add(h.root);
-  // 肩にかかる長さの黒髪（重さで揺れる）
-  const r0 = h.skull.radius;
-  const c0 = h.skull.center;
-  attachHair(h, g, 0x050506, {
-    cards: 60,
-    width: 0.05,
-    len: (th) => (Math.cos(th) > 0.55 ? 0.1 : 0.26),
-    cut: (th) => (Math.cos(th) > 0.55 ? c0.y + 0.15 * r0 : -Infinity),
-    rootHold: 2,
-    inertia: 0.75,
-    stiff: 6,
-    falloff: 1.5,
-    seed: seed + 5,
-  }, 1, undefined, true);
-  // 体のまわりの黒いもや：骨に沿って、ぼんやりした黒い丸を重ねる（輪郭をにじませる）
-  const hazeMat = new THREE.SpriteMaterial({ map: softTexture(), color: 0x000000, transparent: true, opacity: 0.32, depthWrite: false });
-  const haze: { s: THREE.Sprite; base: number; ph: number }[] = [];
-  const hazeOn: [string, number, number][] = [
-    ['head', 0.32, 0.08],
-    ['neck', 0.26, 0],
-    ['chest', 0.42, 0],
-    ['spine', 0.4, 0],
-    ['hips', 0.46, -0.05],
-    ['upperarm_L', 0.22, -0.1],
-    ['upperarm_R', 0.22, -0.1],
-    ['lowerarm_L', 0.2, -0.1],
-    ['lowerarm_R', 0.2, -0.1],
-    ['hand_L', 0.16, -0.03],
-    ['hand_R', 0.16, -0.03],
-    ['upperleg_L', 0.26, -0.15],
-    ['upperleg_R', 0.26, -0.15],
-    ['lowerleg_L', 0.22, -0.15],
-    ['lowerleg_R', 0.22, -0.15],
-  ];
-  for (const [bone, size, dy] of hazeOn) {
-    const m = hazeMat.clone();
-    const sp = new THREE.Sprite(m);
-    sp.position.set(0, dy, 0);
-    sp.scale.setScalar(size);
-    h.bones[bone].add(sp);
-    haze.push({ s: sp, base: size, ph: rand() * 10 });
+  // 落ちくぼんだ黒い目の奥で、赤い光
+  const glow = new THREE.SpriteMaterial({ map: softTexture(), color: 0xff2a14, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+  const glows: THREE.Sprite[] = [];
+  for (const e of h.eyes) {
+    const s = new THREE.Sprite(glow);
+    s.position.copy(e).add(V(0, 0, 0.012));
+    s.scale.setScalar(0.05);
+    h.bones.head.add(s);
+    glows.push(s);
   }
+  // 顔の前まで垂れる、濡れた長い黒髪（分け目から、ひび割れた顔と赤い目がのぞく）。重さで垂れ、体にはめり込まない
+  attachHair(h, g, 0x0a0a0c, {
+    cards: 72,
+    width: 0.05,
+    len: (th) => (Math.cos(th) > 0.55 ? 0.24 : 0.48),
+    part: [-0.95, 0.5],
+    // 分け目からも、細い毛束が数本だけ顔の前に垂れる
+    faceStrands: 9,
+    rootHold: 2,
+    inertia: 0.8,
+    stiff: 3,
+    falloff: 3,
+    seed: seed + 5,
+  }, 1, { guides: 220, strands: 7000, clump: 0.55, widthPx: 1.8 });
   // 足もとから立ちのぼる黒い煙
   const smokeMat = new THREE.SpriteMaterial({ map: softTexture(), color: 0x000000, transparent: true, opacity: 0.5, depthWrite: false });
   const smoke: { s: THREE.Sprite; m: THREE.SpriteMaterial; a: number; r: number; o: number }[] = [];
@@ -1265,11 +1281,9 @@ function shadowChildHuman(seed: number): THREE.Group {
   const side = (s: -1 | 1) => (s < 0 ? 'R' : 'L');
   const extra = (_dt: number, _state: string, time: number) => {
     const t = time + ph;
-    // もやがゆっくり脈打つ
-    for (const hz of haze) {
-      const k = 1 + 0.12 * Math.sin(t * 1.7 + hz.ph) + 0.06 * Math.sin(t * 4.3 + hz.ph * 2);
-      hz.s.scale.setScalar(hz.base * k);
-    }
+    // 赤い目のまわりの、かすかなにじみ（瞳が見えるよう小さく）
+    const gl = 0.022 + 0.005 * Math.sin(t * 9) + 0.003 * Math.sin(t * 23);
+    for (const s of glows) s.scale.setScalar(gl);
     for (const p of smoke) {
       const life = (t * 0.35 + p.o) % 1;
       const a = p.a + t * 0.3;
