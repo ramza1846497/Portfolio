@@ -39,6 +39,8 @@ interface Enemy {
   knock: THREE.Vector2;
   /** 攻撃の予兆：頭の上に出る「！」 */
   mark: THREE.Sprite;
+  /** 振り下ろしの当たりを、もう調べたか */
+  halfStruck?: boolean;
 }
 
 /** ムービーで見せる敵の様子 */
@@ -340,11 +342,12 @@ export class Combat {
     else this.ninomiyaAI(e, dt);
 
     // 予兆の「！」
-    e.mark.visible = e.state === 'windup';
+    // 影の子どもは「！」を出さない（振りかぶる動きが予兆）
+    e.mark.visible = e.state === 'windup' && e.def.kind !== 'shadow';
     if (e.mark.visible) e.mark.scale.setScalar(0.42 + Math.max(0, e.timer) * 0.25);
     // 光り方：被弾は白、身構えは赤く脈打つ
     if (e.flash > 0) this.setGlow(e, 0xffffff, 0.9);
-    else if (e.state === 'windup' || (e.state === 'charge' && e.timer > 0)) this.setGlow(e, 0xff2010, 0.5 + 0.5 * Math.sin(performance.now() * 0.03));
+    else if ((e.state === 'windup' && e.def.kind !== 'shadow') || (e.state === 'charge' && e.timer > 0)) this.setGlow(e, 0xff2010, 0.5 + 0.5 * Math.sin(performance.now() * 0.03));
     else if (e.state === 'stun') this.setGlow(e, 0x4060ff, 0.35);
     else this.setGlow(e, 0x000000, 0);
     this.syncBody(e);
@@ -362,35 +365,46 @@ export class Combat {
         if (d < 12) e.state = 'chase';
         break;
       case 'chase':
+        // 両腕を前へ伸ばして、ゆっくり詰めてくる
         this.face(e, dx, dz);
-        if (d > 1.7) this.moveEnemy(e, (dx / d) * 1.9 * dt, (dz / d) * 1.9 * dt);
-        if (d < 2.0 && e.cooldown <= 0) {
+        if (d > 1.35) this.moveEnemy(e, (dx / d) * 1.5 * dt, (dz / d) * 1.5 * dt);
+        if (d < 1.8 && e.cooldown <= 0) {
+          // 溜め：両腕を高く振りかぶる（「！」も説明も出さない。動きで見せる）
           e.state = 'windup';
-          e.timer = 0.6;
+          e.timer = 0.75;
           this.host.audio.play('growl');
-          this.hint('windup');
         }
         break;
       case 'windup':
+        // 振りかぶっている間も、こちらへ向き直る
         this.face(e, dx, dz);
         if (e.timer <= 0) {
           e.state = 'lunge';
-          e.timer = 0.24;
+          e.timer = 0.38;
+          e.halfStruck = false;
           e.dir.set(dx / Math.max(d, 1e-3), dz / Math.max(d, 1e-3));
         }
         break;
-      case 'lunge':
-        this.moveEnemy(e, e.dir.x * 7 * dt, e.dir.y * 7 * dt);
-        if (d < 1.0) this.hurtPlayer(12, e.dir.x, e.dir.y);
+      case 'lunge': {
+        // 振り下ろし：半歩踏み込みながら。腕が下りきる所で当たる（下がる・横へよければ空振り）
+        this.moveEnemy(e, e.dir.x * 1.6 * dt, e.dir.y * 1.6 * dt);
+        if (!e.halfStruck && e.timer < 0.22) {
+          e.halfStruck = true;
+          const front = (dx * e.dir.x + dz * e.dir.y) / Math.max(d, 1e-3);
+          if (d < 1.75 && front > 0.55) this.hurtPlayer(14, e.dir.x, e.dir.y);
+          this.host.shake();
+        }
         if (e.timer <= 0) {
+          // 振り下ろしたあとは、しばらく体勢を立て直せない（反撃の好機）
           e.state = 'recover';
-          e.timer = 0.8;
+          e.timer = 0.95;
         }
         break;
+      }
       case 'recover':
         if (e.timer <= 0) {
           e.state = 'chase';
-          e.cooldown = 0.6 + Math.random() * 0.6;
+          e.cooldown = 0.8 + Math.random() * 0.8;
         }
         break;
       case 'hurt':
@@ -520,7 +534,6 @@ export class Combat {
     this.iframe = IFRAME_HURT;
     this.host.player.push(nx * 0.9, nz * 0.9);
     this.host.damage(amount);
-    this.hint('hurt');
   }
 
   private moveEnemy(e: Enemy, dx: number, dz: number): void {
@@ -592,11 +605,11 @@ export class Combat {
     for (const [id, d] of this.demo) {
       const e = this.enemies.find((x) => x.def.id === id)!;
       d.flash = Math.max(0, d.flash - dt);
-      e.mark.visible = d.pose === 'windup';
+      e.mark.visible = d.pose === 'windup' && e.def.kind !== 'shadow';
       if (e.mark.visible) e.mark.scale.setScalar(0.42 + 0.06 * Math.sin(now * 0.02));
       e.root.rotation.z = d.pose === 'stun' && !e.root.userData.rig ? Math.sin(now * 0.02) * 0.08 : 0;
       if (d.flash > 0) this.setGlow(e, 0xffffff, 0.9);
-      else if (d.pose === 'windup') this.setGlow(e, 0xff2010, 0.5 + 0.5 * Math.sin(now * 0.03));
+      else if (d.pose === 'windup' && e.def.kind !== 'shadow') this.setGlow(e, 0xff2010, 0.5 + 0.5 * Math.sin(now * 0.03));
       else if (d.pose === 'rage') this.setGlow(e, 0xff3010, 0.55 + 0.3 * Math.sin(now * 0.05));
       else if (d.pose === 'stun') this.setGlow(e, 0x4060ff, 0.35);
       else this.setGlow(e, 0x000000, 0);

@@ -26,7 +26,7 @@ export const combat: StagePart = {
     {
       id: 'n_shadow',
       title: '影の子ども',
-      body: '子どもくらいの背丈の、煙のような影。赤い目が二つ。\n体が赤く光ると、飛びかかってくる。竹刀で何度か叩くと、ほどけて消えた。',
+      body: '女の子くらいの背丈の、真っ黒な影。おかっぱ頭に、スカート。\n竹刀で何度か叩くと、ほどけて消えた。',
     },
   ],
   interactables: [
@@ -115,7 +115,6 @@ export const tutorials: StageDef['tutorials'] = {
     pc: ['<b>F キー</b>（またはクリック）で、竹刀を振る', '<b>Shift キー</b>で、すばやく身をかわす（WASD で向きを決める。押していなければ後ろへ）'],
     common: [
       '竹刀が当たるのは、正面の、竹刀一本ぶんの距離まで',
-      '敵の頭に<b>「！」</b>が出たら、攻撃してくる合図',
       '回避した直後は、少しのあいだ攻撃を受けない',
       '攻撃を受けると体力が減る。0 になると気絶する',
     ],
@@ -125,7 +124,6 @@ export const tutorials: StageDef['tutorials'] = {
 /** 戦闘中に一度だけ出すヒント */
 export const combatHints: StageDef['combatHints'] = {
   windup: '「！」── 回避',
-  hurt: '「！」が出たら回避',
   hit: '当たった！',
   stun: '動けない ── 今だ！',
   charge: '突進 ── 横へ回避',

@@ -66,8 +66,9 @@ tools/mocap_bake.py で人体モデルの骨へ移して使っています。
 | ゲームの中の動き | 元の動き |
 |---|---|
 | 影の子ども：待つ | 91_26 HurtStomachWalk（はじめの立ち姿） |
-| 影の子ども：追う | 104_41 ZombieWalk |
-| 影の子ども：身構え・飛びかかり・着地 | 16_05 forward jump |
+| 影の子ども：追う（両腕を前へ） | 104_41 ZombieWalk |
+| 影の子ども：振りかぶる・振り下ろす | 79_01 chopping wood |
+| （予備）跳ぶ | 16_05 forward jump |
 | 影の子ども：ひるむ | 22_12 A stumbles into B |
 | 影の子ども：倒れる | 90_16 fall on face |
 | 二宮金次郎像：歩く | 104_03 Frankenstein male walk |

@@ -501,14 +501,15 @@ export function mocapShadow(p: MocapShadowParts): CreatureRig {
         break;
       }
       case 'windup':
-        player.play('jump_crouch', { fade: 0.2, speed: 0.9 });
+        // 両腕を頭の上へ振りかぶり、そこで止めて溜める
+        player.play('chop_raise', { fade: 0.2, speed: 0.85 });
         break;
       case 'lunge':
-        player.play('jump_leap', { fade: 0.08, speed: 1.8 });
+        player.play('chop_strike', { fade: 0.06, speed: 1.0 });
         break;
       case 'recover':
-        if (player.current === 'jump_leap' || player.current === 'jump_land') player.play('jump_land', { fade: 0.15 });
-        if (player.current === 'jump_land' && player.finished()) player.play('hunch_idle', { fade: 0.5 });
+        if (player.current === 'chop_strike' || player.current === 'chop_recover') player.play('chop_recover', { fade: 0.1, speed: 0.75 });
+        if (player.current === 'chop_recover' && player.finished()) player.play('hunch_idle', { fade: 0.5 });
         break;
       case 'hurt':
       case 'stun':
@@ -564,7 +565,7 @@ export function mocapShadow(p: MocapShadowParts): CreatureRig {
       const roll = tilt.update(dt) * (state === 'chase' || state === 'idle' || state === 'none' ? 1 : 0.4);
       head.quaternion.multiply(tmpQ.setFromAxisAngle(new THREE.Vector3(0, 0, 1), roll));
       // 指：鉤爪のように曲げ、ゆっくり握ったり開いたり。跳ぶときは大きく開く
-      const wantClaw = state === 'lunge' ? -0.2 : state === 'windup' ? 0.9 : 0.45 + 0.25 * Math.sin(t * 1.3);
+      const wantClaw = state === 'lunge' ? 0.9 : state === 'windup' ? 0.2 : 0.45 + 0.25 * Math.sin(t * 1.3);
       claw = damp(claw, wantClaw, 4, dt);
       for (const f of p.fingers) f.bone.quaternion.setFromAxisAngle(f.axis, claw * f.k);
       p.extra?.(dt, state, t, speed);

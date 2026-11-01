@@ -53,6 +53,9 @@ CLIPS = [
     ('stumble', '22_12', 0.2, 1.3, False, 'face'),
     ('fall_face', '90_16', 2.2, 4.4, False, 'face'),
     ('stiff_walk', '104_03', 3.0, 6.0, True, 'travel'),
+    ('chop_raise', '79_01', 0.3, 0.92, False, 'face'),
+    ('chop_strike', '79_01', 0.92, 1.3, False, 'face'),
+    ('chop_recover', '79_01', 1.3, 2.0, False, 'face'),
 ]
 
 
